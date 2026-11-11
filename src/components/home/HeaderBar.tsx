@@ -6,6 +6,7 @@ import { SettingsMinimalisticIcon } from '@solar-icons/react-native/bold/setting
 import { ImpactStyle, triggerImpact } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { GlassSurface } from '../glass/GlassSurface';
 
 interface HeaderBarProps {
   onOpenSettings: () => void;
@@ -61,22 +62,38 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           onPress={handleToggleTheme}
           scaleTo={0.9}
           accessibilityLabel="Toggle theme mode"
-          contentStyle={[styles.iconButton, { backgroundColor: iconBtnBg }]}
         >
-          {isDark ? (
-            <Sun2Icon size={18} color="#FFFFFF" />
-          ) : (
-            <MoonIcon size={18} color="#000000" />
-          )}
+          <GlassSurface
+            borderRadius={19}
+            glassStyle="regular"
+            interactive
+            intensity={45}
+            matteColor={iconBtnBg}
+            style={styles.iconButton}
+          >
+            {isDark ? (
+              <Sun2Icon size={18} color="#FFFFFF" />
+            ) : (
+              <MoonIcon size={18} color="#000000" />
+            )}
+          </GlassSurface>
         </AnimatedPressable>
 
         <AnimatedPressable
           onPress={handleSettings}
           scaleTo={0.9}
           accessibilityLabel="Open settings"
-          contentStyle={[styles.iconButton, { backgroundColor: iconBtnBg }]}
         >
-          <SettingsMinimalisticIcon size={18} color={textColor} />
+          <GlassSurface
+            borderRadius={19}
+            glassStyle="regular"
+            interactive
+            intensity={45}
+            matteColor={iconBtnBg}
+            style={styles.iconButton}
+          >
+            <SettingsMinimalisticIcon size={18} color={textColor} />
+          </GlassSurface>
         </AnimatedPressable>
       </View>
     </View>

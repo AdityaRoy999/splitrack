@@ -15,6 +15,7 @@ import {
 import { Aurora } from '../effects/Aurora';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassPill } from '../glass/GlassPill';
+import { GlassSurface } from '../glass/GlassSurface';
 import { AddUpiProfileModal } from './AddUpiProfileModal';
 import { UpiQrModal } from './UpiQrModal';
 
@@ -158,22 +159,24 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
         },
       ]}
     >
-      <View style={[styles.upiCardGradient, { backgroundColor: cardBaseBg }]}>
+      <GlassSurface
+        borderRadius={24}
+        glassStyle="regular"
+        matteColor={cardBaseBg}
+        style={styles.upiCardGradient}
+      >
         <Aurora
           colorStops={auroraStops}
-          amplitude={1.05}
-          blend={0.55}
-          height={isCardProfile ? 0.85 : 0.72}
+          amplitude={1.08}
+          blend={0.58}
+          height={isCardProfile ? 0.85 : 0.74}
           speed={0.9}
-          glow={0.65}
+          glow={0.68}
           layers={2}
           direction="bottom"
-          opacity={isCardProfile ? (isDark ? 0.82 : 0.62) : isDark ? 0.72 : 0.56}
+          opacity={isCardProfile ? (isDark ? 0.88 : 0.72) : isDark ? 0.82 : 0.68}
           lightMode={!isDark}
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: cardBaseBg, borderRadius: 24 },
-          ]}
+          style={{ borderRadius: 24 }}
         />
 
         {/* Full-card tap layer (expands stack or collapses default card) */}
@@ -182,6 +185,8 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
           accessibilityLabel={`${acc.title} card`}
           style={StyleSheet.absoluteFill}
         />
+
+        <View style={styles.upiCardInner} pointerEvents="box-none">
 
         {/* Card Top Header */}
         <View style={styles.cardTopRow} pointerEvents="box-none">
@@ -352,7 +357,8 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
             )}
           </View>
         </Animated.View>
-      </View>
+        </View>
+      </GlassSurface>
     </Animated.View>
   );
 };
@@ -561,12 +567,16 @@ const styles = StyleSheet.create({
   upiCardGradient: {
     flex: 1,
     borderRadius: 24,
-    padding: 18,
-    justifyContent: 'space-between',
+    padding: 0,
     overflow: 'hidden',
     borderWidth: 0,
     shadowOpacity: 0,
     elevation: 0,
+  },
+  upiCardInner: {
+    flex: 1,
+    padding: 18,
+    justifyContent: 'space-between',
   },
   cardTopRow: {
     flexDirection: 'row',

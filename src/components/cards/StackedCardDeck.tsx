@@ -7,6 +7,7 @@ import {
   Animated,
 } from 'react-native';
 import { Aurora } from '../effects/Aurora';
+import { GlassSurface } from '../glass/GlassSurface';
 import { triggerImpact, triggerNotification, ImpactStyle, NotificationType } from '../../utils/haptics';
 import { CopyIcon } from '@solar-icons/react-native/bold/copy';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
@@ -130,28 +131,26 @@ export const StackedCardDeck: React.FC<{
                 }}
                 style={{ flex: 1 }}
               >
-                <View
-                  style={[
-                    styles.cardGradient,
-                    { backgroundColor: '#111114', overflow: 'hidden' },
-                  ]}
+                <GlassSurface
+                  borderRadius={24}
+                  glassStyle="regular"
+                  matteColor="#111114"
+                  style={styles.cardGradient}
                 >
                   <Aurora
                     colorStops={auroraStops}
-                    amplitude={1}
+                    amplitude={1.05}
                     blend={0.55}
-                    height={0.65}
+                    height={0.68}
                     speed={0.9}
                     glow={0.6}
                     layers={2}
                     direction="bottom"
-                    opacity={0.7}
+                    opacity={0.78}
                     lightMode={false}
-                    style={[
-                      StyleSheet.absoluteFill,
-                      { backgroundColor: '#111114', borderRadius: 24 },
-                    ]}
+                    style={{ borderRadius: 24 }}
                   />
+                  <View style={styles.cardInner}>
                   {/* Top Row: Cardholder & VISA */}
                   <View style={styles.cardTopRow}>
                     <View>
@@ -214,7 +213,8 @@ export const StackedCardDeck: React.FC<{
                       </TouchableOpacity>
                     )}
                   </View>
-                </View>
+                  </View>
+                </GlassSurface>
               </TouchableOpacity>
             </Animated.View>
           );
@@ -269,12 +269,16 @@ const styles = StyleSheet.create({
   cardGradient: {
     height: CARD_HEIGHT,
     borderRadius: 24,
-    padding: 18,
-    justifyContent: 'space-between',
+    padding: 0,
     overflow: 'hidden',
     borderWidth: 0, // completely borderless
     shadowOpacity: 0,
     elevation: 0,
+  },
+  cardInner: {
+    flex: 1,
+    padding: 18,
+    justifyContent: 'space-between',
   },
   cardTopRow: {
     flexDirection: 'row',

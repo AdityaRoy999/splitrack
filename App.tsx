@@ -23,6 +23,7 @@ import { SplitTrackProvider, useSplitTrack } from './src/store/SplitTrackStore';
 import { renderSolarIcon } from './src/constants/solarIconsCatalog';
 
 // Glass & Modern Nav Components
+import { Aurora } from './src/components/effects/Aurora';
 import { GlassDock, TabKey } from './src/components/glass/GlassDock';
 import { GlassCard } from './src/components/glass/GlassCard';
 import { GlassPill } from './src/components/glass/GlassPill';
@@ -67,7 +68,7 @@ function getLedgerIcon(
 
 function MainAppContent() {
   const insets = useSafeAreaInsets();
-  const { palette, themeMode, formatAmount } = useLiquidGlass();
+  const { palette, themeMode, formatAmount, isLiquidGlassEnabled } = useLiquidGlass();
   const {
     totalIncome,
     totalExpenses,
@@ -746,9 +747,54 @@ function MainAppContent() {
     </ScrollView>
   );
 
+  const rootBg = isLiquidGlassEnabled
+    ? isDark
+      ? '#05050A'
+      : '#E8EDF6'
+    : palette.background;
+
   return (
-    <View style={[styles.container, { backgroundColor: palette.background, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: rootBg, paddingTop: insets.top }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+
+      {isLiquidGlassEnabled && (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <Aurora
+            colorStops={
+              isDark
+                ? ['#3B28CC', '#0EA5E9', '#10B981']
+                : ['#8B5CF6', '#38BDF8', '#34D399']
+            }
+            amplitude={0.85}
+            blend={0.65}
+            height={0.48}
+            speed={0.5}
+            glow={0.85}
+            layers={2}
+            direction="top"
+            intro={false}
+            opacity={isDark ? 0.28 : 0.32}
+            lightMode={!isDark}
+          />
+          <Aurora
+            colorStops={
+              isDark
+                ? ['#6366F1', '#06B6D4', '#4F46E5']
+                : ['#60A5FA', '#A78BFA', '#6EE7B7']
+            }
+            amplitude={0.8}
+            blend={0.65}
+            height={0.38}
+            speed={0.4}
+            glow={0.8}
+            layers={1}
+            direction="bottom"
+            intro={false}
+            opacity={isDark ? 0.22 : 0.24}
+            lightMode={!isDark}
+          />
+        </View>
+      )}
 
       {currentTab === 'home' && renderHomeTab()}
       {currentTab === 'expenses' && renderExpensesTab()}

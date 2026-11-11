@@ -11,6 +11,7 @@ import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { currencies } from '../../theme/colors';
 import { GlassPill } from '../glass/GlassPill';
+import { GlassSurface } from '../glass/GlassSurface';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 
 interface HeroBalanceCardProps {
@@ -25,7 +26,15 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
   onOpenTrips,
 }) => {
   const { totalBalance, monthlyExpenses, netFriendBalance } = useSplitTrack();
-  const { formatAmount, hideAmounts, toggleHideAmounts, themeMode, currency, setCurrency } = useLiquidGlass();
+  const {
+    formatAmount,
+    hideAmounts,
+    toggleHideAmounts,
+    themeMode,
+    currency,
+    setCurrency,
+    isLiquidGlassEnabled,
+  } = useLiquidGlass();
 
   const isDark = themeMode === 'dark';
   const [hideAnim] = useState(() => new Animated.Value(hideAmounts ? 1 : 0));
@@ -78,32 +87,30 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
 
   return (
     <View style={styles.container}>
-      <View
-        style={[
-          styles.heroCard,
-          { backgroundColor: isDark ? '#111114' : '#FFFFFF' },
-        ]}
+      <GlassSurface
+        borderRadius={24}
+        glassStyle="regular"
+        matteColor={isDark ? '#111114' : '#FFFFFF'}
+        style={styles.heroCard}
       >
         <Aurora
           colorStops={['#5227FF', '#7cff67', '#5227FF']}
-          amplitude={1}
-          blend={0.5}
-          height={0.55}
+          amplitude={1.05}
+          blend={0.55}
+          height={0.58}
           speed={1}
-          glow={0.6}
-          opacity={isDark ? 0.68 : 0.55}
+          glow={0.65}
+          layers={2}
+          opacity={isDark ? 0.85 : 0.72}
           lightMode={!isDark}
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: isDark ? '#111114' : '#FFFFFF', borderRadius: 24 },
-          ]}
+          style={{ borderRadius: 24 }}
         />
         {/* Foreground Card Content */}
         <View style={styles.cardContent}>
           {/* Top Header: Net Balance + Eye Toggle */}
           <View style={styles.topRow}>
             <View style={styles.balanceHeaderGroup}>
-              <Text style={[styles.balanceLabel, { color: isDark ? '#A1A1AA' : '#52525B' }]}>
+              <Text style={[styles.balanceLabel, { color: isDark ? 'rgba(255,255,255,0.86)' : '#18181B' }]}>
                 Net Balance
               </Text>
               <AnimatedPressable
@@ -127,7 +134,15 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
               scaleTo={0.94}
               contentStyle={[
                 styles.currencyPill,
-                { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(24, 24, 27, 0.06)' },
+                {
+                  backgroundColor: isLiquidGlassEnabled
+                    ? isDark
+                      ? 'rgba(255, 255, 255, 0.16)'
+                      : 'rgba(255, 255, 255, 0.56)'
+                    : isDark
+                      ? 'rgba(255, 255, 255, 0.1)'
+                      : 'rgba(24, 24, 27, 0.06)',
+                },
               ]}
             >
               <Text style={[styles.currencyPillText, { color: isDark ? '#FFFFFF' : '#18181B' }]}>
@@ -174,10 +189,18 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
             <View
               style={[
                 styles.summaryBadge,
-                { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(24, 24, 27, 0.06)' },
+                {
+                  backgroundColor: isLiquidGlassEnabled
+                    ? isDark
+                      ? 'rgba(12, 14, 20, 0.56)'
+                      : 'rgba(255, 255, 255, 0.78)'
+                    : isDark
+                      ? 'rgba(12, 14, 20, 0.52)'
+                      : 'rgba(255, 255, 255, 0.72)',
+                },
               ]}
             >
-              <Text style={[styles.summaryText, { color: isDark ? '#E4E4E7' : '#27272A' }]}>
+              <Text style={[styles.summaryText, { color: isDark ? '#F4F4F5' : '#18181B' }]}>
                 Spent {formatAmount(monthlyExpenses)} this month
               </Text>
             </View>
@@ -185,7 +208,15 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
             <View
               style={[
                 styles.summaryBadge,
-                { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(24, 24, 27, 0.06)' },
+                {
+                  backgroundColor: isLiquidGlassEnabled
+                    ? isDark
+                      ? 'rgba(12, 14, 20, 0.56)'
+                      : 'rgba(255, 255, 255, 0.78)'
+                    : isDark
+                      ? 'rgba(12, 14, 20, 0.52)'
+                      : 'rgba(255, 255, 255, 0.72)',
+                },
               ]}
             >
               <Text
@@ -195,10 +226,12 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
                     color:
                       netFriendBalance === 0
                         ? isDark
-                          ? '#A1A1AA'
+                          ? '#D4D4D8'
                           : '#52525B'
                         : netFriendBalance > 0
-                          ? '#10B981'
+                          ? isDark
+                            ? '#34D399'
+                            : '#059669'
                           : '#EF4444',
                   },
                 ]}
@@ -237,7 +270,7 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
             />
           </View>
         </View>
-      </View>
+      </GlassSurface>
     </View>
   );
 };

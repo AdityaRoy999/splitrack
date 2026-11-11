@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home2Icon } from '@solar-icons/react-native/bold/home-2';
 import { BillListIcon } from '@solar-icons/react-native/bold/bill-list';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
@@ -16,6 +17,7 @@ import { UsersGroupTwoRoundedIcon } from '@solar-icons/react-native/bold/users-g
 import { PieChart2Icon } from '@solar-icons/react-native/bold/pie-chart-2';
 import { ImpactStyle, triggerImpact } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
+import { GlassSurface } from './GlassSurface';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -69,8 +71,8 @@ const DockTabButton: React.FC<{
         ? '#FFFFFF'
         : '#09090B'
       : isDark
-        ? '#8E8E93'
-        : '#71717A';
+        ? '#A1A1AA'
+        : '#64748B';
 
   return (
     <TouchableOpacity
@@ -108,14 +110,16 @@ const DockTabButton: React.FC<{
 
 /**
  * Floating pill capsule navbar with animated sliding active pill across sections.
+ * Supports true iOS 26 Liquid Glass / BlurView translucency when Liquid Glass is active.
  */
 export const GlassDock: React.FC<GlassDockProps> = ({
   currentTab,
   onTabChange,
   onQuickAdd,
 }) => {
+  const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const capsuleWidth = Math.min(windowWidth - 28, 396);
@@ -199,16 +203,25 @@ export const GlassDock: React.FC<GlassDockProps> = ({
     }
   };
 
+  const bottomOffset = Math.max(16, insets.bottom - 8);
+  const activePillBg = isLiquidGlassEnabled
+    ? isDark
+      ? 'rgba(255, 255, 255, 0.16)'
+      : 'rgba(15, 23, 42, 0.08)'
+    : isDark
+      ? '#23232A'
+      : '#EFEFF5';
+
   return (
-    <View style={styles.outerContainer} pointerEvents="box-none">
-      <View
-        style={[
-          styles.navbarCapsule,
-          {
-            width: capsuleWidth,
-            backgroundColor: isDark ? '#141418' : '#FFFFFF',
-          },
-        ]}
+    <View style={[styles.outerContainer, { bottom: bottomOffset }]} pointerEvents="box-none">
+      <GlassSurface
+        borderRadius={999}
+        glassStyle="regular"
+        interactive
+        intensity={isDark ? 65 : 85}
+        tintColor={isDark ? 'rgba(22, 22, 28, 0.65)' : 'rgba(255, 255, 255, 0.72)'}
+        matteColor={isDark ? '#141418' : '#FFFFFF'}
+        style={[styles.navbarCapsule, { width: capsuleWidth }]}
       >
         <View style={styles.navRow} onLayout={handleRowLayout}>
           {/* Sliding active section pill indicator */}
@@ -218,7 +231,7 @@ export const GlassDock: React.FC<GlassDockProps> = ({
               styles.activeSliderPill,
               {
                 width: slotWidth,
-                backgroundColor: isDark ? '#23232A' : '#EFEFF5',
+                backgroundColor: activePillBg,
                 transform: [{ translateX: slideX }, { scaleX: stretchX }],
               },
             ]}
@@ -234,7 +247,7 @@ export const GlassDock: React.FC<GlassDockProps> = ({
             />
           ))}
         </View>
-      </View>
+      </GlassSurface>
     </View>
   );
 };

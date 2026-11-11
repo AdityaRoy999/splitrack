@@ -3,6 +3,7 @@ import { Text, StyleSheet, ViewStyle, TextStyle, View } from 'react-native';
 import { triggerImpact, ImpactStyle } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { GlassSurface } from './GlassSurface';
 
 interface GlassPillProps {
   label?: string;
@@ -25,7 +26,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
   textStyle,
   active = false,
 }) => {
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const handlePress = () => {
@@ -50,7 +51,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
       case 'glass':
       default:
         return {
-          backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
+          backgroundColor: isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(255, 255, 255, 0.65)',
         };
     }
   };
@@ -67,18 +68,10 @@ export const GlassPill: React.FC<GlassPillProps> = ({
     lg: { paddingVertical: 12, paddingHorizontal: 22, height: 48 },
   }[size];
 
-  return (
-    <AnimatedPressable
-      scaleTo={0.95}
-      onPress={handlePress}
-      style={style}
-      contentStyle={[
-        styles.base,
-        getContainerStyle(),
-        sizePadding,
-        active && { backgroundColor: isDark ? '#FFFFFF' : '#000000' },
-      ]}
-    >
+  const useTranslucentGlass = isLiquidGlassEnabled && (variant === 'glass' || variant === 'dark') && !active;
+
+  const innerContent = (
+    <>
       {icon && <View style={[styles.iconContainer, label ? { marginRight: 6 } : undefined]}>{icon}</View>}
       {label ? (
         <Text
@@ -92,17 +85,62 @@ export const GlassPill: React.FC<GlassPillProps> = ({
           {label}
         </Text>
       ) : null}
+    </>
+  );
+
+  return (
+    <AnimatedPressable
+      scaleTo={0.95}
+      onPress={handlePress}
+      style={style}
+      contentStyle={
+        useTranslucentGlass
+          ? styles.glassPressReset
+          : [
+              styles.base,
+              getContainerStyle(),
+              sizePadding,
+              active && { backgroundColor: isDark ? '#FFFFFF' : '#000000' },
+            ]
+      }
+    >
+      {useTranslucentGlass ? (
+        <GlassSurface
+          borderRadius={999}
+          glassStyle="clear"
+          interactive
+          intensity={36}
+          tintColor={
+            variant === 'dark'
+              ? isDark
+                ? 'rgba(32, 32, 40, 0.56)'
+                : 'rgba(255, 255, 255, 0.54)'
+              : isDark
+                ? 'rgba(255, 255, 255, 0.16)'
+                : 'rgba(255, 255, 255, 0.45)'
+          }
+          style={[styles.base, sizePadding]}
+        >
+          {innerContent}
+        </GlassSurface>
+      ) : (
+        innerContent
+      )}
     </AnimatedPressable>
   );
 };
 
 const styles = StyleSheet.create({
+  glassPressReset: {
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
   base: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 999,
-    borderWidth: 0, // completely borderless
+    borderWidth: 0,
   },
   iconContainer: {
     alignItems: 'center',

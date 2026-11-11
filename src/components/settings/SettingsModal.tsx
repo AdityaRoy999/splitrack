@@ -12,10 +12,12 @@ import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { MoonIcon } from '@solar-icons/react-native/bold/moon';
 import { Sun2Icon } from '@solar-icons/react-native/bold/sun-2';
 import { RefreshCircleIcon } from '@solar-icons/react-native/bold/refresh-circle';
+import { Sparkles, Square } from 'lucide-react-native';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
+import { GlassSurface } from '../glass/GlassSurface';
 import { CurrencyCode, ThemeMode } from '../../types';
 
 interface SettingsModalProps {
@@ -40,8 +42,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
   const isDark = themeMode === 'dark';
 
   const bgSheet = isDark ? '#0C0C0E' : '#F4F4F8';
-  const cardBg = isDark ? '#141418' : '#FFFFFF';
-  const chipBg = isDark ? '#1C1C22' : '#EFEFF4';
+  const cardBg = isLiquidGlassEnabled
+    ? isDark
+      ? 'rgba(28, 28, 36, 0.55)'
+      : 'rgba(255, 255, 255, 0.72)'
+    : isDark
+      ? '#141418'
+      : '#FFFFFF';
+  const chipBg = isLiquidGlassEnabled
+    ? isDark
+      ? 'rgba(255, 255, 255, 0.08)'
+      : 'rgba(15, 23, 42, 0.06)'
+    : isDark
+      ? '#1C1C22'
+      : '#EFEFF4';
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
@@ -70,6 +84,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
     },
   ];
 
+  const surfaceItems = [
+    {
+      value: 'glass',
+      label: 'Liquid Glass',
+      icon: (
+        <Sparkles
+          size={14}
+          color={isLiquidGlassEnabled ? activeText : mutedText}
+        />
+      ),
+    },
+    {
+      value: 'matte',
+      label: 'Matte Surface',
+      icon: (
+        <Square
+          size={14}
+          color={!isLiquidGlassEnabled ? activeText : mutedText}
+        />
+      ),
+    },
+  ];
+
   const currencyItems = [
     { value: 'INR', label: '₹ INR' },
     { value: 'USD', label: '$ USD' },
@@ -85,7 +122,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={[styles.sheetContainer, { backgroundColor: bgSheet }]}>
+        <GlassSurface
+          borderRadius={28}
+          glassStyle="regular"
+          intensity={isDark ? 72 : 88}
+          tintColor={isDark ? 'rgba(16, 16, 22, 0.72)' : 'rgba(246, 248, 252, 0.78)'}
+          matteColor={bgSheet}
+          style={styles.sheetContainer}
+        >
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: textColor }]}>Settings & Display</Text>
             <TouchableOpacity
@@ -97,7 +141,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
           </View>
 
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            {/* Theme Selector using rounded JellyRadio */}
+            {/* Theme, Surface Style (Liquid Glass vs Matte), and Currency */}
             <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
               <Text style={[styles.sectionHeader, { color: mutedText }]}>THEME</Text>
               <JellyRadio
@@ -112,6 +156,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
                 gap={8}
                 radius={999}
               />
+
+              <Text style={[styles.sectionHeader, { color: mutedText, marginTop: 16 }]}>
+                SURFACE STYLE
+              </Text>
+              <JellyRadio
+                items={surfaceItems}
+                value={isLiquidGlassEnabled ? 'glass' : 'matte'}
+                onChange={(val) => setIsLiquidGlassEnabled(val === 'glass')}
+                chipColor={chipBg}
+                activeColor={activeBg}
+                textColor={textColor}
+                activeTextColor={activeText}
+                size="md"
+                gap={8}
+                radius={999}
+              />
+              <Text style={[styles.surfaceCaption, { color: mutedText }]}>
+                {isLiquidGlassEnabled
+                  ? 'Translucent iOS Liquid Glass cards, floating dock & ambient refraction'
+                  : 'Clean solid matte cards & opaque controls'}
+              </Text>
 
               <Text style={[styles.sectionHeader, { color: mutedText, marginTop: 16 }]}>
                 CURRENCY
@@ -137,22 +202,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
               <View style={styles.checkList}>
                 <View style={[styles.checkRow, { backgroundColor: chipBg }]}>
                   <SpringCheck
-                    label="Smooth Surface Contrast"
-                    checked={isLiquidGlassEnabled}
-                    onChange={(checked) => setIsLiquidGlassEnabled(checked)}
-                    color={textColor}
-                    fillColor={activeBg}
-                    checkColor={activeText}
-                    boxSize={22}
-                    boxRadius={999}
-                    fontSize={14}
-                    strike="none"
-                    doneOpacity={1}
-                  />
-                </View>
-
-                <View style={[styles.checkRow, { backgroundColor: chipBg }]}>
-                  <SpringCheck
                     label="Hide Balances & Amounts"
                     checked={hideAmounts}
                     onChange={() => toggleHideAmounts()}
@@ -172,14 +221,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
             {/* Reset Data Button */}
             <TouchableOpacity
               onPress={resetDemoData}
-              style={[styles.resetBtn, { backgroundColor: isDark ? '#1C1414' : '#FEE2E2' }]}
+              style={[styles.resetBtn, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.14)' : '#FEE2E2' }]}
               activeOpacity={0.7}
             >
               <RefreshCircleIcon size={18} color="#EF4444" />
               <Text style={styles.resetBtnText}>Restore Default Sample Expenses</Text>
             </TouchableOpacity>
           </ScrollView>
-        </View>
+        </GlassSurface>
       </View>
     </Modal>
   );
@@ -197,17 +246,19 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingTop: 20,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    paddingTop: 18,
     paddingHorizontal: 18,
-    paddingBottom: 36,
-    maxHeight: '88%',
+    paddingBottom: 24,
+    maxHeight: '90%',
     borderWidth: 0,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   title: {
     fontSize: 19,
@@ -223,8 +274,8 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   scrollContent: {
-    gap: 14,
-    paddingBottom: 16,
+    gap: 12,
+    paddingBottom: 12,
   },
   sectionCard: {
     borderRadius: 22,
@@ -236,6 +287,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 0.9,
     marginBottom: 10,
+  },
+  surfaceCaption: {
+    fontSize: 11,
+    fontWeight: '400',
+    marginTop: 8,
+    lineHeight: 15,
   },
   checkList: {
     gap: 8,

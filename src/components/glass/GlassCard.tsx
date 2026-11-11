@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
+import { StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { getGlassStyles } from '../../theme/colors';
+import { GlassSurface } from './GlassSurface';
 
 interface GlassCardProps {
   children: React.ReactNode;
@@ -13,11 +14,13 @@ interface GlassCardProps {
 
 /**
  * Unified 100% Borderless, Shadowless Card Container across the entire app.
- * Renders clean elevated matte surfaces with zero background blur bleed-through.
+ * Renders native iOS Liquid Glass / BlurView translucency when Liquid Glass is active,
+ * or crisp elevated matte surfaces when Liquid Glass is disabled.
  */
 export const GlassCard: React.FC<GlassCardProps> = ({
   children,
   style,
+  intensity,
   borderRadius = 24,
   overflow = 'hidden',
 }) => {
@@ -25,16 +28,19 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   const glassStyles = getGlassStyles(isLiquidGlassEnabled, themeMode);
 
   return (
-    <View
+    <GlassSurface
+      borderRadius={borderRadius}
+      intensity={intensity}
+      glassStyle="regular"
+      matteColor={glassStyles.card.backgroundColor}
       style={[
         styles.baseCard,
-        glassStyles.card,
-        { borderRadius, overflow },
+        { overflow },
         style,
       ]}
     >
       {children}
-    </View>
+    </GlassSurface>
   );
 };
 

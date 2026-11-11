@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -12,6 +12,7 @@ import {
 import { triggerSelection } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { GlassSurface } from './GlassSurface';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -29,9 +30,9 @@ interface SpotlightCardProps {
 }
 
 /**
- * Clean borderless double-layer surface card with subtle matte tonal separation,
- * optional full-bleed faded backdrop cover photo that highlights on tap while
- * fading inner details, and zero outer glow or borders.
+ * Clean borderless double-layer surface card with subtle tonal or Liquid Glass separation,
+ * full-bleed faded backdrop cover photo that highlights on tap while fading inner details,
+ * and zero outer glow or borders.
  */
 export const SpotlightCard: React.FC<SpotlightCardProps> = ({
   children,
@@ -44,7 +45,7 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
   panelStyle,
   borderRadius = 24,
 }) => {
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const [isHighlighted, setIsHighlighted] = useState(false);
@@ -76,7 +77,7 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
 
   const scrimOpacity = highlightAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [isDark ? 0.72 : 0.78, 0],
+    outputRange: [isDark ? 0.64 : 0.68, 0],
   });
 
   const detailsOpacity = highlightAnim.interpolate({
@@ -91,19 +92,38 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
 
   const innerRadius = Math.max(14, borderRadius - 6);
 
+  // Extract justifyContent / minHeight from panelStyle without adding padding onto the
+  // positioned backdrop container (percentage sizes + padding on iOS Yoga shrink backdrop images).
+  const flattenedPanel = useMemo(() => StyleSheet.flatten(panelStyle) || {}, [panelStyle]);
+  const {
+    padding: _p,
+    paddingHorizontal: _ph,
+    paddingVertical: _pv,
+    paddingTop: _pt,
+    paddingBottom: _pb,
+    paddingLeft: _pl,
+    paddingRight: _pr,
+    justifyContent,
+    ...panelBoxRest
+  } = flattenedPanel;
+
   const innerPanelContent = (
     <View
       style={[
         styles.innerPanel,
         {
-          backgroundColor: innerBg,
+          backgroundColor: isLiquidGlassEnabled
+            ? isDark
+              ? 'rgba(255, 255, 255, 0.05)'
+              : 'rgba(15, 23, 42, 0.04)'
+            : innerBg,
           borderRadius: innerRadius,
         },
-        panelStyle,
+        panelBoxRest,
       ]}
     >
       {coverImageUri ? (
-        <>
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: innerRadius, overflow: 'hidden' }]}>
           <Animated.Image
             source={{ uri: coverImageUri }}
             resizeMode="cover"
@@ -114,7 +134,6 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
             ]}
           />
           <Animated.View
-            pointerEvents="none"
             style={[
               StyleSheet.absoluteFill,
               {
@@ -123,12 +142,16 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
               },
             ]}
           />
-        </>
+        </View>
       ) : null}
 
       <Animated.View
         pointerEvents={isHighlighted ? 'none' : 'box-none'}
-        style={[styles.panelContent, { opacity: detailsOpacity }]}
+        style={[
+          styles.panelContent,
+          justifyContent ? { justifyContent } : null,
+          { opacity: detailsOpacity },
+        ]}
       >
         {children}
       </Animated.View>
@@ -140,7 +163,7 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
       onPress={handleToggleHighlight}
       accessibilityRole="button"
       accessibilityLabel={isHighlighted ? 'Restore trip card details' : 'Highlight trip cover photo'}
-      style={{ borderRadius: innerRadius, overflow: 'hidden' }}
+      style={[styles.innerPressWrap, { borderRadius: innerRadius }]}
     >
       {innerPanelContent}
     </Pressable>
@@ -158,19 +181,15 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
     ) : null;
 
   const cardInner = (
-    <View
-      style={[
-        styles.outerCard,
-        {
-          backgroundColor: outerBg,
-          borderRadius,
-        },
-        style,
-      ]}
+    <GlassSurface
+      borderRadius={borderRadius}
+      glassStyle="regular"
+      matteColor={outerBg}
+      style={[styles.outerCard, style]}
     >
       {wrappedInnerPanel}
       {wrappedFooter}
-    </View>
+    </GlassSurface>
   );
 
   if (onPress && !canToggleCover) {
@@ -195,21 +214,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
   },
+  innerPressWrap: {
+    width: '100%',
+    overflow: 'hidden',
+  },
   innerPanel: {
     width: '100%',
-    padding: 16,
+    padding: 0,
     borderWidth: 0,
     position: 'relative',
     overflow: 'hidden',
   },
   backdropImage: {
-    width: '100%',
-    height: '100%',
     borderWidth: 0,
   },
   panelContent: {
+    flexGrow: 1,
+    padding: 16,
     position: 'relative',
     zIndex: 2,
+    justifyContent: 'space-between',
   },
   footerSlot: {
     paddingTop: 12,

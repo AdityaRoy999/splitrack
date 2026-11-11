@@ -84,10 +84,13 @@ export const getGlassStyles = (isLiquidGlass: boolean, theme: ThemeMode) => {
   const isDark = theme === 'dark';
   const palette = themePalettes[theme];
 
-  // Unified opaque React-Bits card styling across the app (no leaky background blur)
   const elevatedSurface = isDark
-    ? (isLiquidGlass ? '#141418' : '#111114')
-    : '#FFFFFF';
+    ? isLiquidGlass
+      ? 'rgba(22, 22, 28, 0.58)'
+      : '#111114'
+    : isLiquidGlass
+      ? 'rgba(255, 255, 255, 0.68)'
+      : '#FFFFFF';
 
   return {
     card: {
@@ -105,7 +108,13 @@ export const getGlassStyles = (isLiquidGlass: boolean, theme: ThemeMode) => {
       height: 0,
     },
     dock: {
-      backgroundColor: isDark ? '#111115' : '#FFFFFF',
+      backgroundColor: isDark
+        ? isLiquidGlass
+          ? 'rgba(22, 22, 28, 0.65)'
+          : '#141418'
+        : isLiquidGlass
+          ? 'rgba(255, 255, 255, 0.72)'
+          : '#FFFFFF',
       borderColor: 'transparent',
       borderWidth: 0,
       shadowColor: 'transparent',

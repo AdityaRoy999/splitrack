@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, TouchableOpacity, ViewStyle, StyleProp } from 'react-native';
+import { Animated, Platform, TouchableOpacity, ViewStyle, StyleProp } from 'react-native';
+import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 
 interface AnimatedPressableProps {
   children: React.ReactNode;
@@ -70,6 +71,7 @@ export const FadeInSlide: React.FC<FadeInSlideProps> = ({
   offsetY = 8,
   style,
 }) => {
+  const { isLiquidGlassEnabled } = useLiquidGlass();
   const [anim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
@@ -95,8 +97,18 @@ export const FadeInSlide: React.FC<FadeInSlideProps> = ({
     outputRange: [offsetY, 0],
   });
 
+  // Never animate container opacity below 1 when native iOS GlassView is active
+  const avoidOpacityForNativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
+
   return (
-    <Animated.View style={[style, { opacity: anim, transform: [{ translateY }] }]}>
+    <Animated.View
+      style={[
+        style,
+        avoidOpacityForNativeGlass
+          ? { transform: [{ translateY }] }
+          : { opacity: anim, transform: [{ translateY }] },
+      ]}
+    >
       {children}
     </Animated.View>
   );
