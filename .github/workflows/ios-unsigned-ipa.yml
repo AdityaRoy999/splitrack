@@ -1,0 +1,86 @@
+name: Build Unsigned iOS IPA
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-unsigned-ios:
+    name: Build Unsigned iOS (.ipa)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Generate native iOS project (Expo Prebuild)
+        env:
+          CI: '1'
+        run: npx expo prebuild --platform ios --no-install
+
+      - name: Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install --repo-update
+
+      - name: Build unsigned iOS Release app
+        run: |
+          set -euo pipefail
+          WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" | head -n 1)
+          if [ -z "$WORKSPACE" ]; then
+            echo "Error: No .xcworkspace generated inside ios/"
+            ls -la ios
+            exit 1
+          fi
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          echo "Using workspace=$WORKSPACE scheme=$SCHEME"
+
+          xcodebuild build \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
+
+      - name: Package .app into unsigned .ipa
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find ios/build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: .app bundle not found in ios/build/Build/Products/Release-iphoneos"
+            find ios/build -maxdepth 4 || true
+            exit 1
+          fi
+
+          rm -rf build-ipa Splittrack-unsigned.ipa
+          mkdir -p build-ipa/Payload
+          ditto "$APP_PATH" "build-ipa/Payload/$(basename "$APP_PATH")"
+          (cd build-ipa && zip -qry ../Splittrack-unsigned.ipa Payload)
+
+          ls -lh Splittrack-unsigned.ipa
+          shasum -a 256 Splittrack-unsigned.ipa | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload unsigned IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Splittrack-unsigned-ipa
+          path: Splittrack-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
