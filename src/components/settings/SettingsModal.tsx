@@ -12,7 +12,7 @@ import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { MoonIcon } from '@solar-icons/react-native/bold/moon';
 import { Sun2Icon } from '@solar-icons/react-native/bold/sun-2';
 import { RefreshCircleIcon } from '@solar-icons/react-native/bold/refresh-circle';
-import { Sparkles, Square } from 'lucide-react-native';
+import { LogOut, Sparkles, Square } from 'lucide-react-native';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { JellyRadio } from '../common/JellyRadio';
@@ -22,9 +22,14 @@ import { CurrencyCode, ThemeMode } from '../../types';
 interface SettingsModalProps {
   visible: boolean;
   onClose: () => void;
+  onSignOut?: () => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  visible,
+  onClose,
+  onSignOut,
+}) => {
   const {
     isLiquidGlassEnabled,
     setIsLiquidGlassEnabled,
@@ -234,6 +239,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
               <RefreshCircleIcon size={18} color="#EF4444" />
               <Text style={styles.resetBtnText}>Restore Default Sample Expenses</Text>
             </TouchableOpacity>
+
+            {onSignOut && (
+              <TouchableOpacity
+                onPress={() => {
+                  onClose();
+                  onSignOut();
+                }}
+                style={[styles.resetBtn, { backgroundColor: chipBg }]}
+                activeOpacity={0.7}
+              >
+                <LogOut size={16} color={textColor} />
+                <Text style={[styles.resetBtnText, { color: textColor }]}>
+                  Sign Out to Onboarding
+                </Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </View>
       </View>

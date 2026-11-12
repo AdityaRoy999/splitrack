@@ -3,7 +3,6 @@ import {
   Animated,
   Easing,
   Image,
-  PixelRatio,
   Platform,
   StyleSheet,
   Text,
@@ -20,6 +19,15 @@ interface PreloaderSplashProps {
   targetLogoNodeRef?: React.RefObject<ViewRefNode | null>;
   onRevealHeaderLogo?: () => void;
   onFinish: () => void;
+}
+
+interface FlightSpec {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  startCornerRadius: number;
+  endCornerRadius: number;
 }
 
 const HERO_ICON_SIZE = 112;
@@ -42,12 +50,16 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
   const [textWidth, setTextWidth] = useState(156);
   const [showWordmark, setShowWordmark] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const [flightSpec, setFlightSpec] = useState<FlightSpec | null>(null);
 
   const [introOpacity] = useState(() => new Animated.Value(0));
   const [iconScale] = useState(() => new Animated.Value(0.8));
   const [iconTranslateX] = useState(() => new Animated.Value((ICON_TEXT_GAP + 156) / 2));
-  const [iconTranslateY] = useState(() => new Animated.Value(0));
   const [cornerProgress] = useState(() => new Animated.Value(0));
+  const [flightTranslateX] = useState(() => new Animated.Value(0));
+  const [flightTranslateY] = useState(() => new Animated.Value(0));
+  const [flightScale] = useState(() => new Animated.Value(1));
+  const [flightCornerProgress] = useState(() => new Animated.Value(0));
   const [wordmarkOpacity] = useState(() => new Animated.Value(1));
   const [wordmarkTranslateX] = useState(() => new Animated.Value(0));
   const [backdropOpacity] = useState(() => new Animated.Value(1));
@@ -64,6 +76,7 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
   const targetLogoRectRef = useRef(targetLogoRect);
   const lockupShiftStartedRef = useRef(false);
   const exitedRef = useRef(false);
+  const flightStartedRef = useRef(false);
   const revealRef = useRef(onRevealHeaderLogo);
   const finishRef = useRef(onFinish);
 
@@ -94,122 +107,184 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
     });
   }, []);
 
-  const startFlightAnimation = useCallback(
-    (slotRect: HeaderLogoRect, measuredTarget: HeaderLogoRect | null) => {
-      const overlay = overlayRectRef.current;
+  const prepareTargetAnchoredFlight = useCallback(
+    (
+      liveOverlay: HeaderLogoRect,
+      slotRect: HeaderLogoRect,
+      measuredTarget: HeaderLogoRect | null
+    ) => {
+      const target =
+        measuredTarget && measuredTarget.width > 0 && measuredTarget.height > 0
+          ? measuredTarget
+          : targetLogoRectRef.current && targetLogoRectRef.current.width > 0
+            ? targetLogoRectRef.current
+            : {
+                x:
+                  liveOverlay.x +
+                  Math.max(0, (liveOverlay.width - 480) / 2) +
+                  16,
+                y: liveOverlay.y + 54,
+                width: HEADER_ICON_SIZE,
+                height: HEADER_ICON_SIZE,
+              };
+
       const slotCenterX = slotRect.x + slotRect.width / 2;
       const slotCenterY = slotRect.y + slotRect.height / 2;
+      const targetCenterX = target.x + target.width / 2;
+      const targetCenterY = target.y + target.height / 2;
 
-      const target = measuredTarget || targetLogoRectRef.current;
-      const hasMeasuredTarget = Boolean(target && target.width > 0 && target.height > 0);
-      const targetCenterX = hasMeasuredTarget
-        ? target!.x + target!.width / 2
-        : overlay.x + Math.max(0, (overlay.width - 480) / 2) + 16 + HEADER_ICON_SIZE / 2;
-      const targetCenterY = hasMeasuredTarget
-        ? target!.y + target!.height / 2
-        : overlay.y + 54 + HEADER_ICON_SIZE / 2;
-      const endScale =
-        (hasMeasuredTarget ? target!.width : HEADER_ICON_SIZE) / HERO_ICON_SIZE;
+      // Pin flyer at exact target (left, top, width, height) so t=1 settles at translate(0, 0) & scale(1)
+      flightTranslateX.setValue(slotCenterX - targetCenterX);
+      flightTranslateY.setValue(slotCenterY - targetCenterY);
+      flightScale.setValue(SHRUNK_ICON_SIZE / target.width);
+      flightCornerProgress.setValue(0);
 
-      const flyDeltaX = PixelRatio.roundToNearestPixel(targetCenterX - slotCenterX);
-      const flyDeltaY = PixelRatio.roundToNearestPixel(targetCenterY - slotCenterY);
-
-      Animated.parallel([
-        Animated.timing(wordmarkOpacity, {
-          toValue: 0,
-          duration: 210,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(wordmarkTranslateX, {
-          toValue: -10,
-          duration: 210,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 0,
-          duration: 460,
-          delay: 40,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(iconTranslateX, {
-          toValue: flyDeltaX,
-          duration: 540,
-          easing: Easing.bezier(0.22, 1, 0.36, 1),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(iconTranslateY, {
-          toValue: flyDeltaY,
-          duration: 540,
-          easing: Easing.bezier(0.22, 1, 0.36, 1),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(iconScale, {
-          toValue: endScale,
-          duration: 540,
-          easing: Easing.bezier(0.22, 1, 0.36, 1),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(cornerProgress, {
-          toValue: 1,
-          duration: 520,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }),
-      ]).start(() => {
-        revealRef.current?.();
-        // Wait two frames so the header avatar renders underneath at 100% opacity, then swap atomically
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            finishRef.current();
-          });
-        });
+      setFlightSpec({
+        left: target.x - liveOverlay.x,
+        top: target.y - liveOverlay.y,
+        width: target.width,
+        height: target.height,
+        startCornerRadius: (28 * target.width) / HERO_ICON_SIZE,
+        endCornerRadius: target.width / 2,
       });
     },
-    [
-      backdropOpacity,
-      cornerProgress,
-      iconScale,
-      iconTranslateX,
-      iconTranslateY,
-      wordmarkOpacity,
-      wordmarkTranslateX,
-    ]
+    [flightCornerProgress, flightScale, flightTranslateX, flightTranslateY]
   );
+
+  useEffect(() => {
+    if (!flightSpec || flightStartedRef.current) return;
+    flightStartedRef.current = true;
+
+    const anim = Animated.parallel([
+      Animated.timing(wordmarkOpacity, {
+        toValue: 0,
+        duration: 210,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.timing(wordmarkTranslateX, {
+        toValue: -10,
+        duration: 210,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 460,
+        delay: 40,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.timing(flightTranslateX, {
+        toValue: 0,
+        duration: 540,
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.timing(flightTranslateY, {
+        toValue: 0,
+        duration: 540,
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.timing(flightScale, {
+        toValue: 1,
+        duration: 540,
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.timing(flightCornerProgress, {
+        toValue: 1,
+        duration: 440,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+    ]);
+
+    anim.start(({ finished }) => {
+      if (!finished) return;
+      revealRef.current?.();
+      // Let target avatar commit at exact 1:1 scale & coordinates underneath, then unmount overlay atomically
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          finishRef.current();
+        });
+      });
+    });
+
+    return () => {
+      anim.stop();
+    };
+  }, [
+    backdropOpacity,
+    flightCornerProgress,
+    flightScale,
+    flightSpec,
+    flightTranslateX,
+    flightTranslateY,
+    wordmarkOpacity,
+    wordmarkTranslateX,
+  ]);
 
   const triggerExit = useCallback(() => {
     if (exitedRef.current) return;
     exitedRef.current = true;
     setIsFadingOut(true);
 
-    const overlay = overlayRectRef.current;
-    const fallbackSlot: HeaderLogoRect = {
-      x: overlay.x + overlay.width / 2 - (ICON_TEXT_GAP + textWidthRef.current) / 2 - SHRUNK_ICON_SIZE / 2,
-      y: overlay.y + overlay.height / 2 - SHRUNK_ICON_SIZE / 2,
-      width: SHRUNK_ICON_SIZE,
-      height: SHRUNK_ICON_SIZE,
+    iconScale.stopAnimation();
+    iconTranslateX.stopAnimation();
+
+    const measureSafe = (
+      node: ViewRefNode | null,
+      fallback: HeaderLogoRect | null,
+      cb: (rect: HeaderLogoRect | null) => void
+    ) => {
+      if (!node) {
+        cb(fallback);
+        return;
+      }
+      let settled = false;
+      measureNodeInWindow(node, (rect) => {
+        if (!settled) {
+          settled = true;
+          cb(rect);
+        }
+      });
+      requestAnimationFrame(() => {
+        if (!settled) {
+          settled = true;
+          cb(fallback);
+        }
+      });
     };
 
+    const cachedOverlay = overlayRectRef.current;
     const targetNode = targetLogoNodeRef?.current ?? null;
     const slotNode = iconSlotRef.current;
 
-    if (!slotNode) {
-      startFlightAnimation(fallbackSlot, targetLogoRectRef.current ?? null);
-      return;
-    }
+    measureSafe(overlayRef.current, cachedOverlay, (measuredOverlay) => {
+      const liveOverlay = measuredOverlay || cachedOverlay;
+      overlayRectRef.current = liveOverlay;
 
-    measureNodeInWindow(slotNode, (slotRect) => {
-      if (!targetNode) {
-        startFlightAnimation(slotRect, targetLogoRectRef.current ?? null);
-        return;
-      }
-      measureNodeInWindow(targetNode, (liveTargetRect) => {
-        startFlightAnimation(slotRect, liveTargetRect);
+      const fallbackSlot: HeaderLogoRect = {
+        x:
+          liveOverlay.x +
+          liveOverlay.width / 2 -
+          (ICON_TEXT_GAP + textWidthRef.current) / 2 -
+          SHRUNK_ICON_SIZE / 2,
+        y: liveOverlay.y + liveOverlay.height / 2 - SHRUNK_ICON_SIZE / 2,
+        width: SHRUNK_ICON_SIZE,
+        height: SHRUNK_ICON_SIZE,
+      };
+
+      measureSafe(slotNode, fallbackSlot, (measuredSlot) => {
+        const slotRect = measuredSlot || fallbackSlot;
+        measureSafe(targetNode, targetLogoRectRef.current ?? null, (liveTargetRect) => {
+          prepareTargetAnchoredFlight(liveOverlay, slotRect, liveTargetRect);
+        });
       });
     });
-  }, [startFlightAnimation, targetLogoNodeRef]);
+  }, [iconScale, iconTranslateX, prepareTargetAnchoredFlight, targetLogoNodeRef]);
 
   useEffect(() => {
     // Stage 1: Pop hero app icon into screen center
@@ -277,6 +352,13 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
     outputRange: [28, HERO_ICON_SIZE / 2],
   });
 
+  const flightCornerRadius = flightSpec
+    ? flightCornerProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [flightSpec.startCornerRadius, flightSpec.endCornerRadius],
+      })
+    : 0;
+
   const bgColor = isDark ? '#000000' : '#FFFFFF';
   const textColor = isDark ? '#FFFFFF' : '#09090B';
   const iconSurfaceBg = isDark ? '#000000' : '#FFFFFF';
@@ -319,37 +401,38 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
       </Text>
 
       <View style={styles.lockupRow}>
-        {/* Fixed slot matching shrunk icon center before flying to header */}
+        {/* Fixed slot matching shrunk icon center before handing off to target-anchored flyer */}
         <View ref={iconSlotRef} collapsable={false} style={styles.iconSlot}>
-          <Animated.View
-            style={[
-              styles.heroTransformWrap,
-              {
-                opacity: introOpacity,
-                transform: [
-                  { translateX: iconTranslateX },
-                  { translateY: iconTranslateY },
-                  { scale: iconScale },
-                ],
-              },
-            ]}
-          >
+          {!flightSpec ? (
             <Animated.View
               style={[
-                styles.heroIconMask,
+                styles.heroTransformWrap,
                 {
-                  backgroundColor: iconSurfaceBg,
-                  borderRadius: animatedCornerRadius,
+                  opacity: introOpacity,
+                  transform: [
+                    { translateX: iconTranslateX },
+                    { scale: iconScale },
+                  ],
                 },
               ]}
             >
-              <Image
-                source={iconSource}
-                resizeMode="cover"
-                style={styles.heroIconImage}
-              />
+              <Animated.View
+                style={[
+                  styles.heroIconMask,
+                  {
+                    backgroundColor: iconSurfaceBg,
+                    borderRadius: animatedCornerRadius,
+                  },
+                ]}
+              >
+                <Image
+                  source={iconSource}
+                  resizeMode="cover"
+                  style={styles.heroIconImage}
+                />
+              </Animated.View>
             </Animated.View>
-          </Animated.View>
+          ) : null}
         </View>
 
         {/* Wordmark emerges from the logo edge and slides smoothly to the right */}
@@ -383,6 +466,45 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
           ) : null}
         </Animated.View>
       </View>
+
+      {/* Target-anchored 1:1 flyer settles at exact target frame (translate 0, scale 1) */}
+      {flightSpec ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.flightAnchor,
+            {
+              left: flightSpec.left,
+              top: flightSpec.top,
+              width: flightSpec.width,
+              height: flightSpec.height,
+              transform: [
+                { translateX: flightTranslateX },
+                { translateY: flightTranslateY },
+                { scale: flightScale },
+              ],
+            },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.flightMask,
+              {
+                width: flightSpec.width,
+                height: flightSpec.height,
+                backgroundColor: iconSurfaceBg,
+                borderRadius: flightCornerRadius,
+              },
+            ]}
+          >
+            <Image
+              source={iconSource}
+              resizeMode="cover"
+              style={styles.heroIconImage}
+            />
+          </Animated.View>
+        </Animated.View>
+      ) : null}
     </View>
   );
 };
@@ -438,6 +560,17 @@ const styles = StyleSheet.create({
   heroIconImage: {
     width: '100%',
     height: '100%',
+  },
+  flightAnchor: {
+    position: 'absolute',
+    zIndex: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flightMask: {
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   wordmarkSlot: {
     marginLeft: ICON_TEXT_GAP,

@@ -6,20 +6,49 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: splittrack-ios-release
+  cancel-in-progress: false
+
 jobs:
   build-unsigned-ios:
-    name: Build Unsigned iOS (.ipa)
+    if: github.actor != 'github-actions[bot]'
+    name: Build and publish unsigned iOS IPA
     runs-on: macos-latest
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
+
+      - name: Read app version and prepare build number
+        id: app
+        run: |
+          APP_VERSION=$(node -p "require('./app.json').expo.version")
+          BUNDLE_ID=$(node -p "require('./app.json').expo.ios.bundleIdentifier")
+          BUILD_NUMBER="$GITHUB_RUN_NUMBER"
+          RELEASE_TAG="splittrack-ios-$BUILD_NUMBER"
+
+          if [ -z "$APP_VERSION" ] || [ -z "$BUNDLE_ID" ]; then
+            echo "Error: Missing expo.version or expo.ios.bundleIdentifier in app.json"
+            exit 1
+          fi
+
+          echo "version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+          echo "bundle_id=$BUNDLE_ID" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Install npm dependencies
         run: npm ci
@@ -29,12 +58,34 @@ jobs:
           CI: '1'
         run: npx expo prebuild --platform ios --no-install
 
+      - name: Sync iOS Info.plist version and numeric build number
+        env:
+          APP_VERSION: ${{ steps.app.outputs.version }}
+          BUILD_NUMBER: ${{ steps.app.outputs.build_number }}
+          BUNDLE_ID: ${{ steps.app.outputs.bundle_id }}
+        run: |
+          set -euo pipefail
+          INFO_PLIST=$(find ios -maxdepth 2 -name "Info.plist" -not -path "*/Pods/*" | head -n 1)
+          if [ -z "$INFO_PLIST" ]; then
+            echo "Error: Info.plist not found under ios/"
+            find ios -maxdepth 3 || true
+            exit 1
+          fi
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $APP_VERSION" "$INFO_PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$INFO_PLIST"
+
+          echo "Configured $INFO_PLIST ($BUNDLE_ID -> $APP_VERSION ($BUILD_NUMBER))"
+
       - name: Install CocoaPods dependencies
         run: |
           cd ios
           pod install --repo-update
 
       - name: Build unsigned iOS Release app
+        env:
+          APP_VERSION: ${{ steps.app.outputs.version }}
+          BUILD_NUMBER: ${{ steps.app.outputs.build_number }}
         run: |
           set -euo pipefail
           WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" | head -n 1)
@@ -45,6 +96,7 @@ jobs:
           fi
           SCHEME=$(basename "$WORKSPACE" .xcworkspace)
           echo "Using workspace=$WORKSPACE scheme=$SCHEME"
+          echo "Building version=$APP_VERSION build=$BUILD_NUMBER"
 
           xcodebuild build \
             -workspace "$WORKSPACE" \
@@ -53,13 +105,19 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath ios/build \
+            MARKETING_VERSION="$APP_VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER=""
 
-      - name: Package .app into unsigned .ipa
+      - name: Package .app into unsigned .ipa and verify bundle metadata
+        env:
+          APP_VERSION: ${{ steps.app.outputs.version }}
+          BUILD_NUMBER: ${{ steps.app.outputs.build_number }}
+          BUNDLE_ID: ${{ steps.app.outputs.bundle_id }}
         run: |
           set -euo pipefail
           APP_PATH=$(find ios/build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" -type d | head -n 1)
@@ -69,10 +127,31 @@ jobs:
             exit 1
           fi
 
+          ACTUAL_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Info.plist")
+          ACTUAL_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Info.plist")
+          ACTUAL_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_PATH/Info.plist")
+
+          echo "Verified IPA Info.plist -> bundleId=$ACTUAL_BUNDLE_ID version=$ACTUAL_VERSION build=$ACTUAL_BUILD"
+
+          if [ "$ACTUAL_BUNDLE_ID" != "$BUNDLE_ID" ]; then
+            echo "Bundle identifier mismatch: expected $BUNDLE_ID, got $ACTUAL_BUNDLE_ID"
+            exit 1
+          fi
+
+          if [ "$ACTUAL_VERSION" != "$APP_VERSION" ] || [ "$ACTUAL_BUILD" != "$BUILD_NUMBER" ]; then
+            echo "Version mismatch: expected $APP_VERSION ($BUILD_NUMBER), got $ACTUAL_VERSION ($ACTUAL_BUILD)"
+            exit 1
+          fi
+
           rm -rf build-ipa Splittrack-unsigned.ipa
           mkdir -p build-ipa/Payload
           ditto "$APP_PATH" "build-ipa/Payload/$(basename "$APP_PATH")"
           (cd build-ipa && zip -qry ../Splittrack-unsigned.ipa Payload)
+
+          if ! unzip -l Splittrack-unsigned.ipa | grep -q "Payload/.*\.app/Info\.plist"; then
+            echo "Error: Invalid IPA layout — missing Payload/*.app/Info.plist"
+            exit 1
+          fi
 
           ls -lh Splittrack-unsigned.ipa
           shasum -a 256 Splittrack-unsigned.ipa | tee -a "$GITHUB_STEP_SUMMARY"
@@ -84,3 +163,178 @@ jobs:
           path: Splittrack-unsigned.ipa
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish IPA as a GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.app.outputs.release_tag }}
+          name: Splittrack iOS ${{ steps.app.outputs.version }} (build ${{ steps.app.outputs.build_number }})
+          body: |
+            Automated unsigned iOS build from commit ${{ github.sha }}.
+
+            Install or update this IPA through SideStore using the project's AltSource feed.
+          files: Splittrack-unsigned.ipa
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update SideStore AltSource feed
+        env:
+          APP_VERSION: ${{ steps.app.outputs.version }}
+          BUILD_NUMBER: ${{ steps.app.outputs.build_number }}
+          BUNDLE_ID: ${{ steps.app.outputs.bundle_id }}
+          RELEASE_TAG: ${{ steps.app.outputs.release_tag }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          FALLBACK_SIZE=$(stat -f%z Splittrack-unsigned.ipa)
+          export FALLBACK_SIZE
+          export FALLBACK_URL="https://github.com/$REPOSITORY/releases/download/$RELEASE_TAG/Splittrack-unsigned.ipa"
+          export RELEASE_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          if [ -z "${COMMIT_MESSAGE:-}" ]; then
+            export COMMIT_MESSAGE="$(git log -1 --pretty=%s)"
+          fi
+
+          # Sync to latest origin/main BEFORE editing apps.json to handle concurrent commits safely
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git switch -C main origin/main
+
+          node <<'NODE'
+          const fs = require('fs');
+
+          (async () => {
+            const repo = process.env.REPOSITORY;
+            const tag = process.env.RELEASE_TAG;
+            const token = process.env.GH_TOKEN;
+
+            let releaseUrl = process.env.FALLBACK_URL;
+            let ipaSize = Number(process.env.FALLBACK_SIZE);
+            let releaseDate = process.env.RELEASE_DATE;
+
+            try {
+              const res = await fetch(
+                `https://api.github.com/repos/${repo}/releases/tags/${tag}`,
+                {
+                  headers: {
+                    Accept: 'application/vnd.github+json',
+                    Authorization: `Bearer ${token}`,
+                    'User-Agent': 'splittrack-sidestore-updater',
+                  },
+                }
+              );
+              if (res.ok) {
+                const release = await res.json();
+                const asset = Array.isArray(release.assets)
+                  ? release.assets.find((a) => a.name === 'Splittrack-unsigned.ipa') ||
+                    release.assets.find((a) => typeof a.name === 'string' && a.name.endsWith('.ipa'))
+                  : null;
+                if (asset && asset.browser_download_url) {
+                  releaseUrl = asset.browser_download_url;
+                }
+                if (asset && typeof asset.size === 'number' && asset.size > 0) {
+                  ipaSize = asset.size;
+                }
+                if (release.published_at) {
+                  releaseDate = release.published_at;
+                }
+              }
+            } catch (err) {
+              console.warn('Warning: failed to query release API, using local fallback metadata:', err.message);
+            }
+
+            if (!releaseUrl || !ipaSize || Number.isNaN(ipaSize) || ipaSize <= 0) {
+              throw new Error(`Invalid release metadata: url=${releaseUrl} size=${ipaSize}`);
+            }
+
+            const file = 'apps.json';
+            const source = fs.existsSync(file)
+              ? JSON.parse(fs.readFileSync(file, 'utf8'))
+              : {
+                  name: "Aditya's Apps",
+                  identifier: 'com.adityaroy999.splittrack.source',
+                  sourceURL: `https://raw.githubusercontent.com/${repo}/main/apps.json`,
+                  apps: [],
+                };
+
+            source.name = "Aditya's Apps";
+            source.identifier = 'com.adityaroy999.splittrack.source';
+            source.sourceURL = `https://raw.githubusercontent.com/${repo}/main/apps.json`;
+            if (!Array.isArray(source.apps)) {
+              source.apps = [];
+            }
+
+            const existing = source.apps.find(
+              (item) => item.bundleIdentifier === process.env.BUNDLE_ID
+            );
+            const prevVersions =
+              existing && Array.isArray(existing.versions) ? existing.versions : [];
+
+            const description =
+              (process.env.COMMIT_MESSAGE || '').trim() ||
+              `Automated GitHub Actions iOS build ${process.env.BUILD_NUMBER}.`;
+
+            const newVersion = {
+              version: process.env.APP_VERSION,
+              buildVersion: process.env.BUILD_NUMBER,
+              date: releaseDate,
+              downloadURL: releaseUrl,
+              size: ipaSize,
+              localizedDescription: description,
+            };
+
+            const versions = [
+              newVersion,
+              ...prevVersions.filter(
+                (item) =>
+                  !(
+                    item.version === newVersion.version &&
+                    item.buildVersion === newVersion.buildVersion
+                  )
+              ),
+            ].slice(0, 20);
+
+            const app = {
+              name: 'Splittrack',
+              bundleIdentifier: process.env.BUNDLE_ID,
+              developerName: 'Aditya Roy',
+              subtitle: 'Split bills, trips & instant UPI payouts.',
+              localizedDescription:
+                'Split expenses, track shared balances, and manage group spending with Splittrack.',
+              iconURL: `https://raw.githubusercontent.com/${repo}/main/assets/icon-light.png`,
+              tintColor: '#6366F1',
+              version: newVersion.version,
+              versionDate: newVersion.date,
+              versionDescription: newVersion.localizedDescription,
+              downloadURL: newVersion.downloadURL,
+              size: newVersion.size,
+              versions,
+            };
+
+            source.apps = [
+              ...source.apps.filter(
+                (item) => item.bundleIdentifier !== app.bundleIdentifier
+              ),
+              app,
+            ];
+
+            fs.writeFileSync(file, JSON.stringify(source, null, 2) + '\n');
+            console.log(`Updated apps.json -> ${releaseUrl} (${ipaSize} bytes, total versions=${versions.length})`);
+          })().catch((err) => {
+            console.error(err);
+            process.exit(1);
+          });
+          NODE
+
+          git add apps.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update SideStore source for iOS build $BUILD_NUMBER"
+            git push origin HEAD:main
+          else
+            echo "AltSource feed is already up to date."
+          fi

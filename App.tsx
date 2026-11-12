@@ -57,6 +57,7 @@ import { SettingsModal } from './src/components/settings/SettingsModal';
 import { CalendarDatePickerModal, formatDisplayDate } from './src/components/common/CalendarDatePickerModal';
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 import { PreloaderSplash } from './src/components/common/PreloaderSplash';
+import { OnboardingAuthScreen, type AuthLogoRect } from './src/components/auth/OnboardingAuthScreen';
 import { AnimatedPressable, FadeInSlide } from './src/components/common/MotionPrimitives';
 import { JellyRadio } from './src/components/common/JellyRadio';
 import { ExpenseCategory, Friend, Transaction } from './src/types';
@@ -76,10 +77,14 @@ function getLedgerIcon(
 }
 
 function MainAppContent({
+  userDisplayName = 'Jfiqw Alex',
+  onSignOut,
   hideHeaderLogo = false,
   onHeaderLogoLayout,
   onHeaderLogoNode,
 }: {
+  userDisplayName?: string;
+  onSignOut?: () => void;
   hideHeaderLogo?: boolean;
   onHeaderLogoLayout?: (rect: HeaderLogoRect) => void;
   onHeaderLogoNode?: (node: ViewRefNode | null) => void;
@@ -222,7 +227,7 @@ function MainAppContent({
         <FadeInSlide key="home-tab" style={styles.contentConstrainer}>
           <HeaderBar
             onOpenSettings={() => setShowSettings(true)}
-            userName="Jfiqw Alex"
+            userName={userDisplayName}
             hideLogo={hideHeaderLogo}
             onLogoLayout={onHeaderLogoLayout}
             onLogoNode={onHeaderLogoNode}
@@ -1026,6 +1031,7 @@ function MainAppContent({
       <SettingsModal
         visible={showSettings}
         onClose={() => setShowSettings(false)}
+        onSignOut={onSignOut}
       />
 
       <AnalyticsInfoModal
@@ -1048,9 +1054,11 @@ function MainAppContent({
 
 export default function App() {
   const [showPreloader, setShowPreloader] = useState(true);
-  const [hideHeaderLogo, setHideHeaderLogo] = useState(true);
-  const [headerLogoRect, setHeaderLogoRect] = useState<HeaderLogoRect | null>(null);
-  const headerLogoNodeRef = useRef<ViewRefNode | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userDisplayName, setUserDisplayName] = useState('Jfiqw Alex');
+  const [hideOnboardingLogo, setHideOnboardingLogo] = useState(true);
+  const [onboardingLogoRect, setOnboardingLogoRect] = useState<AuthLogoRect | null>(null);
+  const onboardingLogoNodeRef = useRef<ViewRefNode | null>(null);
 
   return (
     <SafeAreaProvider>
@@ -1058,20 +1066,33 @@ export default function App() {
         <LiquidGlassProvider>
           <SplitTrackProvider>
             <View style={styles.appRoot}>
-              <MainAppContent
-                hideHeaderLogo={hideHeaderLogo}
-                onHeaderLogoLayout={setHeaderLogoRect}
-                onHeaderLogoNode={(node) => {
-                  headerLogoNodeRef.current = node;
-                }}
-              />
+              {isAuthenticated ? (
+                <MainAppContent
+                  userDisplayName={userDisplayName}
+                  onSignOut={() => setIsAuthenticated(false)}
+                />
+              ) : (
+                <OnboardingAuthScreen
+                  hideLogo={hideOnboardingLogo}
+                  onLogoLayout={setOnboardingLogoRect}
+                  onLogoNode={(node) => {
+                    onboardingLogoNodeRef.current = node;
+                  }}
+                  onAuthenticate={({ name }) => {
+                    if (name) {
+                      setUserDisplayName(name);
+                    }
+                    setIsAuthenticated(true);
+                  }}
+                />
+              )}
               {showPreloader ? (
                 <PreloaderSplash
-                  targetLogoRect={headerLogoRect}
-                  targetLogoNodeRef={headerLogoNodeRef}
-                  onRevealHeaderLogo={() => setHideHeaderLogo(false)}
+                  targetLogoRect={onboardingLogoRect}
+                  targetLogoNodeRef={onboardingLogoNodeRef}
+                  onRevealHeaderLogo={() => setHideOnboardingLogo(false)}
                   onFinish={() => {
-                    setHideHeaderLogo(false);
+                    setHideOnboardingLogo(false);
                     setShowPreloader(false);
                   }}
                 />
