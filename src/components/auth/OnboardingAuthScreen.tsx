@@ -13,7 +13,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { ArrowRight, ChevronRight, Eye, EyeOff, Lock, Mail, Moon, Sun, User } from 'lucide-react-native';
+import { Sun2Icon } from '@solar-icons/react-native/bold/sun-2';
+import { MoonIcon } from '@solar-icons/react-native/bold/moon';
+import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
+import { UserIcon } from '@solar-icons/react-native/bold/user';
+import { LetterIcon } from '@solar-icons/react-native/bold/letter';
+import { LockPasswordIcon } from '@solar-icons/react-native/bold/lock-password';
+import { EyeIcon } from '@solar-icons/react-native/bold/eye';
+import { EyeClosedIcon } from '@solar-icons/react-native/bold/eye-closed';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { ImpactStyle, NotificationType, triggerImpact, triggerNotification } from '../../utils/haptics';
 import { measureNodeInWindow, type ViewRefNode, type WindowRect } from '../../utils/measureWindow';
@@ -185,9 +192,9 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
               contentStyle={[styles.themeIconBtn, { backgroundColor: themeBtnBg }]}
             >
               {isDark ? (
-                <Sun size={16} color="#E4E4E7" />
+                <Sun2Icon size={16} color="#E4E4E7" />
               ) : (
-                <Moon size={16} color="#18181B" />
+                <MoonIcon size={16} color="#18181B" />
               )}
             </AnimatedPressable>
           </View>
@@ -241,7 +248,7 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
                 {isSignUp ? 'Sign up with Google' : 'Continue with Google'}
               </Text>
               <View style={styles.googleRightSlot}>
-                <ChevronRight size={17} color={mutedText} />
+                <AltArrowRightIcon size={17} color={mutedText} />
               </View>
             </AnimatedPressable>
 
@@ -268,7 +275,7 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
                       { backgroundColor: focusedField === 'name' ? inputFocusBg : inputIdleBg },
                     ]}
                   >
-                    <User
+                    <UserIcon
                       size={16}
                       color={focusedField === 'name' ? textColor : mutedText}
                     />
@@ -295,7 +302,7 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
                     { backgroundColor: focusedField === 'email' ? inputFocusBg : inputIdleBg },
                   ]}
                 >
-                  <Mail
+                  <LetterIcon
                     size={16}
                     color={focusedField === 'email' ? textColor : mutedText}
                   />
@@ -326,7 +333,7 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
                     },
                   ]}
                 >
-                  <Lock
+                  <LockPasswordIcon
                     size={16}
                     color={focusedField === 'password' ? textColor : mutedText}
                   />
@@ -352,9 +359,9 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
                     contentStyle={styles.eyeBtn}
                   >
                     {showPassword ? (
-                      <EyeOff size={16} color={mutedText} />
+                      <EyeClosedIcon size={16} color={mutedText} />
                     ) : (
-                      <Eye size={16} color={mutedText} />
+                      <EyeIcon size={16} color={mutedText} />
                     )}
                   </AnimatedPressable>
                 </View>
@@ -371,7 +378,7 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
                   {isSignUp ? 'Create Account' : 'Sign In'}
                 </Text>
                 <View style={styles.ctaRightArrow}>
-                  <ArrowRight size={17} color={ctaText} />
+                  <AltArrowRightIcon size={17} color={ctaText} />
                 </View>
               </AnimatedPressable>
             </Animated.View>

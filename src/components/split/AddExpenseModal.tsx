@@ -14,7 +14,8 @@ import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
-import { MapPin, Search, X } from 'lucide-react-native';
+import { MapPointIcon } from '@solar-icons/react-native/bold/map-point';
+import { MagnifierIcon } from '@solar-icons/react-native/bold/magnifier';
 import { NotificationType, triggerNotification } from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
@@ -395,7 +396,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 LOCATION (OPTIONAL)
               </Text>
               <View style={[styles.locationInputWrap, { backgroundColor: inputBg }]}>
-                <MapPin size={15} color={location.trim() ? textColor : mutedText} />
+                <MapPointIcon size={15} color={location.trim() ? textColor : mutedText} />
                 <TextInput
                   style={[
                     styles.locationInput,
@@ -420,7 +421,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                     onPress={() => setLocation('')}
                     contentStyle={styles.clearLocationBtn}
                   >
-                    <X size={14} color={mutedText} />
+                    <CloseCircleIcon size={14} color={mutedText} />
                   </AnimatedPressable>
                 )}
               </View>
@@ -534,7 +535,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                       { backgroundColor: showFriendSearch ? activeBg : chipBg },
                     ]}
                   >
-                    <Search
+                    <MagnifierIcon
                       size={14}
                       color={showFriendSearch ? activeText : textColor}
                     />
@@ -573,7 +574,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   }}
                 >
                   <View style={[styles.friendSearchBox, { backgroundColor: inputBg }]}>
-                    <Search size={14} color={mutedText} />
+                    <MagnifierIcon size={14} color={mutedText} />
                     <TextInput
                       style={[
                         styles.friendSearchInput,

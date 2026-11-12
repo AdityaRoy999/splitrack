@@ -12,7 +12,9 @@ import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { MoonIcon } from '@solar-icons/react-native/bold/moon';
 import { Sun2Icon } from '@solar-icons/react-native/bold/sun-2';
 import { RefreshCircleIcon } from '@solar-icons/react-native/bold/refresh-circle';
-import { LogOut, Sparkles, Square } from 'lucide-react-native';
+import { Logout2Icon } from '@solar-icons/react-native/bold/logout-2';
+import { SparklesIcon } from '@solar-icons/react-native/bold/sparkles';
+import { BoxIcon } from '@solar-icons/react-native/bold/box';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { JellyRadio } from '../common/JellyRadio';
@@ -93,7 +95,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       value: 'glass',
       label: 'Liquid Glass',
       icon: (
-        <Sparkles
+        <SparklesIcon
           size={14}
           color={isLiquidGlassEnabled ? activeText : mutedText}
         />
@@ -103,7 +105,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       value: 'matte',
       label: 'Matte Surface',
       icon: (
-        <Square
+        <BoxIcon
           size={14}
           color={!isLiquidGlassEnabled ? activeText : mutedText}
         />
@@ -249,7 +251,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 style={[styles.resetBtn, { backgroundColor: chipBg }]}
                 activeOpacity={0.7}
               >
-                <LogOut size={16} color={textColor} />
+                <Logout2Icon size={16} color={textColor} />
                 <Text style={[styles.resetBtnText, { color: textColor }]}>
                   Sign Out to Onboarding
                 </Text>

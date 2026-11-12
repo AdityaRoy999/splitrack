@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ScrollView,
   StatusBar,
@@ -1052,13 +1053,81 @@ function MainAppContent({
   );
 }
 
+const AUTH_STORAGE_KEY = '@splittrack_auth_session_v1';
+
 export default function App() {
   const [showPreloader, setShowPreloader] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userDisplayName, setUserDisplayName] = useState('Jfiqw Alex');
+  const [hideHeaderLogo, setHideHeaderLogo] = useState(true);
+  const [headerLogoRect, setHeaderLogoRect] = useState<HeaderLogoRect | null>(null);
+  const headerLogoNodeRef = useRef<ViewRefNode | null>(null);
   const [hideOnboardingLogo, setHideOnboardingLogo] = useState(true);
   const [onboardingLogoRect, setOnboardingLogoRect] = useState<AuthLogoRect | null>(null);
   const onboardingLogoNodeRef = useRef<ViewRefNode | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+        if (stored && isMounted) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.isAuthenticated) {
+            setIsAuthenticated(true);
+            if (parsed.userDisplayName) {
+              setUserDisplayName(parsed.userDisplayName);
+            }
+          }
+        }
+      } catch {
+        // Fallback to default state
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleAuthenticate = async (payload: {
+    provider: 'email' | 'google' | 'guest';
+    mode: 'signin' | 'signup';
+    name?: string;
+    email?: string;
+  }) => {
+    const resolvedName =
+      payload.name?.trim() ||
+      (payload.email ? payload.email.split('@')[0] : 'Jfiqw Alex');
+    setUserDisplayName(resolvedName);
+    setIsAuthenticated(true);
+    setHideHeaderLogo(false);
+    try {
+      await AsyncStorage.setItem(
+        AUTH_STORAGE_KEY,
+        JSON.stringify({
+          isAuthenticated: true,
+          userDisplayName: resolvedName,
+          provider: payload.provider,
+          email: payload.email,
+        })
+      );
+    } catch {
+      // storage error
+    }
+  };
+
+  const handleSignOut = async () => {
+    setIsAuthenticated(false);
+    setHideOnboardingLogo(false);
+    try {
+      await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch {
+      // storage error
+    }
+  };
+
+  const activeTargetRect = isAuthenticated ? headerLogoRect : onboardingLogoRect;
+  const activeTargetNodeRef = isAuthenticated ? headerLogoNodeRef : onboardingLogoNodeRef;
 
   return (
     <SafeAreaProvider>
@@ -1069,7 +1138,12 @@ export default function App() {
               {isAuthenticated ? (
                 <MainAppContent
                   userDisplayName={userDisplayName}
-                  onSignOut={() => setIsAuthenticated(false)}
+                  onSignOut={handleSignOut}
+                  hideHeaderLogo={hideHeaderLogo}
+                  onHeaderLogoLayout={setHeaderLogoRect}
+                  onHeaderLogoNode={(node) => {
+                    headerLogoNodeRef.current = node;
+                  }}
                 />
               ) : (
                 <OnboardingAuthScreen
@@ -1078,20 +1152,22 @@ export default function App() {
                   onLogoNode={(node) => {
                     onboardingLogoNodeRef.current = node;
                   }}
-                  onAuthenticate={({ name }) => {
-                    if (name) {
-                      setUserDisplayName(name);
-                    }
-                    setIsAuthenticated(true);
-                  }}
+                  onAuthenticate={handleAuthenticate}
                 />
               )}
               {showPreloader ? (
                 <PreloaderSplash
-                  targetLogoRect={onboardingLogoRect}
-                  targetLogoNodeRef={onboardingLogoNodeRef}
-                  onRevealHeaderLogo={() => setHideOnboardingLogo(false)}
+                  targetLogoRect={activeTargetRect}
+                  targetLogoNodeRef={activeTargetNodeRef}
+                  onRevealHeaderLogo={() => {
+                    if (isAuthenticated) {
+                      setHideHeaderLogo(false);
+                    } else {
+                      setHideOnboardingLogo(false);
+                    }
+                  }}
                   onFinish={() => {
+                    setHideHeaderLogo(false);
                     setHideOnboardingLogo(false);
                     setShowPreloader(false);
                   }}
