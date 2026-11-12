@@ -125,8 +125,7 @@ export const SplineChart: React.FC = () => {
   );
   const [swipeX] = useState(() => new Animated.Value(0));
   const [swipeOpacity] = useState(() => new Animated.Value(1));
-  const [combinedTranslateX] = useState(() => new Animated.Value(0));
-  const transitionBusyRef = useRef(false);
+  const transitionSeqRef = useRef(0);
 
   const isDark = themeMode === 'dark';
   const width = plotBoxWidth;
@@ -135,43 +134,46 @@ export const SplineChart: React.FC = () => {
   const paddingTop = 34;
   const paddingBottom = 26;
 
-  const runSwipeTransition = useCallback(
-    (delta: -1 | 1, commit: () => void) => {
-      if (transitionBusyRef.current) return;
-      transitionBusyRef.current = true;
+  const runChartTransition = useCallback(
+    (delta: -1 | 0 | 1, commit: () => void) => {
+      const seq = ++transitionSeqRef.current;
+      swipeOpacity.stopAnimation();
+      swipeX.stopAnimation();
+
       Animated.parallel([
         Animated.timing(swipeOpacity, {
           toValue: 0,
-          duration: 130,
+          duration: 115,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(swipeX, {
-          toValue: -delta * 26,
-          duration: 130,
+          toValue: delta === 0 ? 0 : -delta * 22,
+          duration: 115,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
-      ]).start(() => {
+      ]).start(({ finished }) => {
+        if (!finished && seq !== transitionSeqRef.current) return;
+        if (seq !== transitionSeqRef.current) return;
+
         setDrawProgress(0);
         commit();
-        swipeX.setValue(delta * 30);
+        swipeX.setValue(delta === 0 ? 0 : delta * 24);
         Animated.parallel([
           Animated.timing(swipeOpacity, {
             toValue: 1,
-            duration: 320,
-            easing: Easing.out(Easing.cubic),
+            duration: 280,
+            easing: Easing.bezier(0.22, 1, 0.36, 1),
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.timing(swipeX, {
             toValue: 0,
-            duration: 340,
-            easing: Easing.out(Easing.cubic),
+            duration: 300,
+            easing: Easing.bezier(0.22, 1, 0.36, 1),
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
-        ]).start(() => {
-          transitionBusyRef.current = false;
-        });
+        ]).start();
       });
     },
     [swipeOpacity, swipeX]
@@ -179,7 +181,7 @@ export const SplineChart: React.FC = () => {
 
   const stepDay = useCallback(
     (delta: -1 | 1) => {
-      runSwipeTransition(delta, () => {
+      runChartTransition(delta, () => {
         const base = selectedDate || getTodayLocalISO();
         const nextIso = shiftIsoDate(base, delta);
         const [yStr, mStr] = nextIso.split('-');
@@ -190,12 +192,12 @@ export const SplineChart: React.FC = () => {
         setGranularity('Date');
       });
     },
-    [runSwipeTransition, selectedDate, selectedYear]
+    [runChartTransition, selectedDate, selectedYear]
   );
 
   const stepMonth = useCallback(
     (delta: -1 | 1) => {
-      runSwipeTransition(delta, () => {
+      runChartTransition(delta, () => {
         let nextMonth = selectedMonth + delta;
         let nextYear = selectedYear;
         if (nextMonth < 0) {
@@ -211,7 +213,7 @@ export const SplineChart: React.FC = () => {
         setGranularity('Month');
       });
     },
-    [runSwipeTransition, selectedMonth, selectedYear]
+    [runChartTransition, selectedMonth, selectedYear]
   );
 
   const { gestureHandlers, isMonthHoldReady, dragAnim } = useDateMonthSwipeGesture({
@@ -219,20 +221,10 @@ export const SplineChart: React.FC = () => {
     onStepMonth: stepMonth,
   });
 
-  useEffect(() => {
-    const id = swipeX.addListener(({ value }) => {
-      combinedTranslateX.setValue(value);
-    });
-    const dragId = dragAnim.addListener(({ value }) => {
-      if (!transitionBusyRef.current) {
-        combinedTranslateX.setValue(value);
-      }
-    });
-    return () => {
-      swipeX.removeListener(id);
-      dragAnim.removeListener(dragId);
-    };
-  }, [combinedTranslateX, dragAnim, swipeX]);
+  const combinedTranslateX = useMemo(
+    () => Animated.add(dragAnim, swipeX),
+    [dragAnim, swipeX]
+  );
 
   const pointsData = useMemo<TrajectoryPoint[]>(() => {
     if (granularity === 'Date') {
@@ -389,7 +381,7 @@ export const SplineChart: React.FC = () => {
     }
 
     let rafId = 0;
-    const duration = 640;
+    const duration = 500;
     let startTime: number | null = null;
 
     const step = (now: number) => {
@@ -560,9 +552,14 @@ export const SplineChart: React.FC = () => {
               items={['Date', 'Month', 'Year']}
               value={granularity}
               onChange={(val) => {
-                setSelectedIndex(null);
-                setDrawProgress(0);
-                setGranularity(val as CashFlowGranularity);
+                const next = val as CashFlowGranularity;
+                if (next === granularity) return;
+                const order: CashFlowGranularity[] = ['Date', 'Month', 'Year'];
+                const dir: -1 | 1 = order.indexOf(next) >= order.indexOf(granularity) ? 1 : -1;
+                runChartTransition(dir, () => {
+                  setSelectedIndex(null);
+                  setGranularity(next);
+                });
               }}
               chipColor={surfacePill}
               activeColor={activeBg}
@@ -607,8 +604,10 @@ export const SplineChart: React.FC = () => {
             <AnimatedPressable
               scaleTo={0.94}
               onPress={() => {
-                setSelectedIndex(null);
-                setSelectedDate(null);
+                runChartTransition(-1, () => {
+                  setSelectedIndex(null);
+                  setSelectedDate(null);
+                });
               }}
               contentStyle={[styles.clearChip, { backgroundColor: surfacePill }]}
             >
@@ -639,9 +638,10 @@ export const SplineChart: React.FC = () => {
             <AnimatedPressable
               scaleTo={0.95}
               onPress={() => {
-                setSelectedIndex(null);
-                setDrawProgress(0);
-                setSelectedDate(null);
+                runChartTransition(-1, () => {
+                  setSelectedIndex(null);
+                  setSelectedDate(null);
+                });
               }}
               contentStyle={[styles.clearChip, { backgroundColor: surfacePill, marginTop: 10, paddingHorizontal: 14, paddingVertical: 6 }]}
             >
@@ -848,17 +848,20 @@ export const SplineChart: React.FC = () => {
         visible={showCalendar}
         selectedDate={selectedDate}
         onSelectDate={(iso) => {
-          setSelectedIndex(null);
-          setDrawProgress(0);
-          setSelectedDate(iso);
-          if (iso) {
-            const [yStr, mStr] = iso.split('-');
-            const yr = Number(yStr);
-            const mn = (Number(mStr) || 1) - 1;
-            if (!isNaN(yr)) setSelectedYear(yr);
-            if (!isNaN(mn) && mn >= 0 && mn <= 11) setSelectedMonth(mn);
-            setGranularity('Date');
-          }
+          const dir: -1 | 1 =
+            iso && selectedDate ? (iso >= selectedDate ? 1 : -1) : iso ? 1 : -1;
+          runChartTransition(dir, () => {
+            setSelectedIndex(null);
+            setSelectedDate(iso);
+            if (iso) {
+              const [yStr, mStr] = iso.split('-');
+              const yr = Number(yStr);
+              const mn = (Number(mStr) || 1) - 1;
+              if (!isNaN(yr)) setSelectedYear(yr);
+              if (!isNaN(mn) && mn >= 0 && mn <= 11) setSelectedMonth(mn);
+              setGranularity('Date');
+            }
+          });
         }}
         onClose={() => setShowCalendar(false)}
         markedDates={transactions.map((t) => t.date)}

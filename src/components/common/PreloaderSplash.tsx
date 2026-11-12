@@ -3,6 +3,7 @@ import {
   Animated,
   Easing,
   Image,
+  PixelRatio,
   Platform,
   StyleSheet,
   Text,
@@ -110,8 +111,8 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
       const endScale =
         (hasMeasuredTarget ? target!.width : HEADER_ICON_SIZE) / HERO_ICON_SIZE;
 
-      const flyDeltaX = targetCenterX - slotCenterX;
-      const flyDeltaY = targetCenterY - slotCenterY;
+      const flyDeltaX = PixelRatio.roundToNearestPixel(targetCenterX - slotCenterX);
+      const flyDeltaY = PixelRatio.roundToNearestPixel(targetCenterY - slotCenterY);
 
       Animated.parallel([
         Animated.timing(wordmarkOpacity, {
@@ -153,19 +154,15 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
         }),
         Animated.timing(cornerProgress, {
           toValue: 1,
-          duration: 480,
+          duration: 520,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: false,
         }),
       ]).start(() => {
         revealRef.current?.();
+        // Wait two frames so the header avatar renders underneath at 100% opacity, then swap atomically
         requestAnimationFrame(() => {
-          Animated.timing(introOpacity, {
-            toValue: 0,
-            duration: 90,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }).start(() => {
+          requestAnimationFrame(() => {
             finishRef.current();
           });
         });
@@ -177,7 +174,6 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
       iconScale,
       iconTranslateX,
       iconTranslateY,
-      introOpacity,
       wordmarkOpacity,
       wordmarkTranslateX,
     ]
@@ -415,6 +411,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconSlot: {
+    position: 'relative',
     width: SHRUNK_ICON_SIZE,
     height: SHRUNK_ICON_SIZE,
     alignItems: 'center',
@@ -423,6 +420,9 @@ const styles = StyleSheet.create({
     zIndex: 4,
   },
   heroTransformWrap: {
+    position: 'absolute',
+    left: (SHRUNK_ICON_SIZE - HERO_ICON_SIZE) / 2,
+    top: (SHRUNK_ICON_SIZE - HERO_ICON_SIZE) / 2,
     width: HERO_ICON_SIZE,
     height: HERO_ICON_SIZE,
     alignItems: 'center',

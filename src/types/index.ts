@@ -103,6 +103,7 @@ export interface Transaction {
   splitType: SplitType;
   splits: SplitMemberShare[];
   settled: boolean;
+  location?: string;
   notes?: string;
 }
 

@@ -70,7 +70,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
                         {tx.title}
                       </Text>
                       <Text style={[styles.txSubtitle, { color: palette.sheetTextSecondary }]} numberOfLines={1}>
-                        {tx.subtitle || tx.time}
+                        {[tx.subtitle || tx.time, tx.location].filter(Boolean).join(' • ')}
                       </Text>
                     </View>
                   </View>

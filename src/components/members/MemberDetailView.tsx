@@ -583,7 +583,7 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
                       ? `Paid by ${firstName}`
                       : 'Group expense';
               const isPositive = tx.type === 'settlement' && tx.amount > 0;
-              const subLine = [payerLabel, linkedTrip?.name, tx.date]
+              const subLine = [payerLabel, linkedTrip?.name, tx.location, tx.date]
                 .filter(Boolean)
                 .join(' • ');
 

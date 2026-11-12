@@ -215,7 +215,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
                         {tx.title}
                       </Text>
                       <Text style={[styles.txMeta, { color: mutedText }]} numberOfLines={1}>
-                        {tx.category} • {tx.date}
+                        {[tx.category, tx.location, tx.date].filter(Boolean).join(' • ')}
                       </Text>
                     </View>
                     <View style={[styles.payerBadge, { backgroundColor: pillSurface }]}>

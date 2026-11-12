@@ -75,47 +75,50 @@ export const DonutPieChart: React.FC = () => {
   const [entranceAnim] = useState(() => new Animated.Value(0));
   const [swipeX] = useState(() => new Animated.Value(0));
   const [swipeOpacity] = useState(() => new Animated.Value(1));
-  const [combinedTranslateX] = useState(() => new Animated.Value(0));
   const lastGlidedSegRef = useRef<string | null>(null);
-  const transitionBusyRef = useRef(false);
+  const transitionSeqRef = useRef(0);
+  const hasEnteredRef = useRef(false);
 
-  const runSwipeTransition = useCallback(
-    (delta: -1 | 1, commit: () => void) => {
-      if (transitionBusyRef.current) return;
-      transitionBusyRef.current = true;
+  const runChartTransition = useCallback(
+    (delta: -1 | 0 | 1, commit: () => void) => {
+      const seq = ++transitionSeqRef.current;
+      swipeOpacity.stopAnimation();
+      swipeX.stopAnimation();
+
       Animated.parallel([
         Animated.timing(swipeOpacity, {
           toValue: 0,
-          duration: 130,
+          duration: 115,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(swipeX, {
-          toValue: -delta * 26,
-          duration: 130,
+          toValue: delta === 0 ? 0 : -delta * 22,
+          duration: 115,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
-      ]).start(() => {
+      ]).start(({ finished }) => {
+        if (!finished && seq !== transitionSeqRef.current) return;
+        if (seq !== transitionSeqRef.current) return;
+
         setSweepProgress(0);
         commit();
-        swipeX.setValue(delta * 30);
+        swipeX.setValue(delta === 0 ? 0 : delta * 24);
         Animated.parallel([
           Animated.timing(swipeOpacity, {
             toValue: 1,
-            duration: 320,
-            easing: Easing.out(Easing.cubic),
+            duration: 280,
+            easing: Easing.bezier(0.22, 1, 0.36, 1),
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.timing(swipeX, {
             toValue: 0,
-            duration: 340,
-            easing: Easing.out(Easing.cubic),
+            duration: 300,
+            easing: Easing.bezier(0.22, 1, 0.36, 1),
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
-        ]).start(() => {
-          transitionBusyRef.current = false;
-        });
+        ]).start();
       });
     },
     [swipeOpacity, swipeX]
@@ -123,7 +126,7 @@ export const DonutPieChart: React.FC = () => {
 
   const stepDay = useCallback(
     (delta: -1 | 1) => {
-      runSwipeTransition(delta, () => {
+      runChartTransition(delta, () => {
         const base = selectedDate || getTodayLocalISO();
         const nextIso = shiftIsoDate(base, delta);
         const [yStr, mStr] = nextIso.split('-');
@@ -134,12 +137,12 @@ export const DonutPieChart: React.FC = () => {
         setGranularity('Date');
       });
     },
-    [runSwipeTransition, selectedDate, selectedYear]
+    [runChartTransition, selectedDate, selectedYear]
   );
 
   const stepMonth = useCallback(
     (delta: -1 | 1) => {
-      runSwipeTransition(delta, () => {
+      runChartTransition(delta, () => {
         let nextMonth = selectedMonth + delta;
         let nextYear = selectedYear;
         if (nextMonth < 0) {
@@ -155,7 +158,7 @@ export const DonutPieChart: React.FC = () => {
         setGranularity('Month');
       });
     },
-    [runSwipeTransition, selectedMonth, selectedYear]
+    [runChartTransition, selectedMonth, selectedYear]
   );
 
   const { gestureHandlers, isMonthHoldReady, dragAnim } = useDateMonthSwipeGesture({
@@ -163,20 +166,10 @@ export const DonutPieChart: React.FC = () => {
     onStepMonth: stepMonth,
   });
 
-  useEffect(() => {
-    const id = swipeX.addListener(({ value }) => {
-      combinedTranslateX.setValue(value);
-    });
-    const dragId = dragAnim.addListener(({ value }) => {
-      if (!transitionBusyRef.current) {
-        combinedTranslateX.setValue(value);
-      }
-    });
-    return () => {
-      swipeX.removeListener(id);
-      dragAnim.removeListener(dragId);
-    };
-  }, [combinedTranslateX, dragAnim, swipeX]);
+  const combinedTranslateX = useMemo(
+    () => Animated.add(dragAnim, swipeX),
+    [dragAnim, swipeX]
+  );
 
   const filteredMetrics = useMemo(() => {
     if (granularity === 'All') {
@@ -223,16 +216,21 @@ export const DonutPieChart: React.FC = () => {
 
   useEffect(() => {
     let rafId = 0;
-    const duration = 560;
+    const duration = 480;
     let startTime: number | null = null;
 
-    entranceAnim.setValue(0);
-    Animated.spring(entranceAnim, {
-      toValue: 1,
-      friction: 8,
-      tension: 65,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
+    if (!hasEnteredRef.current) {
+      hasEnteredRef.current = true;
+      entranceAnim.setValue(0);
+      Animated.spring(entranceAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 65,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }).start();
+    } else {
+      entranceAnim.setValue(1);
+    }
 
     const tick = (now: number) => {
       if (startTime === null) {
@@ -486,9 +484,14 @@ export const DonutPieChart: React.FC = () => {
               items={['All', 'Date', 'Month', 'Year']}
               value={granularity}
               onChange={(val) => {
-                setSelectedId(null);
-                setSweepProgress(0);
-                setGranularity(val as DistributionGranularity);
+                const next = val as DistributionGranularity;
+                if (next === granularity) return;
+                const order: DistributionGranularity[] = ['All', 'Date', 'Month', 'Year'];
+                const dir: -1 | 1 = order.indexOf(next) >= order.indexOf(granularity) ? 1 : -1;
+                runChartTransition(dir, () => {
+                  setSelectedId(null);
+                  setGranularity(next);
+                });
               }}
               chipColor={surfacePill}
               activeColor={activeBg}
@@ -542,9 +545,10 @@ export const DonutPieChart: React.FC = () => {
             <AnimatedPressable
               scaleTo={0.95}
               onPress={() => {
-                setSelectedId(null);
-                setSweepProgress(0);
-                setGranularity('All');
+                runChartTransition(-1, () => {
+                  setSelectedId(null);
+                  setGranularity('All');
+                });
               }}
               contentStyle={[styles.periodPill, { backgroundColor: surfacePill, marginTop: 10 }]}
             >
@@ -743,17 +747,20 @@ export const DonutPieChart: React.FC = () => {
         visible={showCalendar}
         selectedDate={selectedDate}
         onSelectDate={(iso) => {
-          setSelectedId(null);
-          setSweepProgress(0);
-          setSelectedDate(iso);
-          if (iso) {
-            const [yStr, mStr] = iso.split('-');
-            const y = Number(yStr);
-            const m = (Number(mStr) || 1) - 1;
-            if (!isNaN(y)) setSelectedYear(y);
-            if (!isNaN(m) && m >= 0 && m <= 11) setSelectedMonth(m);
-            setGranularity('Date');
-          }
+          const dir: -1 | 1 =
+            iso && selectedDate ? (iso >= selectedDate ? 1 : -1) : iso ? 1 : -1;
+          runChartTransition(dir, () => {
+            setSelectedId(null);
+            setSelectedDate(iso);
+            if (iso) {
+              const [yStr, mStr] = iso.split('-');
+              const y = Number(yStr);
+              const m = (Number(mStr) || 1) - 1;
+              if (!isNaN(y)) setSelectedYear(y);
+              if (!isNaN(m) && m >= 0 && m <= 11) setSelectedMonth(m);
+              setGranularity('Date');
+            }
+          });
         }}
         onClose={() => setShowCalendar(false)}
         markedDates={transactions.map((t) => t.date)}
@@ -843,6 +850,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   emptyState: {
+    minHeight: 220,
     paddingVertical: 34,
     alignItems: 'center',
     justifyContent: 'center',

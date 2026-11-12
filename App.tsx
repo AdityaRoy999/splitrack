@@ -489,7 +489,9 @@ function MainAppContent({
                                   numberOfLines={1}
                                   style={[styles.tripExpenseSub, { color: mutedText }]}
                                 >
-                                  {tx.category} • {tx.subtitle || tx.date}
+                                  {[tx.category, tx.subtitle || tx.date, tx.location]
+                                    .filter(Boolean)
+                                    .join(' • ')}
                                 </Text>
                               </View>
                             </View>
@@ -793,7 +795,9 @@ function MainAppContent({
                                   numberOfLines={1}
                                   style={[styles.tripExpenseSub, { color: mutedText }]}
                                 >
-                                  {tx.subtitle || 'Shared group split'}
+                                  {[tx.subtitle || 'Shared group split', tx.location]
+                                    .filter(Boolean)
+                                    .join(' • ')}
                                 </Text>
                               </View>
                             </View>

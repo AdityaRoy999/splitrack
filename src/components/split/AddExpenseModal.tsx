@@ -14,7 +14,7 @@ import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
-import { Search } from 'lucide-react-native';
+import { MapPin, Search, X } from 'lucide-react-native';
 import { NotificationType, triggerNotification } from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
@@ -58,6 +58,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [tripId, setTripId] = useState<string | undefined>(defaultTripId);
   const [upiProfileId, setUpiProfileId] = useState<string>(selectedAccountId);
   const [selectedDate, setSelectedDate] = useState<string>(() => getTodayLocalISO());
+  const [location, setLocation] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showFriendSearch, setShowFriendSearch] = useState(false);
@@ -169,10 +170,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       splitType,
       splits,
       settled: false,
+      location: location.trim() || undefined,
     });
 
     setTitle('');
     setAmountStr('');
+    setLocation('');
     setSelectedDate(getTodayLocalISO());
     onClose();
   };
@@ -217,6 +220,30 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     { value: 'none', label: 'None (General)' },
     ...trips.map((t) => ({ value: t.id, label: t.name })),
   ];
+
+  const locationSuggestions = useMemo(() => {
+    const seen = new Set<string>();
+    const results: string[] = [];
+    const selectedTrip = tripId ? trips.find((t) => t.id === tripId) : undefined;
+    if (selectedTrip?.name) {
+      const cleanName = selectedTrip.name.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim();
+      if (cleanName && !seen.has(cleanName.toLowerCase())) {
+        seen.add(cleanName.toLowerCase());
+        results.push(cleanName);
+      }
+    }
+    for (const tx of transactions) {
+      const loc = tx.location?.trim();
+      if (!loc) continue;
+      const key = loc.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        results.push(loc);
+        if (results.length >= 6) break;
+      }
+    }
+    return results;
+  }, [transactions, tripId, trips]);
 
   const isIOS = Platform.OS === 'ios';
 
@@ -363,6 +390,73 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   <AltArrowRightIcon size={14} color={mutedText} />
                 </View>
               </AnimatedPressable>
+
+              <Text style={[styles.fieldLabel, { color: mutedText, marginTop: 14 }]}>
+                LOCATION (OPTIONAL)
+              </Text>
+              <View style={[styles.locationInputWrap, { backgroundColor: inputBg }]}>
+                <MapPin size={15} color={location.trim() ? textColor : mutedText} />
+                <TextInput
+                  style={[
+                    styles.locationInput,
+                    { color: textColor },
+                    Platform.OS === 'web' &&
+                      ({
+                        outlineStyle: 'none',
+                        outlineWidth: 0,
+                        outlineColor: 'transparent',
+                        outline: 'none',
+                        boxShadow: 'none',
+                      } as any),
+                  ]}
+                  placeholder="e.g. Curlies Beach Shack, Goa"
+                  placeholderTextColor={mutedText}
+                  value={location}
+                  onChangeText={setLocation}
+                />
+                {location.length > 0 && (
+                  <AnimatedPressable
+                    scaleTo={0.9}
+                    onPress={() => setLocation('')}
+                    contentStyle={styles.clearLocationBtn}
+                  >
+                    <X size={14} color={mutedText} />
+                  </AnimatedPressable>
+                )}
+              </View>
+              {locationSuggestions.length > 0 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.locationChipsRow}
+                  style={styles.locationChipsScroll}
+                >
+                  {locationSuggestions.map((locOption) => {
+                    const isPicked = location.trim().toLowerCase() === locOption.toLowerCase();
+                    return (
+                      <AnimatedPressable
+                        key={locOption}
+                        scaleTo={0.95}
+                        onPress={() => setLocation(isPicked ? '' : locOption)}
+                        contentStyle={[
+                          styles.locationChip,
+                          { backgroundColor: isPicked ? activeBg : chipBg },
+                        ]}
+                      >
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.locationChipText,
+                            { color: isPicked ? activeText : textColor },
+                          ]}
+                        >
+                          {locOption}
+                        </Text>
+                      </AnimatedPressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
             </View>
 
             {/* Paid By, UPI Profile & Trip Group */}
@@ -824,5 +918,40 @@ const styles = StyleSheet.create({
   dateChangeHint: {
     fontSize: 12,
     fontWeight: '400',
+  },
+  locationInputWrap: {
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 0,
+  },
+  locationInput: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 14,
+    fontWeight: '400',
+    paddingVertical: 0,
+  },
+  clearLocationBtn: {
+    padding: 2,
+  },
+  locationChipsScroll: {
+    marginTop: 8,
+  },
+  locationChipsRow: {
+    gap: 6,
+    paddingRight: 8,
+  },
+  locationChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  locationChipText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
 });
