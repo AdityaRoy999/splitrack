@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Modal,
   Platform,
   ScrollView,
@@ -20,6 +22,7 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassPill } from '../glass/GlassPill';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { UpiQrModal } from '../upi/UpiQrModal';
+import { GradualBlur } from '../effects/GradualBlur';
 
 interface SettleModalProps {
   visible: boolean;
@@ -36,9 +39,18 @@ export const SettleModal: React.FC<SettleModalProps> = ({
   const { formatAmount, themeMode } = useLiquidGlass();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [toastAnim] = useState(() => new Animated.Value(0));
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   const isDark = themeMode === 'dark';
   const isIOS = Platform.OS === 'ios';
+  const useNativeDriver = Platform.OS !== 'web';
   const rawDebts = getSimplifiedDebts();
   const targetFriend = targetFriendId
     ? friends.find((f) => f.id === targetFriendId) || null
@@ -67,8 +79,29 @@ export const SettleModal: React.FC<SettleModalProps> = ({
     const friendId = fromId === 'user' ? toId : fromId;
     settleWithFriend(friendId, amount);
 
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+
     setSuccessMsg(`Settled ${formatAmount(amount)} successfully!`);
-    setTimeout(() => setSuccessMsg(null), 3000);
+    toastAnim.setValue(0);
+    Animated.spring(toastAnim, {
+      toValue: 1,
+      friction: 8,
+      tension: 85,
+      useNativeDriver,
+    }).start();
+
+    toastTimerRef.current = setTimeout(() => {
+      Animated.timing(toastAnim, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver,
+      }).start(({ finished }) => {
+        if (finished) setSuccessMsg(null);
+      });
+    }, 2600);
   };
 
   const handleSendReminder = async (debtorName: string, amount: number) => {
@@ -89,7 +122,6 @@ export const SettleModal: React.FC<SettleModalProps> = ({
 
   const bgSheet = isDark ? '#09090B' : '#F2F2F7';
   const cardSurface = isDark ? '#141418' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
   const pillSurface = isDark ? '#1B1B20' : '#F2F2F7';
@@ -138,8 +170,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                 {
                   backgroundColor: cardSurface,
                   borderRadius: 18,
-                  borderWidth: StyleSheet.hairlineWidth,
-                  borderColor: cardBorder,
+                  borderWidth: 0,
                 },
               ]}
             >
@@ -174,14 +205,8 @@ export const SettleModal: React.FC<SettleModalProps> = ({
             </View>
           )}
 
-          {successMsg && (
-            <View style={styles.successBanner}>
-              <CheckCircleIcon size={16} color="#10B981" />
-              <Text style={styles.successText}>{successMsg}</Text>
-            </View>
-          )}
-
-          <ScrollView contentContainerStyle={styles.debtsList} showsVerticalScrollIndicator={false}>
+          <View style={styles.scrollAreaWrap}>
+            <ScrollView contentContainerStyle={styles.debtsList} showsVerticalScrollIndicator={false}>
             {simplifiedDebts.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <CheckCircleIcon size={44} color="#10B981" />
@@ -197,8 +222,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                   {
                     backgroundColor: cardSurface,
                     borderRadius: 22,
-                    borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: cardBorder,
+                    borderWidth: 0,
                   },
                 ]}
               >
@@ -303,8 +327,49 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                 })}
               </View>
             )}
-          </ScrollView>
+            </ScrollView>
+            <GradualBlur position="top" height={20} strength={1.2} layers={5} tint={bgSheet} />
+            <GradualBlur position="bottom" height={24} strength={1.3} layers={5} tint={bgSheet} />
+          </View>
         </View>
+
+        {successMsg && (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.bottomBubbleWrap,
+              {
+                opacity: toastAnim,
+                transform: [
+                  {
+                    translateY: toastAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [72, 0],
+                    }),
+                  },
+                  {
+                    scale: toastAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.9, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.bottomBubblePill,
+                {
+                  backgroundColor: isDark ? '#1F2026' : '#18181B',
+                },
+              ]}
+            >
+              <CheckCircleIcon size={18} color="#10B981" />
+              <Text style={styles.bottomBubbleText}>{successMsg}</Text>
+            </View>
+          </Animated.View>
+        )}
       </View>
 
       {activeUpiAccount && (
@@ -377,7 +442,12 @@ const styles = StyleSheet.create({
   },
   debtsList: {
     gap: 10,
-    paddingVertical: 6,
+    paddingVertical: 12,
+  },
+  scrollAreaWrap: {
+    position: 'relative',
+    flexShrink: 1,
+    overflow: 'hidden',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -491,6 +561,33 @@ const styles = StyleSheet.create({
   },
   qrMiniText: {
     fontSize: 12,
+    fontWeight: '500',
+  },
+  bottomBubbleWrap: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 26,
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  bottomBubblePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    gap: 9,
+    borderWidth: 0,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.28,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  bottomBubbleText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '500',
   },
 });

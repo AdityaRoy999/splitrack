@@ -1,210 +1,758 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, useWindowDimensions, TouchableOpacity } from 'react-native';
-import Svg, { Path, Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  GestureResponderEvent,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import Svg, { Path, Defs, LinearGradient, Stop, Circle, Line } from 'react-native-svg';
+import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { triggerSelection } from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassCard } from '../glass/GlassCard';
+import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
+import {
+  CalendarDatePickerModal,
+  formatDisplayDate,
+  getTodayLocalISO,
+} from '../common/CalendarDatePickerModal';
+import {
+  shiftIsoDate,
+  useDateMonthSwipeGesture,
+} from '../../hooks/useDateMonthSwipeGesture';
+
+type CashFlowGranularity = 'Date' | 'Month' | 'Year';
+
+interface TrajectoryPoint {
+  key: string;
+  label: string;
+  fullLabel: string;
+  income: number;
+  expense: number;
+}
+
+interface PointCoord {
+  x: number;
+  y: number;
+}
+
+const MONTH_SHORT = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+function computeSmoothCurve(points: PointCoord[]): {
+  path: string;
+  length: number;
+} {
+  if (points.length === 0) return { path: '', length: 0 };
+  if (points.length === 1) {
+    return { path: `M ${points[0].x} ${points[0].y}`, length: 1 };
+  }
+
+  let path = `M ${points[0].x} ${points[0].y}`;
+  let length = 0;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const cp1x = p1.x + (p2.x - p1.x) * 0.45;
+    const cp1y = p1.y;
+    const cp2x = p1.x + (p2.x - p1.x) * 0.55;
+    const cp2y = p2.y;
+    path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+
+    // Approximate cubic segment length with 8 sub-steps
+    let prevX = p1.x;
+    let prevY = p1.y;
+    for (let s = 1; s <= 8; s++) {
+      const t = s / 8;
+      const omt = 1 - t;
+      const sx =
+        omt * omt * omt * p1.x +
+        3 * omt * omt * t * cp1x +
+        3 * omt * t * t * cp2x +
+        t * t * t * p2.x;
+      const sy =
+        omt * omt * omt * p1.y +
+        3 * omt * omt * t * cp1y +
+        3 * omt * t * t * cp2y +
+        t * t * t * p2.y;
+      length += Math.hypot(sx - prevX, sy - prevY);
+      prevX = sx;
+      prevY = sy;
+    }
+  }
+
+  return { path, length };
+}
 
 export const SplineChart: React.FC = () => {
   const { width: windowWidth } = useWindowDimensions();
-  const { chartData } = useSplitTrack();
+  const { chartData, transactions } = useSplitTrack();
   const { themeMode, formatAmount } = useLiquidGlass();
-  const [selectedIndex, setSelectedIndex] = useState<number>(4);
-  const [period, setPeriod] = useState<'Week' | 'Month' | 'Year'>('Month');
+
+  const [granularity, setGranularity] = useState<CashFlowGranularity>('Month');
+  const [selectedYear, setSelectedYear] = useState<number>(() => new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(() => new Date().getMonth());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [drawProgress, setDrawProgress] = useState<number>(() =>
+    typeof requestAnimationFrame !== 'undefined' ? 0 : 1
+  );
 
   const isDark = themeMode === 'dark';
   const width = Math.min(windowWidth - 68, 380);
-  const height = 150;
+  const height = 154;
   const paddingHorizontal = 20;
-  const paddingTop = 30;
-  const paddingBottom = 30;
+  const paddingTop = 34;
+  const paddingBottom = 26;
 
-  const activePoint = chartData[selectedIndex] || chartData[0];
+  const stepDay = useCallback(
+    (delta: -1 | 1) => {
+      const base = selectedDate || getTodayLocalISO();
+      const nextIso = shiftIsoDate(base, delta);
+      const [yStr, mStr] = nextIso.split('-');
+      setSelectedIndex(null);
+      setSelectedDate(nextIso);
+      setSelectedYear(Number(yStr) || selectedYear);
+      setSelectedMonth(Math.max(0, Math.min(11, (Number(mStr) || 1) - 1)));
+      setGranularity('Date');
+    },
+    [selectedDate, selectedYear]
+  );
 
-  const handleSelectPoint = (idx: number) => {
+  const stepMonth = useCallback(
+    (delta: -1 | 1) => {
+      let nextMonth = selectedMonth + delta;
+      let nextYear = selectedYear;
+      if (nextMonth < 0) {
+        nextMonth = 11;
+        nextYear -= 1;
+      } else if (nextMonth > 11) {
+        nextMonth = 0;
+        nextYear += 1;
+      }
+      setSelectedIndex(null);
+      setSelectedMonth(nextMonth);
+      setSelectedYear(nextYear);
+      setGranularity('Month');
+    },
+    [selectedMonth, selectedYear]
+  );
+
+  const { gestureHandlers, isMonthHoldReady } = useDateMonthSwipeGesture({
+    onStepDay: stepDay,
+    onStepMonth: stepMonth,
+  });
+
+  const pointsData = useMemo<TrajectoryPoint[]>(() => {
+    if (granularity === 'Date') {
+      if (selectedDate) {
+        const dayTx = transactions
+          .filter((tx) => tx.date === selectedDate)
+          .sort((a, b) => a.time.localeCompare(b.time));
+
+        if (dayTx.length === 0) return [];
+        if (dayTx.length === 1) {
+          const single = dayTx[0];
+          const inc = single.amount > 0 ? single.amount : 0;
+          const exp = single.amount < 0 ? Math.abs(single.amount) : 0;
+          return [
+            {
+              key: 'start',
+              label: 'Start',
+              fullLabel: formatDisplayDate(selectedDate, true),
+              income: 0,
+              expense: 0,
+            },
+            {
+              key: single.id,
+              label: single.time || 'Recorded',
+              fullLabel: `${single.title} • ${formatDisplayDate(selectedDate, true)}`,
+              income: inc,
+              expense: exp,
+            },
+          ];
+        }
+
+        let runIncome = 0;
+        let runExpense = 0;
+        return dayTx.map((tx) => {
+          if (tx.amount > 0) runIncome += tx.amount;
+          else runExpense += Math.abs(tx.amount);
+          return {
+            key: tx.id,
+            label: tx.time || tx.title.slice(0, 6),
+            fullLabel: `${tx.title} • ${tx.time}`,
+            income: runIncome,
+            expense: runExpense,
+          };
+        });
+      }
+
+      // Daily trajectory across unique recorded dates
+      const byDate = new Map<string, { income: number; expense: number }>();
+      transactions.forEach((tx) => {
+        const entry = byDate.get(tx.date) || { income: 0, expense: 0 };
+        if (tx.amount > 0) entry.income += tx.amount;
+        else entry.expense += Math.abs(tx.amount);
+        byDate.set(tx.date, entry);
+      });
+
+      return Array.from(byDate.entries())
+        .sort(([dA], [dB]) => dA.localeCompare(dB))
+        .slice(-7)
+        .map(([iso, vals]) => {
+          const [, m, d] = iso.split('-');
+          const mLabel = MONTH_SHORT[(Number(m) || 1) - 1] || m;
+          return {
+            key: iso,
+            label: `${Number(d)} ${mLabel}`,
+            fullLabel: formatDisplayDate(iso, true),
+            income: vals.income,
+            expense: vals.expense,
+          };
+        });
+    }
+
+    if (granularity === 'Year') {
+      const yearsMap = new Map<number, { income: number; expense: number }>([
+        [2024, { income: 3420, expense: 2180 }],
+        [2025, { income: 4860, expense: 2940 }],
+        [2026, { income: 0, expense: 0 }],
+      ]);
+
+      chartData.forEach((pt) => {
+        const y = Number(pt.date.split('-')[0]) || 2026;
+        const curr = yearsMap.get(y) || { income: 0, expense: 0 };
+        curr.income += pt.income;
+        curr.expense += pt.expense;
+        yearsMap.set(y, curr);
+      });
+
+      transactions.forEach((tx) => {
+        const y = Number(tx.date.split('-')[0]) || 2026;
+        const curr = yearsMap.get(y) || { income: 0, expense: 0 };
+        if (tx.amount > 0) curr.income += tx.amount;
+        else curr.expense += Math.abs(tx.amount);
+        yearsMap.set(y, curr);
+      });
+
+      return Array.from(yearsMap.entries())
+        .sort(([a], [b]) => a - b)
+        .map(([yr, vals]) => ({
+          key: String(yr),
+          label: String(yr),
+          fullLabel: `Year ${yr}`,
+          income: vals.income,
+          expense: vals.expense,
+        }));
+    }
+
+    // 6-month sliding trajectory ending at (selectedYear, selectedMonth)
+    const totalsByYm = new Map<string, { income: number; expense: number }>();
+    chartData.forEach((pt) => {
+      const [yStr, mStr] = pt.date.split('-');
+      const key = `${Number(yStr)}-${(Number(mStr) || 1) - 1}`;
+      totalsByYm.set(key, { income: pt.income, expense: pt.expense });
+    });
+
+    transactions.forEach((tx) => {
+      const [yStr, mStr] = tx.date.split('-');
+      const y = Number(yStr);
+      const mIdx = (Number(mStr) || 1) - 1;
+      if (isNaN(y) || mIdx < 0 || mIdx > 11) return;
+      const key = `${y}-${mIdx}`;
+      const existing = totalsByYm.get(key) || { income: 0, expense: 0 };
+      if (tx.amount > 0) existing.income += tx.amount;
+      else existing.expense += Math.abs(tx.amount);
+      totalsByYm.set(key, existing);
+    });
+
+    const windowPoints: TrajectoryPoint[] = [];
+    for (let offset = 5; offset >= 0; offset--) {
+      const dt = new Date(selectedYear, selectedMonth - offset, 1);
+      const y = dt.getFullYear();
+      const mIdx = dt.getMonth();
+      const key = `${y}-${mIdx}`;
+      const vals = totalsByYm.get(key) || { income: 0, expense: 0 };
+      windowPoints.push({
+        key,
+        label: MONTH_SHORT[mIdx],
+        fullLabel: `${MONTH_SHORT[mIdx]} ${y}`,
+        income: vals.income,
+        expense: vals.expense,
+      });
+    }
+    return windowPoints;
+  }, [granularity, selectedDate, selectedMonth, selectedYear, chartData, transactions]);
+
+  const defaultIndex = Math.max(0, pointsData.length - 1);
+  const safeIndex =
+    selectedIndex === null
+      ? defaultIndex
+      : Math.max(0, Math.min(selectedIndex, Math.max(0, pointsData.length - 1)));
+  const activePoint = pointsData[safeIndex];
+
+  useEffect(() => {
+    if (typeof requestAnimationFrame === 'undefined') {
+      return;
+    }
+
+    let rafId = 0;
+    const duration = 640;
+    let startTime: number | null = null;
+
+    const step = (now: number) => {
+      if (startTime === null) startTime = now;
+      const elapsed = now - startTime;
+      const raw = Math.min(1, Math.max(0, elapsed / duration));
+      const eased = 1 - Math.pow(1 - raw, 3);
+      setDrawProgress(eased);
+      if (raw < 1) {
+        rafId = requestAnimationFrame(step);
+      }
+    };
+
+    rafId = requestAnimationFrame(step);
+    return () => {
+      if (rafId && typeof cancelAnimationFrame !== 'undefined') {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [granularity, selectedDate, selectedMonth, selectedYear, pointsData.length]);
+
+  const lastScrubIdxRef = useRef<number>(safeIndex);
+  useEffect(() => {
+    lastScrubIdxRef.current = safeIndex;
+  }, [safeIndex]);
+
+  const handleSelectPoint = useCallback((idx: number) => {
+    if (idx === lastScrubIdxRef.current) return;
+    lastScrubIdxRef.current = idx;
     triggerSelection();
     setSelectedIndex(idx);
-  };
+  }, []);
 
-  const maxVal = Math.max(...chartData.map((d) => Math.max(d.income, d.expense))) * 1.25;
-  const minVal = 0;
+  const scrubAtX = useCallback(
+    (localX: number) => {
+      if (pointsData.length <= 1) {
+        if (pointsData.length === 1) handleSelectPoint(0);
+        return;
+      }
+      const plotWidth = Math.max(40, width - paddingHorizontal * 2);
+      const ratio = Math.min(1, Math.max(0, (localX - paddingHorizontal) / plotWidth));
+      const nearestIdx = Math.round(ratio * (pointsData.length - 1));
+      handleSelectPoint(nearestIdx);
+    },
+    [handleSelectPoint, paddingHorizontal, pointsData.length, width]
+  );
 
-  const getCoordinates = (value: number, index: number) => {
-    const x = paddingHorizontal + (index / (chartData.length - 1)) * (width - 2 * paddingHorizontal);
-    const y = height - paddingBottom - ((value - minVal) / (maxVal - minVal)) * (height - paddingTop - paddingBottom);
+  const handleWebGlide = useCallback(
+    (e: any) => {
+      const target = e?.currentTarget;
+      const clientX =
+        typeof e?.clientX === 'number'
+          ? e.clientX
+          : typeof e?.nativeEvent?.clientX === 'number'
+            ? e.nativeEvent.clientX
+            : null;
+      if (target && typeof target.getBoundingClientRect === 'function' && clientX !== null) {
+        const rect = target.getBoundingClientRect();
+        scrubAtX(clientX - rect.left);
+        return;
+      }
+      const locX = e?.nativeEvent?.locationX ?? e?.nativeEvent?.offsetX;
+      if (typeof locX === 'number') {
+        scrubAtX(locX);
+      }
+    },
+    [scrubAtX]
+  );
+
+  const maxVal = Math.max(
+    50,
+    ...pointsData.map((d) => Math.max(d.income, d.expense))
+  );
+
+  const getCoordinates = (val: number, index: number, total: number): PointCoord => {
+    const plotWidth = Math.max(40, width - paddingHorizontal * 2);
+    const stepX = total > 1 ? plotWidth / (total - 1) : 0;
+    const x =
+      total > 1 ? paddingHorizontal + index * stepX : paddingHorizontal + plotWidth / 2;
+    const plotHeight = height - paddingTop - paddingBottom;
+    const ratio = val / (maxVal * 1.15);
+    const y = paddingTop + plotHeight * (1 - Math.min(1, Math.max(0, ratio)));
     return { x, y };
   };
 
-  const generateSmoothPath = (key: 'income' | 'expense') => {
-    const points = chartData.map((d, i) => getCoordinates(d[key], i));
-    if (points.length < 2) return '';
+  const incomeCoords = pointsData.map((d, i) =>
+    getCoordinates(d.income, i, pointsData.length)
+  );
+  const expenseCoords = pointsData.map((d, i) =>
+    getCoordinates(d.expense, i, pointsData.length)
+  );
 
-    let path = `M ${points[0].x} ${points[0].y}`;
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = i > 0 ? points[i - 1] : points[i];
-      const p1 = points[i];
-      const p2 = points[i + 1];
-      const p3 = i < points.length - 2 ? points[i + 2] : p2;
+  const incomeCurve = computeSmoothCurve(incomeCoords);
+  const expenseCurve = computeSmoothCurve(expenseCoords);
+  const incomeArea =
+    incomeCoords.length >= 2
+      ? `${incomeCurve.path} L ${incomeCoords[incomeCoords.length - 1].x} ${height - paddingBottom} L ${incomeCoords[0].x} ${height - paddingBottom} Z`
+      : '';
 
-      const cp1x = p1.x + (p2.x - p0.x) / 6;
-      const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p3.x - p1.x) / 6;
-      const cp2y = p2.y - (p3.y - p1.y) / 6;
+  const activeExpenseCoord =
+    expenseCoords[safeIndex] || { x: width / 2, y: height / 2 };
 
-      path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
-    }
-    return path;
-  };
+  const textColor = isDark ? '#F4F4F5' : '#09090B';
+  const mutedText = isDark ? '#8E8E93' : '#71717A';
+  const surfacePill = isDark ? '#18181D' : '#F3F4F6';
+  const activeBg = isDark ? '#F4F4F5' : '#18181B';
+  const activeText = isDark ? '#18181B' : '#FFFFFF';
 
-  const generateAreaPath = (key: 'income' | 'expense') => {
-    const linePath = generateSmoothPath(key);
-    if (!linePath) return '';
-    const points = chartData.map((d, i) => getCoordinates(d[key], i));
-    const first = points[0];
-    const last = points[points.length - 1];
-    const bottomY = height - paddingBottom;
-    return `${linePath} L ${last.x} ${bottomY} L ${first.x} ${bottomY} Z`;
-  };
+  const incomeDrawLen = Math.max(0.01, drawProgress * incomeCurve.length);
+  const expenseDrawLen = Math.max(0.01, drawProgress * expenseCurve.length);
 
-  const incomePath = generateSmoothPath('income');
-  const expensePath = generateSmoothPath('expense');
-  const incomeArea = generateAreaPath('income');
-  const activeExpenseCoord = getCoordinates(activePoint.expense, selectedIndex);
+  const activeScopeSubtitle = isMonthHoldReady
+    ? 'Month Mode Ready • Swipe ↔'
+    : granularity === 'Date'
+      ? selectedDate
+        ? formatDisplayDate(selectedDate, true)
+        : 'All Dates'
+      : granularity === 'Month'
+        ? `${MONTH_SHORT[selectedMonth]} ${selectedYear}`
+        : 'Multi-Year';
 
   return (
     <GlassCard borderRadius={24} intensity={20} style={styles.card}>
-      {/* Header with Stats & Period */}
-      <View style={styles.header}>
-        <View>
-          <Text style={[styles.statSublabel, { color: isDark ? '#FFFFFF' : '#18181B' }]}>
-            {formatAmount(activePoint.income)} Income
-          </Text>
-          <Text style={[styles.statSublabelExpense, { color: isDark ? '#A1A1AA' : '#71717A' }]}>
-            {formatAmount(activePoint.expense)} Expenses
-          </Text>
-        </View>
+      <View {...gestureHandlers}>
+        {/* Header with Stats on left + Calendar Button & Date/Month/Year Selector on right */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={[styles.statSublabel, { color: isDark ? '#FFFFFF' : '#18181B' }]}>
+              {activePoint ? `${formatAmount(activePoint.income)} Income` : `${formatAmount(0)} Income`}
+            </Text>
+            <Text style={[styles.statSublabelExpense, { color: mutedText }]}>
+              {activePoint ? `${formatAmount(activePoint.expense)} Expenses` : `${formatAmount(0)} Expenses`}
+            </Text>
+          </View>
 
-        {/* Rounded JellyRadio Period Selector */}
-        <JellyRadio
-          items={['Week', 'Month', 'Year']}
-          value={period}
-          onChange={(val) => setPeriod(val as 'Week' | 'Month' | 'Year')}
-          chipColor={isDark ? '#18181D' : '#F3F4F6'}
-          activeColor={isDark ? '#F4F4F5' : '#18181B'}
-          textColor={isDark ? '#8E8E93' : '#71717A'}
-          activeTextColor={isDark ? '#18181B' : '#FFFFFF'}
-          size="sm"
-          gap={5}
-          radius={999}
-          swell={0.18}
-          barge={5}
-        />
-      </View>
-
-      {/* SVG Canvas with Modern Bezier Curves */}
-      <View style={styles.chartContainer}>
-        {/* Floating Tooltip Pin */}
-        <View
-          style={[
-            styles.tooltipPin,
-            {
-              backgroundColor: isDark ? '#FFFFFF' : '#000000',
-              left: Math.max(10, Math.min(width - 100, activeExpenseCoord.x - 45)),
-              top: Math.max(0, activeExpenseCoord.y - 48),
-            },
-          ]}
-        >
-          <Text style={[styles.tooltipAmount, { color: isDark ? '#000000' : '#FFFFFF' }]}>
-            {formatAmount(activePoint.expense)}
-          </Text>
-          <Text style={[styles.tooltipDate, { color: isDark ? '#71717A' : '#A1A1AA' }]}>
-            {activePoint.label} 2026
-          </Text>
-        </View>
-
-        <Svg width={width} height={height}>
-          <Defs>
-            {/* Amber golden gradient matching user reference image 2 */}
-            <LinearGradient id="goldCurveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%" stopColor="#F59E0B" stopOpacity="1" />
-              <Stop offset="100%" stopColor="#FCD34D" stopOpacity="0.9" />
-            </LinearGradient>
-
-            {/* Coral orange gradient for expense curve */}
-            <LinearGradient id="coralCurveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%" stopColor="#EA580C" stopOpacity="0.9" />
-              <Stop offset="100%" stopColor="#FB923C" stopOpacity="0.7" />
-            </LinearGradient>
-
-            {/* Area fill glow */}
-            <LinearGradient id="goldAreaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <Stop offset="0%" stopColor="#F59E0B" stopOpacity="0.18" />
-              <Stop offset="100%" stopColor="#F59E0B" stopOpacity="0.0" />
-            </LinearGradient>
-          </Defs>
-
-          {/* Area fill under curve */}
-          <Path
-            d={incomeArea}
-            fill="url(#goldAreaGrad)"
-          />
-
-          {/* Income trend - Vibrant gold line */}
-          <Path
-            d={incomePath}
-            fill="none"
-            stroke="url(#goldCurveGrad)"
-            strokeWidth={2.8}
-            strokeLinecap="round"
-          />
-
-          {/* Expense trend - Coral curve */}
-          <Path
-            d={expensePath}
-            fill="none"
-            stroke="url(#coralCurveGrad)"
-            strokeWidth={2.2}
-            strokeLinecap="round"
-          />
-
-          {/* Active Node Pin */}
-          <Circle
-            cx={activeExpenseCoord.x}
-            cy={activeExpenseCoord.y}
-            r={5.5}
-            fill="#FFFFFF"
-            stroke="#F59E0B"
-            strokeWidth={3}
-          />
-        </Svg>
-
-        {/* Labels Row */}
-        <View style={styles.labelsRow}>
-          {chartData.map((d, i) => (
-            <TouchableOpacity
-              key={d.label}
-              onPress={() => handleSelectPoint(i)}
-              style={styles.labelBtn}
+          <View style={styles.headerRightControls}>
+            <AnimatedPressable
+              scaleTo={0.92}
+              onPress={() => setShowCalendar(true)}
+              accessibilityLabel="Open calendar date picker for cash flow"
+              contentStyle={[
+                styles.calendarIconBtn,
+                {
+                  backgroundColor:
+                    granularity === 'Date' && selectedDate ? activeBg : surfacePill,
+                },
+              ]}
             >
-              <Text
+              <CalendarDateIcon
+                size={15}
+                color={
+                  granularity === 'Date' && selectedDate ? activeText : textColor
+                }
+              />
+            </AnimatedPressable>
+
+            <JellyRadio
+              items={['Date', 'Month', 'Year']}
+              value={granularity}
+              onChange={(val) => {
+                setSelectedIndex(null);
+                setGranularity(val as CashFlowGranularity);
+              }}
+              chipColor={surfacePill}
+              activeColor={activeBg}
+              textColor={mutedText}
+              activeTextColor={activeText}
+              size="sm"
+              gap={4}
+              radius={999}
+              swell={0.18}
+              barge={5}
+            />
+          </View>
+        </View>
+
+        {/* Quiet Context & Gesture Hint Line */}
+        <View style={styles.contextLineRow}>
+          <View
+            style={[
+              styles.gestureHintPill,
+              {
+                backgroundColor: isMonthHoldReady
+                  ? isDark
+                    ? 'rgba(16, 185, 129, 0.2)'
+                    : 'rgba(16, 185, 129, 0.14)'
+                  : 'transparent',
+              },
+            ]}
+          >
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.gestureHintText,
+                { color: isMonthHoldReady ? '#10B981' : mutedText },
+              ]}
+            >
+              {activeScopeSubtitle}
+            </Text>
+          </View>
+
+          {granularity === 'Date' && selectedDate && (
+            <AnimatedPressable
+              scaleTo={0.94}
+              onPress={() => {
+                setSelectedIndex(null);
+                setSelectedDate(null);
+              }}
+              contentStyle={[styles.clearChip, { backgroundColor: surfacePill }]}
+            >
+              <Text style={[styles.clearChipText, { color: mutedText }]}>All Dates</Text>
+            </AnimatedPressable>
+          )}
+        </View>
+
+        {pointsData.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={[styles.emptyText, { color: mutedText }]}>
+              No cash flow recorded on{' '}
+              {selectedDate ? formatDisplayDate(selectedDate, true) : 'this selection'}.
+            </Text>
+            <AnimatedPressable
+              scaleTo={0.95}
+              onPress={() => {
+                setSelectedIndex(null);
+                setSelectedDate(null);
+              }}
+              contentStyle={[styles.clearChip, { backgroundColor: surfacePill, marginTop: 10, paddingHorizontal: 14, paddingVertical: 6 }]}
+            >
+              <Text style={[styles.clearChipText, { color: textColor }]}>Show All Dates</Text>
+            </AnimatedPressable>
+          </View>
+        ) : (
+          <View style={styles.chartContainer}>
+            {/* Floating Tooltip Pin */}
+            {activePoint && (
+              <View
+                pointerEvents="none"
                 style={[
-                  styles.axisLabel,
+                  styles.tooltipPin,
                   {
-                    color: selectedIndex === i
-                      ? (isDark ? '#FFFFFF' : '#000000')
-                      : (isDark ? '#52525B' : '#9CA3AF'),
-                    fontWeight: selectedIndex === i ? '500' : '400',
+                    backgroundColor: isDark ? '#FFFFFF' : '#000000',
+                    left: Math.max(10, Math.min(width - 108, activeExpenseCoord.x - 48)),
+                    top: Math.max(0, activeExpenseCoord.y - 48),
+                    opacity: drawProgress > 0.35 ? 1 : 0,
                   },
                 ]}
               >
-                {d.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+                <Text style={[styles.tooltipAmount, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                  {formatAmount(activePoint.expense)}
+                </Text>
+                <Text style={[styles.tooltipDate, { color: isDark ? '#71717A' : '#A1A1AA' }]}>
+                  {activePoint.fullLabel}
+                </Text>
+              </View>
+            )}
+
+            <View style={{ width, height, position: 'relative' }}>
+              <Svg width={width} height={height}>
+                <Defs>
+                  <LinearGradient id="goldFillGrad" x1="0" y1="0" x2="0" y2="1">
+                    <Stop offset="0%" stopColor="#F59E0B" stopOpacity={0.25 * drawProgress} />
+                    <Stop offset="100%" stopColor="#F59E0B" stopOpacity={0.0} />
+                  </LinearGradient>
+                  <LinearGradient id="goldCurveGrad" x1="0" y1="0" x2="1" y2="0">
+                    <Stop offset="0%" stopColor="#FDE047" />
+                    <Stop offset="100%" stopColor="#F59E0B" />
+                  </LinearGradient>
+                  <LinearGradient id="coralCurveGrad" x1="0" y1="0" x2="1" y2="0">
+                    <Stop offset="0%" stopColor="#F97316" />
+                    <Stop offset="100%" stopColor="#EA580C" />
+                  </LinearGradient>
+                </Defs>
+
+                {drawProgress > 0.35 && (
+                  <Line
+                    x1={activeExpenseCoord.x}
+                    y1={paddingTop - 6}
+                    x2={activeExpenseCoord.x}
+                    y2={height - paddingBottom + 6}
+                    stroke={isDark ? 'rgba(255,255,255,0.16)' : 'rgba(15,23,42,0.14)'}
+                    strokeWidth={1.25}
+                    strokeDasharray="3 4"
+                  />
+                )}
+
+                {incomeArea ? (
+                  <Path d={incomeArea} fill="url(#goldFillGrad)" opacity={drawProgress} />
+                ) : null}
+
+                {incomeCurve.path ? (
+                  <Path
+                    d={incomeCurve.path}
+                    fill="none"
+                    stroke="url(#goldCurveGrad)"
+                    strokeWidth={2.8}
+                    strokeLinecap="round"
+                    strokeDasharray={
+                      incomeCurve.length > 0 && drawProgress < 0.999
+                        ? `${incomeDrawLen} ${incomeCurve.length + 20}`
+                        : undefined
+                    }
+                  />
+                ) : null}
+
+                {expenseCurve.path ? (
+                  <Path
+                    d={expenseCurve.path}
+                    fill="none"
+                    stroke="url(#coralCurveGrad)"
+                    strokeWidth={2.2}
+                    strokeLinecap="round"
+                    strokeDasharray={
+                      expenseCurve.length > 0 && drawProgress < 0.999
+                        ? `${expenseDrawLen} ${expenseCurve.length + 20}`
+                        : undefined
+                    }
+                  />
+                ) : null}
+
+                {expenseCoords.map((pt, idx) => {
+                  const isActive = idx === safeIndex;
+                  if (!isActive) return null;
+                  return (
+                    <Circle
+                      key={`dot-${idx}`}
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={Math.max(1.5, 5.5 * drawProgress)}
+                      fill="#FFFFFF"
+                      stroke="#F59E0B"
+                      strokeWidth={3}
+                      opacity={drawProgress > 0.2 ? 1 : 0}
+                    />
+                  );
+                })}
+              </Svg>
+
+              {/* Transparent Glide / Scrub Overlay */}
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  Platform.OS === 'web' && ({ cursor: 'ew-resize' } as any),
+                ]}
+                onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => true}
+                onResponderTerminationRequest={() => false}
+                onResponderGrant={(e: GestureResponderEvent) => {
+                  e.stopPropagation?.();
+                  scrubAtX(e.nativeEvent.locationX);
+                }}
+                onResponderMove={(e: GestureResponderEvent) => {
+                  e.stopPropagation?.();
+                  scrubAtX(e.nativeEvent.locationX);
+                }}
+                {...(Platform.OS === 'web'
+                  ? ({
+                      onPointerMove: handleWebGlide,
+                      onMouseMove: handleWebGlide,
+                      onMouseDown: (e: any) => {
+                        e.stopPropagation?.();
+                        handleWebGlide(e);
+                      },
+                      onTouchStart: (e: any) => {
+                        e.stopPropagation?.();
+                        const touch = e?.nativeEvent?.touches?.[0] || e?.nativeEvent;
+                        if (touch?.locationX !== undefined) scrubAtX(touch.locationX);
+                      },
+                      onTouchMove: (e: any) => {
+                        e.stopPropagation?.();
+                        const touch = e?.nativeEvent?.touches?.[0] || e?.nativeEvent;
+                        if (touch?.locationX !== undefined) scrubAtX(touch.locationX);
+                      },
+                    } as any)
+                  : {})}
+              />
+            </View>
+
+            {/* Labels Row */}
+            <View style={styles.labelsRow}>
+              {pointsData.map((d, i) => (
+                <TouchableOpacity
+                  key={`${d.key}-${i}`}
+                  onPress={() => handleSelectPoint(i)}
+                  {...(Platform.OS === 'web'
+                    ? ({ onMouseEnter: () => handleSelectPoint(i) } as any)
+                    : {})}
+                  style={styles.labelBtn}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.axisLabel,
+                      {
+                        color:
+                          safeIndex === i
+                            ? isDark
+                              ? '#FFFFFF'
+                              : '#000000'
+                            : isDark
+                              ? '#52525B'
+                              : '#9CA3AF',
+                        fontWeight: safeIndex === i ? '500' : '400',
+                      },
+                    ]}
+                  >
+                    {d.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
       </View>
+
+      <CalendarDatePickerModal
+        visible={showCalendar}
+        selectedDate={selectedDate}
+        onSelectDate={(iso) => {
+          setSelectedIndex(null);
+          setSelectedDate(iso);
+          if (iso) {
+            const [yStr, mStr] = iso.split('-');
+            const yr = Number(yStr);
+            const mn = (Number(mStr) || 1) - 1;
+            if (!isNaN(yr)) setSelectedYear(yr);
+            if (!isNaN(mn) && mn >= 0 && mn <= 11) setSelectedMonth(mn);
+            setGranularity('Date');
+          }
+        }}
+        onClose={() => setShowCalendar(false)}
+        markedDates={transactions.map((t) => t.date)}
+        allowClear={true}
+        title="Cash Flow Date"
+      />
     </GlassCard>
   );
 };
@@ -220,22 +768,81 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
+    rowGap: 8,
+    columnGap: 8,
+  },
+  headerLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerRightControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
+  calendarIconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
   },
   statSublabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   statSublabelExpense: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '400',
     marginTop: 2,
   },
+  contextLineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 4,
+  },
+  gestureHintPill: {
+    flexShrink: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  gestureHintText: {
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: 0.15,
+  },
+  clearChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 0,
+  },
+  clearChipText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  emptyBox: {
+    paddingVertical: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 13,
+    fontWeight: '400',
+    textAlign: 'center',
+  },
   chartContainer: {
     position: 'relative',
-    marginTop: 10,
+    marginTop: 8,
   },
   tooltipPin: {
     position: 'absolute',
@@ -267,6 +874,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   axisLabel: {
-    fontSize: 12,
+    fontSize: 11,
   },
 });
+
+export default SplineChart;

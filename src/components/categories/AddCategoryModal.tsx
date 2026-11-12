@@ -23,6 +23,7 @@ import { ImpactStyle, NotificationType, triggerImpact, triggerNotification } fro
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { GlassPill } from '../glass/GlassPill';
+import { GradualBlur } from '../effects/GradualBlur';
 
 interface AddCategoryModalProps {
   visible: boolean;
@@ -55,6 +56,9 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
   const [selectedGroup, setSelectedGroup] = useState<SolarIconGroup>('All');
   const [selectedIconKey, setSelectedIconKey] = useState('cup-hot');
   const [selectedColor, setSelectedColor] = useState(ACCENT_PALETTE[0]);
+  const [gridWidth, setGridWidth] = useState(0);
+
+  const iconTileWidth = gridWidth > 0 ? Math.floor((gridWidth - 24) / 4) : undefined;
 
   const sheetBg = isDark ? '#0B0B0E' : '#F6F7FB';
   const cardBg = isDark ? '#141418' : '#FFFFFF';
@@ -150,7 +154,8 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
             </AnimatedPressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.scrollAreaWrap}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {/* Category Preview + Name Input */}
             <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
               <View style={styles.previewRow}>
@@ -161,7 +166,14 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                   style={[
                     styles.nameInput,
                     { backgroundColor: inputBg, color: textColor },
-                    Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null,
+                    Platform.OS === 'web' &&
+                      ({
+                        outlineStyle: 'none',
+                        outlineWidth: 0,
+                        outlineColor: 'transparent',
+                        outline: 'none',
+                        boxShadow: 'none',
+                      } as any),
                   ]}
                   placeholder="Name (e.g. Drinks, Gym, Pets)"
                   placeholderTextColor={mutedText}
@@ -215,7 +227,14 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                   style={[
                     styles.searchInput,
                     { color: textColor },
-                    Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null,
+                    Platform.OS === 'web' &&
+                      ({
+                        outlineStyle: 'none',
+                        outlineWidth: 0,
+                        outlineColor: 'transparent',
+                        outline: 'none',
+                        boxShadow: 'none',
+                      } as any),
                   ]}
                   placeholder="Search coffee, car, gym, food, wifi..."
                   placeholderTextColor={mutedText}
@@ -227,6 +246,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
               <View style={styles.groupRadioWrap}>
                 <JellyRadio
                   scrollable
+                  fadeColor={cardBg}
                   items={[...SOLAR_ICON_GROUPS]}
                   value={selectedGroup}
                   onChange={(val) => setSelectedGroup(val as SolarIconGroup)}
@@ -240,7 +260,15 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                 />
               </View>
 
-              <View style={styles.iconsGrid}>
+              <View
+                style={styles.iconsGrid}
+                onLayout={(e) => {
+                  const nextW = Math.floor(e.nativeEvent.layout.width);
+                  if (nextW > 0 && Math.abs(nextW - gridWidth) > 1) {
+                    setGridWidth(nextW);
+                  }
+                }}
+              >
                 {filteredIcons.map((item) => {
                   const active = selectedIconKey === item.key;
                   return (
@@ -251,9 +279,13 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                         triggerImpact(ImpactStyle.Light);
                         setSelectedIconKey(item.key);
                       }}
+                      style={
+                        iconTileWidth ? { width: iconTileWidth } : styles.iconTileWrapFallback
+                      }
                       contentStyle={[
                         styles.iconTile,
                         {
+                          width: '100%',
                           backgroundColor: active ? selectedColor : inputBg,
                         },
                       ]}
@@ -273,7 +305,10 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                 })}
               </View>
             </View>
-          </ScrollView>
+            </ScrollView>
+            <GradualBlur position="top" height={22} strength={1.3} layers={6} tint={sheetBg} />
+            <GradualBlur position="bottom" height={26} strength={1.4} layers={6} tint={sheetBg} />
+          </View>
 
           <GlassPill
             label="Create Category"
@@ -340,9 +375,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 0,
   },
+  scrollAreaWrap: {
+    position: 'relative',
+    flexShrink: 1,
+    overflow: 'hidden',
+  },
   scrollContent: {
     gap: 12,
-    paddingBottom: 14,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
   sectionCard: {
     borderRadius: 22,
@@ -423,13 +464,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    alignItems: 'stretch',
+  },
+  iconTileWrapFallback: {
+    width: '23%',
+    minWidth: 68,
   },
   iconTile: {
-    width: '23%',
-    minWidth: 72,
     borderRadius: 14,
-    paddingVertical: 10,
+    paddingVertical: 11,
     paddingHorizontal: 6,
+    height: 66,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,

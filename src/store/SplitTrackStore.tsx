@@ -415,7 +415,15 @@ interface SplitTrackContextType {
   selectedAccountId: string;
   setSelectedAccountId: (id: string) => void;
   addTransaction: (tx: Omit<Transaction, 'id'>) => void;
-  addFriend: (friend: Omit<Friend, 'id' | 'netBalance'>) => void;
+  addFriend: (friend: Omit<Friend, 'id' | 'netBalance'>) => Friend;
+  updateFriend: (
+    friendId: string,
+    updates: Partial<Omit<Friend, 'id' | 'netBalance'>>
+  ) => Friend | null;
+  addMemberToTrip: (
+    tripId: string,
+    member: string | { name: string; avatar?: string }
+  ) => Friend | null;
   addTrip: (trip: Omit<Trip, 'id' | 'totalSpend'>) => void;
   addUpiAccount: (acc: Omit<UpiAccount, 'id' | 'totalSpent'>) => UpiAccount;
   addCategory: (name: string, iconKey: string, color?: string) => ExpenseCategory;
@@ -577,7 +585,7 @@ export const SplitTrackProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   // Add friend
-  const addFriend = (friendData: Omit<Friend, 'id' | 'netBalance'>) => {
+  const addFriend = (friendData: Omit<Friend, 'id' | 'netBalance'>): Friend => {
     const newFriend: Friend = {
       ...friendData,
       id: `friend-${Date.now()}`,
@@ -585,7 +593,70 @@ export const SplitTrackProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
     const nextFriends = [newFriend, ...friends];
     setFriends(nextFriends);
-    saveState(accounts, nextFriends, trips, transactions);
+    saveState(accounts, nextFriends, trips, transactions, categories);
+    return newFriend;
+  };
+
+  // Update existing member details (name, handle, avatar, upiId, phone)
+  const updateFriend = (
+    friendId: string,
+    updates: Partial<Omit<Friend, 'id' | 'netBalance'>>
+  ): Friend | null => {
+    let updated: Friend | null = null;
+    const nextFriends = friends.map((f) => {
+      if (f.id !== friendId) return f;
+      updated = {
+        ...f,
+        ...updates,
+        id: f.id,
+        netBalance: f.netBalance,
+      };
+      return updated;
+    });
+    if (!updated) return null;
+    setFriends(nextFriends);
+    saveState(accounts, nextFriends, trips, transactions, categories);
+    triggerNotification(NotificationType.Success);
+    return updated;
+  };
+
+  // Add either an existing friendId or a newly created member atomically to a trip
+  const addMemberToTrip = (
+    tripId: string,
+    member: string | { name: string; avatar?: string }
+  ): Friend | null => {
+    let targetFriend: Friend | null = null;
+    let nextFriends = friends;
+
+    if (typeof member === 'string') {
+      targetFriend = friends.find((f) => f.id === member) || null;
+      if (!targetFriend) return null;
+    } else {
+      const cleanName = member.name.trim();
+      if (!cleanName) return null;
+      const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'member';
+      targetFriend = {
+        id: `friend-${Date.now()}`,
+        name: cleanName,
+        handle: `@${slug}`,
+        avatar: member.avatar || '',
+        netBalance: 0,
+      };
+      nextFriends = [targetFriend, ...friends];
+      setFriends(nextFriends);
+    }
+
+    const memberId = targetFriend.id;
+    const nextTrips = trips.map((t) => {
+      if (t.id !== tripId) return t;
+      if (t.members.includes(memberId)) return t;
+      return { ...t, members: [...t.members, memberId] };
+    });
+
+    setTrips(nextTrips);
+    saveState(accounts, nextFriends, nextTrips, transactions, categories);
+    triggerNotification(NotificationType.Success);
+    return targetFriend;
   };
 
   // Add Trip
@@ -766,6 +837,8 @@ export const SplitTrackProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setSelectedAccountId,
         addTransaction,
         addFriend,
+        updateFriend,
+        addMemberToTrip,
         addTrip,
         addUpiAccount,
         addCategory,

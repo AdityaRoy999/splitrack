@@ -42,10 +42,15 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       <View style={styles.userSection}>
         <AnimatedPressable scaleTo={0.94} onPress={handleSettings} style={styles.avatarWrapper}>
           <Image
-            source={require('../../../assets/icon.png')}
+            source={
+              isDark
+                ? require('../../../assets/icon-dark.png')
+                : require('../../../assets/icon-light.png')
+            }
+            resizeMode="cover"
             style={[
               styles.avatar,
-              { backgroundColor: isDark ? '#1E1E24' : '#E5E7EB' },
+              { backgroundColor: isDark ? '#000000' : '#FFFFFF' },
             ]}
           />
         </AnimatedPressable>

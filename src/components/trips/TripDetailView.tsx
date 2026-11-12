@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
@@ -13,6 +13,7 @@ import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassCard } from '../glass/GlassCard';
 import { SpotlightCard } from '../glass/SpotlightCard';
 import { GlassPill } from '../glass/GlassPill';
+import { AddMemberModal } from './AddMemberModal';
 
 interface TripDetailViewProps {
   trip: Trip;
@@ -31,6 +32,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
 }) => {
   const { friends, transactions, categories } = useSplitTrack();
   const { formatAmount, themeMode } = useLiquidGlass();
+  const [showAddMember, setShowAddMember] = useState(false);
   const isDark = themeMode === 'dark';
 
   const textColor = isDark ? '#FFFFFF' : '#09090B';
@@ -117,9 +119,19 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
 
       {/* Members Card */}
       <View style={styles.sectionBlock}>
-        <Text style={[styles.sectionHeading, { color: textColor }]}>
-          Members ({trip.members.length})
-        </Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionHeading, { color: textColor }]}>
+            Members ({trip.members.length})
+          </Text>
+          <AnimatedPressable
+            scaleTo={0.9}
+            onPress={() => setShowAddMember(true)}
+            accessibilityLabel="Add trip member"
+            contentStyle={[styles.addMemberBtn, { backgroundColor: pillSurface }]}
+          >
+            <AddCircleIcon size={16} color={textColor} />
+          </AnimatedPressable>
+        </View>
         <GlassCard borderRadius={22} style={styles.membersCard}>
           <View style={styles.membersWrap}>
             <View style={[styles.memberPill, { backgroundColor: pillSurface }]}>
@@ -129,7 +141,20 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
 
             {tripFriends.map((f) => (
               <View key={f.id} style={[styles.memberPill, { backgroundColor: pillSurface }]}>
-                <Image source={{ uri: f.avatar }} style={styles.memberAvatar} />
+                {f.avatar ? (
+                  <Image source={{ uri: f.avatar }} style={styles.memberAvatar} />
+                ) : (
+                  <View
+                    style={[
+                      styles.memberInitialCircle,
+                      { backgroundColor: isDark ? '#27272F' : '#D4D4D8' },
+                    ]}
+                  >
+                    <Text style={[styles.memberInitialText, { color: textColor }]}>
+                      {f.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
                 <Text style={[styles.memberName, { color: textColor }]}>{f.name}</Text>
               </View>
             ))}
@@ -231,6 +256,12 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
           </GlassCard>
         )}
       </View>
+
+      <AddMemberModal
+        visible={showAddMember}
+        onClose={() => setShowAddMember(false)}
+        tripId={trip.id}
+      />
     </View>
   );
 };
@@ -359,6 +390,25 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
+  },
+  memberInitialCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberInitialText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  addMemberBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
   },
   memberName: {
     fontSize: 12,

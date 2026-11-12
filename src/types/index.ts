@@ -57,7 +57,7 @@ export interface SplitMemberShare {
 export interface Trip {
   id: string;
   name: string;
-  category: 'trip' | 'apartment' | 'party' | 'weekend' | 'general';
+  category: string;
   icon: string;
   coverGradient: [string, string];
   coverImage?: string;

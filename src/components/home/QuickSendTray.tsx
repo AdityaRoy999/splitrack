@@ -7,6 +7,7 @@ import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { Friend } from '../../types';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { GradualBlur } from '../effects/GradualBlur';
 
 interface QuickSendTrayProps {
   onSelectFriend: (friend: Friend) => void;
@@ -18,7 +19,7 @@ export const QuickSendTray: React.FC<QuickSendTrayProps> = ({
   onAddFriend,
 }) => {
   const { friends } = useSplitTrack();
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const handlePressFriend = (friend: Friend) => {
@@ -49,12 +50,13 @@ export const QuickSendTray: React.FC<QuickSendTrayProps> = ({
         </AnimatedPressable>
       </View>
 
-      <ScrollView
-        horizontal
-        style={styles.horizontalScroll}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+      <View style={styles.horizontalBlurWrap}>
+        <ScrollView
+          horizontal
+          style={styles.horizontalScroll}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
         {friends.map((friend) => {
           const isOwed = friend.netBalance > 0;
           const isOwing = friend.netBalance < 0;
@@ -67,13 +69,27 @@ export const QuickSendTray: React.FC<QuickSendTrayProps> = ({
               contentStyle={styles.friendItem}
             >
               <View style={styles.avatarWrapper}>
-                <Image
-                  source={{ uri: friend.avatar }}
-                  style={[
-                    styles.avatar,
-                    { backgroundColor: isDark ? '#1E1E24' : '#E5E7EB' },
-                  ]}
-                />
+                {friend.avatar ? (
+                  <Image
+                    source={{ uri: friend.avatar }}
+                    style={[
+                      styles.avatar,
+                      { backgroundColor: isDark ? '#1E1E24' : '#E5E7EB' },
+                    ]}
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.avatar,
+                      styles.avatarFallback,
+                      { backgroundColor: isDark ? '#1E1E24' : '#E5E7EB' },
+                    ]}
+                  >
+                    <Text style={[styles.avatarInitial, { color: textColor }]}>
+                      {friend.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
                 {isOwed && (
                   <View style={[styles.badge, styles.badgeOwed]}>
                     <Text style={styles.badgeText}>+{Math.round(friend.netBalance)}</Text>
@@ -104,7 +120,38 @@ export const QuickSendTray: React.FC<QuickSendTrayProps> = ({
             </AnimatedPressable>
           );
         })}
-      </ScrollView>
+        </ScrollView>
+        <GradualBlur
+          position="left"
+          width={18}
+          strength={1.1}
+          layers={5}
+          tint={
+            isLiquidGlassEnabled
+              ? isDark
+                ? 'rgba(5, 5, 10, 0.5)'
+                : 'rgba(232, 237, 246, 0.5)'
+              : isDark
+                ? 'rgba(9, 9, 11, 0.8)'
+                : 'rgba(242, 242, 247, 0.8)'
+          }
+        />
+        <GradualBlur
+          position="right"
+          width={22}
+          strength={1.2}
+          layers={5}
+          tint={
+            isLiquidGlassEnabled
+              ? isDark
+                ? 'rgba(5, 5, 10, 0.5)'
+                : 'rgba(232, 237, 246, 0.5)'
+              : isDark
+                ? 'rgba(9, 9, 11, 0.8)'
+                : 'rgba(242, 242, 247, 0.8)'
+          }
+        />
+      </View>
     </View>
   );
 };
@@ -135,6 +182,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 0,
   },
+  horizontalBlurWrap: {
+    position: 'relative',
+    width: '100%',
+    overflow: 'hidden',
+  },
   horizontalScroll: {
     width: '100%',
   },
@@ -155,6 +207,14 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 27,
     borderWidth: 0, // completely borderless
+  },
+  avatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontSize: 18,
+    fontWeight: '600',
   },
   badge: {
     position: 'absolute',

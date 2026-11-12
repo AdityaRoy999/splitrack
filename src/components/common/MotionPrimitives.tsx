@@ -5,6 +5,8 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 interface AnimatedPressableProps {
   children: React.ReactNode;
   onPress?: () => void;
+  onHoverIn?: () => void;
+  onHoverOut?: () => void;
   disabled?: boolean;
   scaleTo?: number;
   style?: StyleProp<ViewStyle>;
@@ -19,6 +21,8 @@ interface AnimatedPressableProps {
 export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   children,
   onPress,
+  onHoverIn,
+  onHoverOut,
   disabled = false,
   scaleTo = 0.97,
   style,
@@ -38,7 +42,12 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   };
 
   return (
-    <Animated.View style={[style, { transform: [{ scale: scaleAnim }] }]}>
+    <Animated.View
+      style={[style, { transform: [{ scale: scaleAnim }] }]}
+      {...(Platform.OS === 'web' && (onHoverIn || onHoverOut)
+        ? ({ onMouseEnter: onHoverIn, onMouseLeave: onHoverOut } as any)
+        : {})}
+    >
       <TouchableOpacity
         activeOpacity={0.9}
         disabled={disabled || !onPress}

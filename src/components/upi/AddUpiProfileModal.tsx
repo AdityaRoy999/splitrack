@@ -17,6 +17,7 @@ import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
 import { GlassPill } from '../glass/GlassPill';
+import { GradualBlur } from '../effects/GradualBlur';
 
 interface AddUpiProfileModalProps {
   visible: boolean;
@@ -199,7 +200,8 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
             </AnimatedPressable>
           </View>
 
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.scrollAreaWrap}>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
               <Text style={[styles.fieldLabel, { color: mutedText }]}>PROFILE TYPE</Text>
               <JellyRadio
@@ -356,7 +358,10 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
                 />
               </View>
             </View>
-          </ScrollView>
+            </ScrollView>
+            <GradualBlur position="top" height={22} strength={1.3} layers={6} tint={bgSheet} />
+            <GradualBlur position="bottom" height={26} strength={1.4} layers={6} tint={bgSheet} />
+          </View>
 
           <GlassPill
             label={kind === 'upi' ? 'Save UPI Profile' : 'Save Card Profile'}
@@ -423,9 +428,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 0,
   },
+  scrollAreaWrap: {
+    position: 'relative',
+    flexShrink: 1,
+    overflow: 'hidden',
+  },
   scrollContent: {
     gap: 12,
-    paddingBottom: 14,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
   sectionCard: {
     borderRadius: 22,

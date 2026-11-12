@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CopyIcon } from '@solar-icons/react-native/bold/copy';
 import { QrCodeIcon } from '@solar-icons/react-native/bold/qr-code';
@@ -241,29 +241,11 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
         {/* Middle Row for Real Debit / Credit Bank Cards */}
         {isCardProfile && (
           <View style={styles.cardMiddleRow} pointerEvents="none">
-            <View
-              style={[
-                styles.emvChip,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(255, 224, 153, 0.24)'
-                    : 'rgba(180, 140, 60, 0.22)',
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.emvChipInnerH,
-                  { backgroundColor: isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.2)' },
-                ]}
-              />
-              <View
-                style={[
-                  styles.emvChipInnerV,
-                  { backgroundColor: isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.2)' },
-                ]}
-              />
-            </View>
+            <Image
+              source={require('../../../assets/card-chip.png')}
+              style={styles.emvChipImage}
+              resizeMode="contain"
+            />
             <Text style={[styles.cardNumberDigits, { color: textColor }]} numberOfLines={1}>
               {acc.cardNumber}
             </Text>
@@ -632,26 +614,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  emvChip: {
-    width: 30,
-    height: 21,
+  emvChipImage: {
+    width: 34,
+    height: 27,
     borderRadius: 5,
-    position: 'relative',
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emvChipInnerH: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 1,
-  },
-  emvChipInnerV: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 1,
   },
   cardNumberDigits: {
     flex: 1,

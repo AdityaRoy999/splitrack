@@ -16,6 +16,7 @@ import { BillListIcon } from '@solar-icons/react-native/bold/bill-list';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { UsersGroupTwoRoundedIcon } from '@solar-icons/react-native/bold/users-group-two-rounded';
+import { InfoCircleIcon } from '@solar-icons/react-native/linear/info-circle';
 
 // Providers & Context
 import { LiquidGlassProvider, useLiquidGlass } from './src/theme/LiquidGlassContext';
@@ -24,6 +25,7 @@ import { renderSolarIcon } from './src/constants/solarIconsCatalog';
 
 // Glass & Modern Nav Components
 import { Aurora } from './src/components/effects/Aurora';
+import { GradualBlur } from './src/components/effects/GradualBlur';
 import { GlassDock, TabKey } from './src/components/glass/GlassDock';
 import { GlassCard } from './src/components/glass/GlassCard';
 import { GlassPill } from './src/components/glass/GlassPill';
@@ -36,18 +38,24 @@ import { QuickSendTray } from './src/components/home/QuickSendTray';
 import { RecentTransactions } from './src/components/home/RecentTransactions';
 import { DonutPieChart } from './src/components/charts/DonutPieChart';
 import { SplineChart } from './src/components/charts/SplineChart';
+import { AnalyticsInfoModal } from './src/components/charts/AnalyticsInfoModal';
 import { TripCard } from './src/components/trips/TripCard';
 import { TripDetailView } from './src/components/trips/TripDetailView';
 import { UpiProfilesSection } from './src/components/upi/UpiProfilesSection';
+import { ManageMembersSection } from './src/components/members/ManageMembersSection';
+import { MembersPageView } from './src/components/members/MembersPageView';
+import { MemberDetailView } from './src/components/members/MemberDetailView';
 
 // Modals & Primitives
 import { AddExpenseModal } from './src/components/split/AddExpenseModal';
 import { AddTripModal } from './src/components/trips/AddTripModal';
+import { AddMemberModal } from './src/components/trips/AddMemberModal';
 import { AddCategoryModal } from './src/components/categories/AddCategoryModal';
 import { SettleModal } from './src/components/trips/SettleModal';
 import { SettingsModal } from './src/components/settings/SettingsModal';
 import { CalendarDatePickerModal, formatDisplayDate } from './src/components/common/CalendarDatePickerModal';
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
+import { PreloaderSplash } from './src/components/common/PreloaderSplash';
 import { AnimatedPressable, FadeInSlide } from './src/components/common/MotionPrimitives';
 import { JellyRadio } from './src/components/common/JellyRadio';
 import { ExpenseCategory, Friend, Transaction } from './src/types';
@@ -88,15 +96,23 @@ function MainAppContent() {
   const [selectedExpenseDate, setSelectedExpenseDate] = useState<string | null>(null);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
 
-  // Separate Trip Page & Modals
+  // Separate Trip Page, Member Pages & Modals
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [homeView, setHomeView] = useState<'overview' | 'members' | 'member-detail'>('overview');
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [expenseDefaultTripId, setExpenseDefaultTripId] = useState<string | undefined>(undefined);
+  const [expenseDefaultFriendIds, setExpenseDefaultFriendIds] = useState<string[] | undefined>(
+    undefined
+  );
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAddTrip, setShowAddTrip] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showSettle, setShowSettle] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAnalyticsInfo, setShowAnalyticsInfo] = useState(false);
   const [selectedFriendForSettle, setSelectedFriendForSettle] = useState<Friend | null>(null);
+  const [editingFriend, setEditingFriend] = useState<Friend | null>(null);
 
   const handleSelectFriend = (friend: Friend) => {
     setSelectedFriendForSettle(friend);
@@ -110,63 +126,146 @@ function MainAppContent() {
   const activeText = isDark ? '#18181B' : '#FFFFFF';
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
 
-  const renderHomeTab = () => (
-    <ScrollView
-      key="home-tab-scroll"
-      style={styles.scrollView}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={[styles.scrollContent, { paddingBottom: 108 }]}
-    >
-      <FadeInSlide key="home-tab" style={styles.contentConstrainer}>
-        <HeaderBar
-          onOpenSettings={() => setShowSettings(true)}
-          userName="Jfiqw Alex"
-        />
+  const renderHomeTab = () => {
+    const activeMember = selectedMemberId
+      ? friends.find((f) => f.id === selectedMemberId)
+      : undefined;
 
-        <HeroBalanceCard
-          onAddExpense={() => setShowAddExpense(true)}
-          onSettle={() => setShowSettle(true)}
-          onOpenTrips={() => setCurrentTab('trips')}
-        />
+    if (homeView === 'member-detail' && activeMember) {
+      return (
+        <ScrollView
+          key={`member-detail-scroll-${activeMember.id}`}
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 108 }]}
+        >
+          <FadeInSlide key={`member-detail-${activeMember.id}`} style={styles.contentConstrainer}>
+            <HeaderBar
+              onOpenSettings={() => setShowSettings(true)}
+              userName={activeMember.name}
+            />
+            <MemberDetailView
+              friend={activeMember}
+              onBack={() => setHomeView('members')}
+              onEditFriend={(friend) => {
+                setEditingFriend(friend);
+                setShowAddMember(true);
+              }}
+              onSettleFriend={handleSelectFriend}
+              onSplitWithFriend={(f) => {
+                setExpenseDefaultTripId(undefined);
+                setExpenseDefaultFriendIds([f.id]);
+                setShowAddExpense(true);
+              }}
+              onOpenTrip={(tripId) => {
+                setSelectedTripId(tripId);
+                setCurrentTab('trips');
+              }}
+            />
+          </FadeInSlide>
+        </ScrollView>
+      );
+    }
 
-        <QuickSendTray
-          onSelectFriend={handleSelectFriend}
-          onAddFriend={() => setShowAddExpense(true)}
-        />
+    if (homeView === 'members') {
+      return (
+        <ScrollView
+          key="members-page-scroll"
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 108 }]}
+        >
+          <FadeInSlide key="members-page" style={styles.contentConstrainer}>
+            <HeaderBar
+              onOpenSettings={() => setShowSettings(true)}
+              userName="Manage Members"
+            />
+            <MembersPageView
+              onBack={() => {
+                setSelectedMemberId(null);
+                setHomeView('overview');
+              }}
+              onSelectMember={(friend) => {
+                setSelectedMemberId(friend.id);
+                setHomeView('member-detail');
+              }}
+              onEditMember={(friend) => {
+                setEditingFriend(friend);
+                setShowAddMember(true);
+              }}
+              onAddMember={() => {
+                setEditingFriend(null);
+                setShowAddMember(true);
+              }}
+            />
+          </FadeInSlide>
+        </ScrollView>
+      );
+    }
 
-        <View style={styles.metricsSection}>
-          <GlassMetricTile
-            label="Income"
-            sublabel="This month"
-            amount={totalIncome}
-            icon={<CardReceiveIcon size={18} color="#10B981" />}
-            iconBgColor="rgba(16, 185, 129, 0.12)"
+    return (
+      <ScrollView
+        key="home-tab-scroll"
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 108 }]}
+      >
+        <FadeInSlide key="home-tab" style={styles.contentConstrainer}>
+          <HeaderBar
+            onOpenSettings={() => setShowSettings(true)}
+            userName="Jfiqw Alex"
           />
-          <GlassMetricTile
-            label="Expenses"
-            sublabel="This month"
-            amount={totalExpenses}
-            icon={<CardSendIcon size={18} color="#EF4444" />}
-            iconBgColor="rgba(239, 68, 68, 0.12)"
-            onPress={() => setCurrentTab('expenses')}
-          />
-          <GlassMetricTile
-            label="Net Friend Balance"
-            sublabel={`+${formatAmount(totalOwedToYou)} owed to you`}
-            amount={totalOwedToYou - totalYouOwe}
-            icon={<ShieldCheckIcon size={18} color={textColor} />}
-            iconBgColor={isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)'}
-            onPress={() => setShowSettle(true)}
-          />
-        </View>
 
-        <RecentTransactions
-          onSelectTransaction={() => setShowSettle(true)}
-          onViewAll={() => setCurrentTab('expenses')}
-        />
-      </FadeInSlide>
-    </ScrollView>
-  );
+          <HeroBalanceCard
+            onAddExpense={() => setShowAddExpense(true)}
+            onSettle={() => setShowSettle(true)}
+            onOpenTrips={() => setCurrentTab('trips')}
+          />
+
+          <QuickSendTray
+            onSelectFriend={handleSelectFriend}
+            onAddFriend={() => {
+              setEditingFriend(null);
+              setShowAddMember(true);
+            }}
+          />
+
+          <View style={styles.metricsSection}>
+            <GlassMetricTile
+              label="Income"
+              sublabel="This month"
+              amount={totalIncome}
+              icon={<CardReceiveIcon size={18} color="#10B981" />}
+              iconBgColor="rgba(16, 185, 129, 0.12)"
+            />
+            <GlassMetricTile
+              label="Expenses"
+              sublabel="This month"
+              amount={totalExpenses}
+              icon={<CardSendIcon size={18} color="#EF4444" />}
+              iconBgColor="rgba(239, 68, 68, 0.12)"
+              onPress={() => setCurrentTab('expenses')}
+            />
+            <GlassMetricTile
+              label="Net Friend Balance"
+              sublabel={`+${formatAmount(totalOwedToYou)} owed to you`}
+              amount={totalOwedToYou - totalYouOwe}
+              icon={<ShieldCheckIcon size={18} color={textColor} />}
+              iconBgColor={isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)'}
+              onPress={() => setShowSettle(true)}
+            />
+          </View>
+
+          <ManageMembersSection onOpenMembersPage={() => setHomeView('members')} />
+
+          <RecentTransactions
+            onSelectTransaction={() => setShowSettle(true)}
+            onViewAll={() => setCurrentTab('expenses')}
+          />
+        </FadeInSlide>
+      </ScrollView>
+    );
+  };
 
   const renderExpensesTab = () => {
     const filteredTransactions = transactions.filter((tx) => {
@@ -239,6 +338,7 @@ function MainAppContent() {
               <View style={styles.filterChipsCol}>
                 <JellyRadio
                   scrollable
+                  fadeColor={rootBg}
                   items={['All', 'Expenses', 'Splits', 'Income']}
                   value={expenseFilter}
                   onChange={(val) => setExpenseFilter(val as ExpenseFilter)}
@@ -281,6 +381,7 @@ function MainAppContent() {
               <View style={styles.filterChipsCol}>
                 <JellyRadio
                   scrollable
+                  fadeColor={rootBg}
                   items={categoryFilterItems}
                   value={selectedCategoryFilter}
                   onChange={(val) => setSelectedCategoryFilter(val)}
@@ -730,27 +831,28 @@ function MainAppContent() {
 
         <View style={styles.tabContentContainer}>
           <View style={styles.sectionTitleRow}>
-            <View>
-              <Text style={[styles.sectionTitleText, { color: textColor }]}>
-                Expense Breakdown
-              </Text>
-              <Text style={[styles.sectionSubtitleText, { color: mutedText }]}>
-                Category shares & spend
-              </Text>
-            </View>
+            <Text style={[styles.sectionTitleText, { color: textColor }]}>
+              Expense Breakdown
+            </Text>
+            <AnimatedPressable
+              scaleTo={0.9}
+              onPress={() => setShowAnalyticsInfo(true)}
+              accessibilityLabel="Analytics instructions"
+              contentStyle={[
+                styles.infoIconBtn,
+                { backgroundColor: chipBg },
+              ]}
+            >
+              <InfoCircleIcon size={20} color={textColor} />
+            </AnimatedPressable>
           </View>
 
           <DonutPieChart />
 
           <View style={[styles.sectionTitleRow, { marginTop: 14 }]}>
-            <View>
-              <Text style={[styles.sectionTitleText, { color: textColor }]}>
-                Cash Flow Trajectory
-              </Text>
-              <Text style={[styles.sectionSubtitleText, { color: mutedText }]}>
-                Tap points to inspect monthly totals
-              </Text>
-            </View>
+            <Text style={[styles.sectionTitleText, { color: textColor }]}>
+              Cash Flow Trajectory
+            </Text>
           </View>
 
           <SplineChart />
@@ -808,36 +910,86 @@ function MainAppContent() {
         </View>
       )}
 
-      {currentTab === 'home' && renderHomeTab()}
-      {currentTab === 'expenses' && renderExpensesTab()}
-      {currentTab === 'trips' && renderTripsTab()}
-      {currentTab === 'analytics' && renderAnalyticsTab()}
+      <View style={styles.mainViewport}>
+        {currentTab === 'home' && renderHomeTab()}
+        {currentTab === 'expenses' && renderExpensesTab()}
+        {currentTab === 'trips' && renderTripsTab()}
+        {currentTab === 'analytics' && renderAnalyticsTab()}
+
+        <GradualBlur
+          position="top"
+          height={30}
+          strength={1.4}
+          layers={7}
+          tint={
+            isLiquidGlassEnabled
+              ? isDark
+                ? 'rgba(5, 5, 10, 0.5)'
+                : 'rgba(232, 237, 246, 0.5)'
+              : isDark
+                ? 'rgba(9, 9, 11, 0.78)'
+                : 'rgba(242, 242, 247, 0.78)'
+          }
+          zIndex={45}
+        />
+        <GradualBlur
+          position="bottom"
+          height={52}
+          strength={1.5}
+          layers={8}
+          tint={
+            isLiquidGlassEnabled
+              ? isDark
+                ? 'rgba(5, 5, 10, 0.6)'
+                : 'rgba(232, 237, 246, 0.6)'
+              : isDark
+                ? 'rgba(9, 9, 11, 0.84)'
+                : 'rgba(242, 242, 247, 0.84)'
+          }
+          zIndex={45}
+        />
+      </View>
 
       <GlassDock
         currentTab={currentTab}
         onTabChange={(tab) => {
           setCurrentTab(tab);
           setSelectedTripId(null);
+          setHomeView('overview');
+          setSelectedMemberId(null);
         }}
         onQuickAdd={() => {
           setExpenseDefaultTripId(undefined);
+          setExpenseDefaultFriendIds(undefined);
           setShowAddExpense(true);
         }}
       />
 
       <AddExpenseModal
-        key={expenseDefaultTripId || 'general'}
+        key={`${expenseDefaultTripId || 'general'}-${expenseDefaultFriendIds?.join(',') || 'all'}`}
         visible={showAddExpense}
         defaultTripId={expenseDefaultTripId}
+        defaultFriendIds={expenseDefaultFriendIds}
         onClose={() => {
           setShowAddExpense(false);
           setExpenseDefaultTripId(undefined);
+          setExpenseDefaultFriendIds(undefined);
         }}
       />
 
       <AddTripModal
         visible={showAddTrip}
         onClose={() => setShowAddTrip(false)}
+      />
+
+      <AddMemberModal
+        key={editingFriend ? `${editingFriend.id}-${editingFriend.name}-${editingFriend.avatar || ''}` : 'new-member'}
+        visible={showAddMember}
+        editingFriend={editingFriend}
+        onClose={() => {
+          setShowAddMember(false);
+          setEditingFriend(null);
+        }}
       />
 
       <AddCategoryModal
@@ -860,6 +1012,11 @@ function MainAppContent() {
         onClose={() => setShowSettings(false)}
       />
 
+      <AnalyticsInfoModal
+        visible={showAnalyticsInfo}
+        onClose={() => setShowAnalyticsInfo(false)}
+      />
+
       <CalendarDatePickerModal
         visible={showCalendarModal}
         selectedDate={selectedExpenseDate}
@@ -874,12 +1031,19 @@ function MainAppContent() {
 }
 
 export default function App() {
+  const [showPreloader, setShowPreloader] = useState(true);
+
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
         <LiquidGlassProvider>
           <SplitTrackProvider>
-            <MainAppContent />
+            <View style={styles.appRoot}>
+              <MainAppContent />
+              {showPreloader ? (
+                <PreloaderSplash onFinish={() => setShowPreloader(false)} />
+              ) : null}
+            </View>
           </SplitTrackProvider>
         </LiquidGlassProvider>
       </ErrorBoundary>
@@ -888,10 +1052,20 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  appRoot: {
+    flex: 1,
+    position: 'relative',
+  },
   container: {
     flex: 1,
     width: '100%',
     position: 'relative',
+  },
+  mainViewport: {
+    flex: 1,
+    width: '100%',
+    position: 'relative',
+    overflow: 'hidden',
   },
   scrollView: {
     flex: 1,
@@ -1151,5 +1325,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '400',
     marginTop: 2,
+  },
+  infoIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
   },
 });

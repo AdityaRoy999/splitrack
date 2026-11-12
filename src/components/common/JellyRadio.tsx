@@ -13,6 +13,7 @@ import {
 import { triggerSelection } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AppleRadioControl } from './AppleNativeControls';
+import { GradualBlur } from '../effects/GradualBlur';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -48,6 +49,7 @@ export interface JellyRadioProps {
   stiffness?: number;
   disabled?: boolean;
   scrollable?: boolean;
+  fadeColor?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -351,9 +353,11 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   stiffness = 500,
   disabled = false,
   scrollable = false,
+  fadeColor,
   style,
 }) => {
   const { isLiquidGlassEnabled, themeMode } = useLiquidGlass();
+  const isDark = themeMode === 'dark';
   const normalizedItems: JellyRadioItem[] =
     items === 'levels'
       ? LEVELS_PRESET
@@ -451,15 +455,19 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   );
 
   if (scrollable) {
+    const resolvedFade = fadeColor || (isDark ? 'rgba(18, 18, 22, 0.85)' : 'rgba(255, 255, 255, 0.85)');
     return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={style}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {rowContent}
-      </ScrollView>
+      <View style={[styles.scrollWrap, style]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {rowContent}
+        </ScrollView>
+        <GradualBlur position="left" width={16} strength={1.1} layers={5} tint={resolvedFade} />
+        <GradualBlur position="right" width={18} strength={1.1} layers={5} tint={resolvedFade} />
+      </View>
     );
   }
 
@@ -478,9 +486,13 @@ const styles = StyleSheet.create({
   rowNoWrap: {
     flexWrap: 'nowrap',
   },
+  scrollWrap: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
   scrollContent: {
     paddingVertical: 6,
-    paddingHorizontal: 4,
+    paddingHorizontal: 10,
     overflow: 'visible',
   },
   chip: {

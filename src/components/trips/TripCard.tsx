@@ -7,7 +7,8 @@ import { MapPointIcon } from '@solar-icons/react-native/bold/map-point';
 import { SuitcaseLinesIcon } from '@solar-icons/react-native/bold/suitcase-lines';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
-import { Trip } from '../../types';
+import { renderSolarIcon } from '../../constants/solarIconsCatalog';
+import { ExpenseCategory, Trip } from '../../types';
 import { SpotlightCard } from '../glass/SpotlightCard';
 
 interface TripCardProps {
@@ -15,14 +16,29 @@ interface TripCardProps {
   onPress: () => void;
 }
 
-const getTripCategoryIcon = (category: Trip['category'], color: string) => {
-  switch (category) {
+const getTripCategoryIcon = (
+  category: Trip['category'],
+  iconKey: string | undefined,
+  categories: ExpenseCategory[],
+  color: string
+) => {
+  switch (category.toLowerCase()) {
     case 'apartment':
       return <Home2Icon size={20} color={color} />;
     case 'trip':
       return <SuitcaseLinesIcon size={20} color={color} />;
-    default:
+    default: {
+      const catMatch = categories.find(
+        (c) => c.name.toLowerCase() === category.toLowerCase()
+      );
+      if (catMatch) {
+        return renderSolarIcon(catMatch.iconKey, 20, color);
+      }
+      if (iconKey && iconKey !== 'Palmtree' && iconKey !== 'Home' && iconKey !== 'Users') {
+        return renderSolarIcon(iconKey, 20, color);
+      }
       return <MapPointIcon size={20} color={color} />;
+    }
   }
 };
 
@@ -32,7 +48,7 @@ const getTripCategoryIcon = (category: Trip['category'], color: string) => {
  * paired with a tracked footer displaying category, total spend, and arrow.
  */
 export const TripCard: React.FC<TripCardProps> = ({ trip, onPress }) => {
-  const { friends } = useSplitTrack();
+  const { friends, categories } = useSplitTrack();
   const { formatAmount, themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
@@ -68,7 +84,7 @@ export const TripCard: React.FC<TripCardProps> = ({ trip, onPress }) => {
       >
         <View style={styles.panelTopRow}>
           <View style={[styles.iconChip, { backgroundColor: subtleIconBg }]}>
-            {getTripCategoryIcon(trip.category, textColor)}
+            {getTripCategoryIcon(trip.category, trip.icon, categories, textColor)}
           </View>
 
           <View style={styles.dateBadge}>

@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Modal,
   Platform,
   ScrollView,
@@ -12,6 +14,7 @@ import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
+import { Search } from 'lucide-react-native';
 import { NotificationType, triggerNotification } from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
@@ -22,6 +25,7 @@ import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
 import { AddCategoryModal } from '../categories/AddCategoryModal';
+import { GradualBlur } from '../effects/GradualBlur';
 import {
   CalendarDatePickerModal,
   formatDisplayDate,
@@ -33,12 +37,14 @@ interface AddExpenseModalProps {
   visible: boolean;
   onClose: () => void;
   defaultTripId?: string;
+  defaultFriendIds?: string[];
 }
 
 export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   visible,
   onClose,
   defaultTripId,
+  defaultFriendIds,
 }) => {
   const { accounts, friends, trips, transactions, categories, addTransaction, selectedAccountId } =
     useSplitTrack();
@@ -54,8 +60,74 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>(() => getTodayLocalISO());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showFriendSearch, setShowFriendSearch] = useState(false);
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  const [searchExpandAnim] = useState(() => new Animated.Value(0));
+
+  const toggleFriendSearch = () => {
+    if (showFriendSearch) {
+      Animated.timing(searchExpandAnim, {
+        toValue: 0,
+        duration: 190,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished) {
+          setShowFriendSearch(false);
+          setFriendSearchQuery('');
+        }
+      });
+    } else {
+      setShowFriendSearch(true);
+      searchExpandAnim.setValue(0);
+      Animated.timing(searchExpandAnim, {
+        toValue: 1,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+    }
+  };
   const [splitType] = useState<SplitType>('equal');
-  const [splitWithMembers, setSplitWithMembers] = useState<string[]>(['user', 'friend-1', 'friend-3']);
+  const [splitWithMembers, setSplitWithMembers] = useState<string[]>(() => {
+    if (defaultTripId) {
+      const matchTrip = trips.find((t) => t.id === defaultTripId);
+      if (matchTrip?.members?.length) return matchTrip.members;
+    }
+    if (defaultFriendIds && defaultFriendIds.length > 0) {
+      return Array.from(new Set(['user', ...defaultFriendIds]));
+    }
+    return ['user', 'friend-1', 'friend-3'];
+  });
+
+  const selectedTrip = useMemo(
+    () => (tripId ? trips.find((t) => t.id === tripId) : undefined),
+    [tripId, trips]
+  );
+
+  const tripScopedFriends = useMemo(() => {
+    if (!selectedTrip) return friends;
+    return friends.filter((f) => selectedTrip.members.includes(f.id));
+  }, [friends, selectedTrip]);
+
+  const showUserInScope = !selectedTrip || selectedTrip.members.includes('user');
+
+  const handleSelectTrip = (val: string) => {
+    const nextTripId = val === 'none' ? undefined : val;
+    setTripId(nextTripId);
+    setFriendSearchQuery('');
+    if (!nextTripId) {
+      setSplitWithMembers(['user', ...friends.slice(0, 2).map((f) => f.id)]);
+      return;
+    }
+    const targetTrip = trips.find((t) => t.id === nextTripId);
+    if (targetTrip && targetTrip.members.length > 0) {
+      setSplitWithMembers(targetTrip.members);
+      if (paidBy !== 'user' && !targetTrip.members.includes(paidBy)) {
+        setPaidBy('user');
+      }
+    }
+  };
 
   const handleMemberCheckedChange = (id: string, checked: boolean) => {
     if (checked) {
@@ -125,9 +197,21 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   }));
 
   const paidByItems = [
-    { value: 'user', label: 'You' },
-    ...friends.map((f) => ({ value: f.id, label: f.name })),
+    ...(showUserInScope ? [{ value: 'user', label: 'You' }] : []),
+    ...tripScopedFriends.map((f) => ({ value: f.id, label: f.name })),
   ];
+
+  const normalizedQuery = friendSearchQuery.trim().toLowerCase();
+  const visibleScopedFriends = useMemo(() => {
+    if (!normalizedQuery) return tripScopedFriends;
+    return tripScopedFriends.filter(
+      (f) =>
+        f.name.toLowerCase().includes(normalizedQuery) ||
+        f.handle.toLowerCase().includes(normalizedQuery)
+    );
+  }, [tripScopedFriends, normalizedQuery]);
+  const showUserFiltered =
+    showUserInScope && (!normalizedQuery || 'you'.includes(normalizedQuery));
 
   const tripItems = [
     { value: 'none', label: 'None (General)' },
@@ -179,7 +263,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </AnimatedPressable>
           </View>
 
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.scrollAreaWrap}>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {/* Amount, Description & Category */}
             <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
               <View style={[styles.amountInputBox, { backgroundColor: inputBg }]}>
@@ -244,6 +329,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               </View>
               <JellyRadio
                 scrollable
+                fadeColor={cardBg}
                 items={categoryItems}
                 value={category}
                 onChange={(val) => setCategory(val)}
@@ -284,6 +370,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               <Text style={[styles.fieldLabel, { color: mutedText }]}>UPI OR CARD PROFILE</Text>
               <JellyRadio
                 scrollable
+                fadeColor={cardBg}
                 items={accounts.map((acc) => ({
                   value: acc.id,
                   label:
@@ -305,6 +392,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               <Text style={[styles.fieldLabel, { color: mutedText, marginTop: 14 }]}>PAID BY</Text>
               <JellyRadio
                 scrollable
+                fadeColor={cardBg}
                 items={paidByItems}
                 value={paidBy}
                 onChange={(val) => setPaidBy(val)}
@@ -322,9 +410,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               </Text>
               <JellyRadio
                 scrollable
+                fadeColor={cardBg}
                 items={tripItems}
                 value={tripId ?? 'none'}
-                onChange={(val) => setTripId(val === 'none' ? undefined : val)}
+                onChange={handleSelectTrip}
                 chipColor={chipBg}
                 activeColor={activeBg}
                 textColor={textColor}
@@ -338,43 +427,122 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             {/* Split Among Whom using React Bits SpringCheck */}
             <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
               <View style={styles.splitHeaderRow}>
-                <Text style={[styles.fieldLabel, { color: mutedText }]}>
+                <Text style={[styles.fieldLabel, { color: mutedText, marginBottom: 0 }]}>
                   SPLIT AMONG ({splitWithMembers.length})
                 </Text>
-                <View style={[styles.splitSummaryBadge, { backgroundColor: chipBg }]}>
-                  <Text style={[styles.splitPerPersonNote, { color: textColor }]}>
-                    {parsedAmount > 0
-                      ? `${currSym}${perPersonShare.toFixed(2)} / person`
-                      : 'Equal Split'}
-                  </Text>
+                <View style={styles.splitHeaderActions}>
+                  <AnimatedPressable
+                    scaleTo={0.9}
+                    onPress={toggleFriendSearch}
+                    accessibilityLabel="Search friends"
+                    contentStyle={[
+                      styles.searchIconBtn,
+                      { backgroundColor: showFriendSearch ? activeBg : chipBg },
+                    ]}
+                  >
+                    <Search
+                      size={14}
+                      color={showFriendSearch ? activeText : textColor}
+                    />
+                  </AnimatedPressable>
+                  <View style={[styles.splitSummaryBadge, { backgroundColor: chipBg }]}>
+                    <Text style={[styles.splitPerPersonNote, { color: textColor }]}>
+                      {parsedAmount > 0
+                        ? `${currSym}${perPersonShare.toFixed(2)} / person`
+                        : 'Equal Split'}
+                    </Text>
+                  </View>
                 </View>
               </View>
 
-              <View style={styles.splitMembersList}>
-                <View style={[styles.springCheckRow, { backgroundColor: inputBg }]}>
-                  <SpringCheck
-                    label="You"
-                    checked={splitWithMembers.includes('user')}
-                    onChange={(checked) => handleMemberCheckedChange('user', checked)}
-                    color={textColor}
-                    fillColor={activeBg}
-                    checkColor={activeText}
-                    boxSize={22}
-                    boxRadius={999}
-                    fontSize={14}
-                    strike="none"
-                    doneOpacity={1}
-                    trailing={
-                      splitWithMembers.includes('user') && parsedAmount > 0 ? (
-                        <Text style={[styles.memberShareText, { color: mutedText }]}>
-                          {currSym}{perPersonShare.toFixed(2)}
-                        </Text>
-                      ) : null
-                    }
-                  />
-                </View>
+              {showFriendSearch && (
+                <Animated.View
+                  style={{
+                    overflow: 'hidden',
+                    maxHeight: searchExpandAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 52],
+                    }),
+                    marginBottom: searchExpandAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 10],
+                    }),
+                    opacity: searchExpandAnim,
+                    transform: [
+                      {
+                        translateY: searchExpandAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-8, 0],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <View style={[styles.friendSearchBox, { backgroundColor: inputBg }]}>
+                    <Search size={14} color={mutedText} />
+                    <TextInput
+                      style={[
+                        styles.friendSearchInput,
+                        { color: textColor },
+                        Platform.OS === 'web' &&
+                          ({
+                            outlineStyle: 'none',
+                            outlineWidth: 0,
+                            outlineColor: 'transparent',
+                            outline: 'none',
+                            boxShadow: 'none',
+                          } as any),
+                      ]}
+                      placeholder={
+                        selectedTrip
+                          ? `Search in ${selectedTrip.name}...`
+                          : 'Search friends by name...'
+                      }
+                      placeholderTextColor={mutedText}
+                      value={friendSearchQuery}
+                      onChangeText={setFriendSearchQuery}
+                      autoFocus
+                    />
+                    {friendSearchQuery.length > 0 && (
+                      <AnimatedPressable
+                        scaleTo={0.9}
+                        onPress={() => setFriendSearchQuery('')}
+                        accessibilityLabel="Clear friend search"
+                      >
+                        <CloseCircleIcon size={16} color={mutedText} />
+                      </AnimatedPressable>
+                    )}
+                  </View>
+                </Animated.View>
+              )}
 
-                {friends.map((f) => {
+              <View style={styles.splitMembersList}>
+                {showUserFiltered && (
+                  <View style={[styles.springCheckRow, { backgroundColor: inputBg }]}>
+                    <SpringCheck
+                      label="You"
+                      checked={splitWithMembers.includes('user')}
+                      onChange={(checked) => handleMemberCheckedChange('user', checked)}
+                      color={textColor}
+                      fillColor={activeBg}
+                      checkColor={activeText}
+                      boxSize={22}
+                      boxRadius={999}
+                      fontSize={14}
+                      strike="none"
+                      doneOpacity={1}
+                      trailing={
+                        splitWithMembers.includes('user') && parsedAmount > 0 ? (
+                          <Text style={[styles.memberShareText, { color: mutedText }]}>
+                            {currSym}{perPersonShare.toFixed(2)}
+                          </Text>
+                        ) : null
+                      }
+                    />
+                  </View>
+                )}
+
+                {visibleScopedFriends.map((f) => {
                   const inSplit = splitWithMembers.includes(f.id);
                   return (
                     <View key={f.id} style={[styles.springCheckRow, { backgroundColor: inputBg }]}>
@@ -401,9 +569,20 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                     </View>
                   );
                 })}
+
+                {!showUserFiltered && visibleScopedFriends.length === 0 && (
+                  <View style={[styles.springCheckRow, { backgroundColor: inputBg }]}>
+                    <Text style={[styles.memberShareText, { color: mutedText, textAlign: 'center' }]}>
+                      No matching members found
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
-          </ScrollView>
+            </ScrollView>
+            <GradualBlur position="top" height={24} strength={1.3} layers={6} tint={bgSheet} />
+            <GradualBlur position="bottom" height={28} strength={1.4} layers={6} tint={bgSheet} />
+          </View>
 
           <GlassPill
             label="Save & Split Expense"
@@ -488,9 +667,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 0,
   },
+  scrollAreaWrap: {
+    position: 'relative',
+    flexShrink: 1,
+    overflow: 'hidden',
+  },
   scrollContent: {
     gap: 12,
-    paddingBottom: 14,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
   sectionCard: {
     borderRadius: 22,
@@ -559,6 +744,33 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
+  },
+  splitHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
+  },
+  friendSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+    borderWidth: 0,
+  },
+  friendSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    paddingVertical: 0,
   },
   splitSummaryBadge: {
     paddingVertical: 4,
