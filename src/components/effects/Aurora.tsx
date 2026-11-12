@@ -10,11 +10,11 @@ import {
   ViewStyle,
 } from 'react-native';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
-import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
+import { AuroraMesh } from './AuroraMesh';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 const MAX_STOPS = 5;
-const MAX_LAYERS = 3;
 
 export interface AuroraProps {
   colorStops?: string[];
@@ -102,18 +102,18 @@ const oklchToHex = (L: number, C: number, h: number): string => {
   return `#${toSrgbChannel(linR)}${toSrgbChannel(linG)}${toSrgbChannel(linB)}`;
 };
 
-const sampleOklchRamp = (
+const sampleOklchHexes = (
   rawStops: string[],
   sampleCount: number,
   lightMode: boolean
-): { offset: string; color: string }[] => {
+): string[] => {
   const safe = rawStops.slice(0, MAX_STOPS);
   const normalized =
     safe.length === 0 ? ['#5227FF', '#7cff67', '#5227FF'] : safe.length === 1 ? [safe[0], safe[0]] : safe;
   const lchStops = unwrapHues(normalized.map((hex) => toOklch(parseHexRgb(hex))));
   const count = lchStops.length;
 
-  const result: { offset: string; color: string }[] = [];
+  const result: string[] = [];
   for (let s = 0; s < sampleCount; s++) {
     const t = s / Math.max(1, sampleCount - 1);
     const x = clamp(t, 0, 1) * (count - 1);
@@ -128,17 +128,14 @@ const sampleOklchRamp = (
     const h = a[2] + (b[2] - a[2]) * f;
 
     if (lightMode) {
-      L = clamp(L, 0.56, 0.76);
-      C = Math.min(0.25, C * 1.1);
+      L = clamp(L, 0.58, 0.78);
+      C = Math.min(0.24, C * 1.05);
     } else {
-      L = clamp(L, 0.44, 0.88);
-      C = Math.min(0.32, C * 1.12);
+      L = clamp(L, 0.48, 0.86);
+      C = Math.min(0.30, C * 1.1);
     }
 
-    result.push({
-      offset: `${Math.round(t * 1000) / 10}%`,
-      color: oklchToHex(L, C, h),
-    });
+    result.push(oklchToHex(L, C, h));
   }
   return result;
 };
@@ -158,51 +155,21 @@ const hexWithAlpha = (hex: string, alpha: number): string => {
   return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1).toFixed(3)})`;
 };
 
-const buildCurtainPath = (
-  width: number,
-  height: number,
-  direction: 'top' | 'bottom',
-  layer: number,
-  reachRatio: number,
-  amplitude: number,
-  scale: number,
-  points: number = 28
-): string => {
-  const anchorY = direction === 'top' ? -height * 0.08 : height * 1.08;
-  const seed = layer * 2.37;
-  const coords: { x: number; y: number }[] = [];
-
-  for (let i = 0; i <= points; i++) {
-    const u = i / points;
-    const x = u * width;
-    const w = (u - 0.5) * Math.PI * 2 * clamp(scale, 0.4, 2.4);
-    const wave =
-      Math.sin(w * 1.15 + seed) * 0.56 +
-      Math.cos(w * 2.1 - seed * 1.4) * 0.28 +
-      Math.sin(w * 3.3 + seed * 0.7) * 0.16;
-
-    const span = clamp(reachRatio + wave * 0.16 * amplitude, 0.12, 1.08) * height;
-    const y = direction === 'top' ? span : height - span;
-    coords.push({ x, y });
-  }
-
-  let d = `M ${coords[0].x.toFixed(1)} ${anchorY.toFixed(1)} L ${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)}`;
-  for (let i = 0; i < coords.length - 1; i++) {
-    const p0 = coords[i];
-    const p1 = coords[i + 1];
-    const midX = ((p0.x + p1.x) * 0.5).toFixed(1);
-    const midY = ((p0.y + p1.y) * 0.5).toFixed(1);
-    d += ` Q ${p0.x.toFixed(1)} ${p0.y.toFixed(1)}, ${midX} ${midY}`;
-  }
-  const last = coords[coords.length - 1];
-  d += ` L ${last.x.toFixed(1)} ${last.y.toFixed(1)} L ${last.x.toFixed(1)} ${anchorY.toFixed(1)} Z`;
-  return d;
-};
+const GAUSSIAN_FALLOFF = [
+  { offset: '0%', factor: 1.0 },
+  { offset: '14%', factor: 0.92 },
+  { offset: '28%', factor: 0.78 },
+  { offset: '44%', factor: 0.58 },
+  { offset: '60%', factor: 0.36 },
+  { offset: '75%', factor: 0.18 },
+  { offset: '88%', factor: 0.06 },
+  { offset: '100%', factor: 0 },
+];
 
 /**
- * Pure React Native OKLCH Aurora Shader Curtain component
- * Ported directly from React Bits <Aurora /> geometry & OKLCH math so iOS,
- * Android, and Web execute identical multi-layer flowing northern-lights waves.
+ * Hardware-accelerated SwiftUI MeshGradient on iOS 18+/26+ and Android,
+ * backed by Gaussian radial diffusion on Web and legacy OS versions so every
+ * Aurora card renders silky smooth with zero visible bands or contours.
  */
 export const Aurora: React.FC<AuroraProps> = ({
   colorStops = ['#5227FF', '#7cff67', '#5227FF'],
@@ -211,9 +178,7 @@ export const Aurora: React.FC<AuroraProps> = ({
   height = 0.45,
   speed = 1,
   glow = 0.6,
-  scale = 1,
   brightness = 1,
-  layers = 1,
   direction = 'top',
   intro = true,
   opacity = 0.9,
@@ -226,7 +191,7 @@ export const Aurora: React.FC<AuroraProps> = ({
   const [boxSize, setBoxSize] = useState({ width: 340, height: 180 });
 
   const [driftAnim] = useState(() => new Animated.Value(0));
-  const [pulseAnim] = useState(() => new Animated.Value(0));
+  const [breatheAnim] = useState(() => new Animated.Value(0));
   const [revealAnim] = useState(() => new Animated.Value(intro ? 0 : 1));
 
   useEffect(() => {
@@ -234,7 +199,7 @@ export const Aurora: React.FC<AuroraProps> = ({
       revealAnim.setValue(0);
       Animated.timing(revealAnim, {
         toValue: 1,
-        duration: 850,
+        duration: 750,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: USE_NATIVE_DRIVER,
       }).start();
@@ -250,30 +215,30 @@ export const Aurora: React.FC<AuroraProps> = ({
       Animated.sequence([
         Animated.timing(driftAnim, {
           toValue: 1,
-          duration: 7500 / safeSpeed,
+          duration: 8500 / safeSpeed,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(driftAnim, {
           toValue: 0,
-          duration: 7500 / safeSpeed,
+          duration: 8500 / safeSpeed,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ])
     );
 
-    const pulseLoop = Animated.loop(
+    const breatheLoop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
+        Animated.timing(breatheAnim, {
           toValue: 1,
-          duration: 5600 / safeSpeed,
+          duration: 6200 / safeSpeed,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
-        Animated.timing(pulseAnim, {
+        Animated.timing(breatheAnim, {
           toValue: 0,
-          duration: 5600 / safeSpeed,
+          duration: 6200 / safeSpeed,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
@@ -281,12 +246,12 @@ export const Aurora: React.FC<AuroraProps> = ({
     );
 
     driftLoop.start();
-    pulseLoop.start();
+    breatheLoop.start();
     return () => {
       driftLoop.stop();
-      pulseLoop.stop();
+      breatheLoop.stop();
     };
-  }, [driftAnim, pulseAnim, speed, paused]);
+  }, [driftAnim, breatheAnim, speed, paused]);
 
   const handleLayout = (e: LayoutChangeEvent) => {
     const { width: w, height: h } = e.nativeEvent.layout;
@@ -295,145 +260,189 @@ export const Aurora: React.FC<AuroraProps> = ({
     }
   };
 
-  const rampStops = useMemo(
-    () => sampleOklchRamp(colorStops, 9, lightMode),
+  const strength = clamp(brightness, 0.2, 1.5);
+  const clampedOpacity = clamp(opacity, 0, 1);
+
+  const fourStops = useMemo(
+    () => sampleOklchHexes(colorStops, 4, lightMode),
     [colorStops, lightMode]
   );
 
-  const canvasW = boxSize.width * 1.44;
-  const canvasH = boxSize.height;
-  const activeLayers = clamp(Math.round(layers), 1, MAX_LAYERS);
-  const strength = clamp(brightness, 0.2, 1.8);
+  // Build 4x3 cubic MeshGradient colors & organic points anchored on top or bottom
+  const meshConfig = useMemo(() => {
+    const [c0, c1, c2, c3] = fourStops;
+    const primaryAlpha = clamp((lightMode ? 0.84 : 0.94) * strength, 0.25, 0.98);
+    const midAlpha = clamp((lightMode ? 0.36 : 0.5) * strength * (0.7 + blend * 0.4), 0.12, 0.72);
+    const tailAlpha = glow > 0.7 ? (lightMode ? 0.05 : 0.08) : 0;
 
-  const curtainSpecs = useMemo(() => {
-    const featherOffsets = [-0.24, -0.1, 0.03, 0.16, 0.29];
-    const featherAlphas = lightMode
-      ? [0.34, 0.28, 0.21, 0.14, 0.07]
-      : [0.38, 0.30, 0.22, 0.14, 0.08];
-    const softSpan = 0.2 + blend * 0.26 + glow * 0.22;
+    const strongRow = [
+      hexWithAlpha(c0, primaryAlpha),
+      hexWithAlpha(c1, primaryAlpha),
+      hexWithAlpha(c2, primaryAlpha),
+      hexWithAlpha(c3, primaryAlpha),
+    ];
+    const midRow = [
+      hexWithAlpha(c1, midAlpha),
+      hexWithAlpha(c2, midAlpha),
+      hexWithAlpha(c0, midAlpha),
+      hexWithAlpha(c3, midAlpha * 0.85),
+    ];
+    const fadeRow = [
+      hexWithAlpha(c0, tailAlpha),
+      hexWithAlpha(c1, tailAlpha),
+      hexWithAlpha(c2, tailAlpha),
+      hexWithAlpha(c3, tailAlpha),
+    ];
 
-    const layersList: {
-      layerIndex: number;
-      gradId: string;
-      paths: { d: string; fillOpacity: number }[];
-    }[] = [];
+    const reachY = clamp(0.32 + height * 0.44 + blend * 0.12, 0.35, 0.82);
+    const waveTilt = clamp(amplitude * 0.08, 0.02, 0.14);
 
-    for (let k = 0; k < activeLayers; k++) {
-      const layerDecay = k === 0 ? 1 : 0.56 / k;
-      const baseReach = clamp(height + k * 0.07, 0.22, 0.92);
-      const paths = featherOffsets.map((offsetRatio, idx) => {
-        const bandReach = clamp(baseReach + offsetRatio * softSpan, 0.14, 1.04);
-        return {
-          d: buildCurtainPath(
-            canvasW,
-            canvasH,
-            direction,
-            k + idx * 0.18,
-            bandReach,
-            amplitude,
-            scale
-          ),
-          fillOpacity: clamp(featherAlphas[idx] * layerDecay * strength, 0.03, 0.92),
-        };
-      });
-
-      layersList.push({
-        layerIndex: k,
-        gradId: `${uid}-curtain-${k}`,
-        paths,
-      });
+    if (direction === 'top') {
+      return {
+        colors: [...strongRow, ...midRow, ...fadeRow],
+        points: [
+          [0.0, 0.0], [0.33, 0.0], [0.67, 0.0], [1.0, 0.0],
+          [0.0, clamp(reachY - waveTilt, 0.2, 0.85)],
+          [0.36, clamp(reachY + waveTilt, 0.25, 0.9)],
+          [0.64, clamp(reachY - waveTilt * 0.7, 0.2, 0.85)],
+          [1.0, clamp(reachY + waveTilt * 0.5, 0.22, 0.88)],
+          [0.0, 1.0], [0.33, 1.0], [0.67, 1.0], [1.0, 1.0],
+        ],
+      };
     }
-    return layersList;
-  }, [activeLayers, amplitude, blend, canvasH, canvasW, direction, glow, height, lightMode, scale, strength, uid]);
 
-  const txPrimary = driftAnim.interpolate({
+    const invY = 1 - reachY;
+    return {
+      colors: [...fadeRow, ...midRow, ...strongRow],
+      points: [
+        [0.0, 0.0], [0.33, 0.0], [0.67, 0.0], [1.0, 0.0],
+        [0.0, clamp(invY + waveTilt * 0.5, 0.12, 0.78)],
+        [0.34, clamp(invY - waveTilt, 0.1, 0.75)],
+        [0.68, clamp(invY + waveTilt, 0.14, 0.8)],
+        [1.0, clamp(invY - waveTilt * 0.6, 0.12, 0.78)],
+        [0.0, 1.0], [0.33, 1.0], [0.67, 1.0], [1.0, 1.0],
+      ],
+    };
+  }, [fourStops, direction, height, blend, glow, amplitude, lightMode, strength]);
+
+  const txDrift = driftAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [-boxSize.width * 0.34, -boxSize.width * 0.08],
+    outputRange: [-boxSize.width * 0.14, 0],
   });
-  const txSecondary = driftAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-boxSize.width * 0.06, -boxSize.width * 0.36],
-  });
-  const syWave = pulseAnim.interpolate({
+  const syBreathe = breatheAnim.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: [0.96, 1.07, 0.96],
+    outputRange: [0.98, 1.06, 0.98],
   });
 
-  // Soft anchor atmospheric glow tapering transparently across the card
+  const canUseMesh = Platform.OS === 'ios' || Platform.OS === 'android';
+
+  // Soft anchor wash so both native and Gaussian fallback melt gently into background
   const edgeWashColors = useMemo(() => {
-    const midHex = rampStops[Math.floor(rampStops.length / 2)]?.color || colorStops[0] || '#5227FF';
-    const strongTint = hexWithAlpha(midHex, lightMode ? 0.16 : 0.26);
-    const faintTint = hexWithAlpha(midHex, lightMode ? 0.05 : 0.09);
+    const midHex = fourStops[1] || colorStops[0] || '#5227FF';
+    const strongTint = hexWithAlpha(midHex, lightMode ? 0.14 : 0.2);
+    const faintTint = hexWithAlpha(midHex, lightMode ? 0.04 : 0.06);
     const clear = hexWithAlpha(midHex, 0);
     return direction === 'top'
       ? ([strongTint, faintTint, clear] as const)
       : ([clear, faintTint, strongTint] as const);
-  }, [colorStops, direction, lightMode, rampStops]);
+  }, [colorStops, direction, fourStops, lightMode]);
 
-  const clampedOpacity = clamp(opacity, 0, 1);
+  const blobAnchorY = direction === 'top' ? boxSize.height * 0.18 : boxSize.height * 0.82;
 
   return (
-    <View
-      onLayout={handleLayout}
-      pointerEvents="none"
-      style={[styles.container, style]}
-    >
+    <View onLayout={handleLayout} pointerEvents="none" style={[styles.container, style]}>
       <Animated.View style={[styles.fill, { opacity: revealAnim }]}>
         <ExpoLinearGradient
           colors={[...edgeWashColors]}
-          locations={direction === 'top' ? [0, 0.5, 0.95] : [0.05, 0.5, 1]}
+          locations={direction === 'top' ? [0, 0.55, 0.96] : [0.04, 0.45, 1]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={[styles.fill, { opacity: clampedOpacity }]}
         />
 
-        {curtainSpecs.map((spec) => {
-          const isPrimary = spec.layerIndex % 2 === 0;
-          return (
-            <Animated.View
-              key={spec.gradId}
-              style={[
-                styles.curtainCanvas,
-                {
-                  width: canvasW,
-                  height: canvasH,
-                  opacity: clampedOpacity,
-                  transform: [
-                    { translateX: isPrimary ? txPrimary : txSecondary },
-                    { scaleY: syWave },
-                  ],
-                },
-              ]}
-            >
-              <Svg
-                width={canvasW}
-                height={canvasH}
-                viewBox={`0 0 ${canvasW} ${canvasH}`}
-                preserveAspectRatio="none"
-              >
-                <Defs>
-                  <LinearGradient id={spec.gradId} x1="0%" y1="0%" x2="100%" y2="0%">
-                    {rampStops.map((stop, idx) => (
+        {canUseMesh ? (
+          <Animated.View
+            style={[
+              styles.meshOverscan,
+              {
+                width: boxSize.width * 1.18,
+                height: boxSize.height,
+                opacity: clampedOpacity,
+                transform: [{ translateX: txDrift }, { scaleY: syBreathe }],
+              },
+            ]}
+          >
+            <AuroraMesh
+              columns={4}
+              rows={3}
+              colors={meshConfig.colors}
+              points={meshConfig.points}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
+        ) : null}
+
+        {/* Smooth Gaussian Radial Blobs (always shown on Web + legacy OS, and seamlessly blends on all platforms) */}
+        {!canUseMesh && (
+          <Animated.View
+            style={[
+              styles.meshOverscan,
+              {
+                width: boxSize.width * 1.24,
+                height: boxSize.height,
+                opacity: clampedOpacity,
+                transform: [{ translateX: txDrift }, { scaleY: syBreathe }],
+              },
+              Platform.OS === 'web'
+                ? ({ filter: 'blur(26px)' } as unknown as ViewStyle)
+                : undefined,
+            ]}
+          >
+            <Svg width={boxSize.width * 1.24} height={boxSize.height}>
+              <Defs>
+                {fourStops.map((hex, idx) => (
+                  <RadialGradient
+                    key={`${uid}-rg-${idx}`}
+                    id={`${uid}-rg-${idx}`}
+                    cx="50%"
+                    cy="50%"
+                    r="50%"
+                  >
+                    {GAUSSIAN_FALLOFF.map((step, sIdx) => (
                       <Stop
-                        key={`${spec.gradId}-s-${idx}`}
-                        offset={stop.offset}
-                        stopColor={stop.color}
+                        key={`${uid}-rg-${idx}-s-${sIdx}`}
+                        offset={step.offset}
+                        stopColor={hex}
+                        stopOpacity={step.factor * (lightMode ? 0.65 : 0.78)}
                       />
                     ))}
-                  </LinearGradient>
-                </Defs>
-                {spec.paths.map((p, idx) => (
-                  <Path
-                    key={`${spec.gradId}-p-${idx}`}
-                    d={p.d}
-                    fill={`url(#${spec.gradId})`}
-                    fillOpacity={p.fillOpacity}
-                  />
+                  </RadialGradient>
                 ))}
-              </Svg>
-            </Animated.View>
-          );
-        })}
+              </Defs>
+
+              {fourStops.map((_, idx) => {
+                const w = boxSize.width * 1.24;
+                const cx = w * (0.18 + idx * 0.22);
+                const cy =
+                  direction === 'top'
+                    ? blobAnchorY + (idx % 2 === 0 ? -8 : 14)
+                    : blobAnchorY + (idx % 2 === 0 ? 8 : -14);
+                const rx = boxSize.width * (0.46 + (idx % 2) * 0.1);
+                const ry = boxSize.height * (0.58 + height * 0.34);
+                return (
+                  <Ellipse
+                    key={`${uid}-el-${idx}`}
+                    cx={cx}
+                    cy={cy}
+                    rx={rx}
+                    ry={ry}
+                    fill={`url(#${uid}-rg-${idx})`}
+                  />
+                );
+              })}
+            </Svg>
+          </Animated.View>
+        )}
       </Animated.View>
     </View>
   );
@@ -458,7 +467,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  curtainCanvas: {
+  meshOverscan: {
     position: 'absolute',
     top: 0,
     left: 0,

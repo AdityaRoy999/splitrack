@@ -5,7 +5,7 @@ import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { UsersGroupRoundedIcon } from '@solar-icons/react-native/bold/users-group-rounded';
-import { Trip } from '../../types';
+import { Trip, Transaction } from '../../types';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { renderSolarIcon } from '../../constants/solarIconsCatalog';
@@ -19,6 +19,7 @@ interface TripDetailViewProps {
   onBack: () => void;
   onAddTripExpense: (tripId: string) => void;
   onOpenSettle: () => void;
+  onSelectTransaction?: (tx: Transaction) => void;
 }
 
 export const TripDetailView: React.FC<TripDetailViewProps> = ({
@@ -26,6 +27,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
   onBack,
   onAddTripExpense,
   onOpenSettle,
+  onSelectTransaction,
 }) => {
   const { friends, transactions, categories } = useSplitTrack();
   const { formatAmount, themeMode } = useLiquidGlass();
@@ -160,9 +162,26 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
               const meta = getCategoryMeta(tx.category, tx.categoryIcon);
               const showDivider = idx < tripTransactions.length - 1;
               const isPos = tx.amount > 0;
+              const payerFriend =
+                tx.paidBy === 'user'
+                  ? null
+                  : friends.find((f) => f.id === tx.paidBy);
+              const payerName =
+                tx.paidBy === 'user' ? 'You' : payerFriend?.name || 'Friend';
+              const payerFirstName =
+                tx.paidBy === 'user'
+                  ? 'You'
+                  : payerName.split(' ')[0] || payerName;
+
               return (
                 <React.Fragment key={tx.id}>
-                  <View style={styles.txRow}>
+                  <AnimatedPressable
+                    scaleTo={0.985}
+                    onPress={() =>
+                      onSelectTransaction ? onSelectTransaction(tx) : onOpenSettle()
+                    }
+                    contentStyle={styles.txRow}
+                  >
                     <View style={[styles.txIconBox, { backgroundColor: `${meta.color}20` }]}>
                       {renderSolarIcon(meta.iconKey, 18, meta.color)}
                     </View>
@@ -174,6 +193,26 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
                         {tx.category} • {tx.date}
                       </Text>
                     </View>
+                    <View style={[styles.payerBadge, { backgroundColor: pillSurface }]}>
+                      {tx.paidBy === 'user' ? (
+                        <View
+                          style={[
+                            styles.payerDot,
+                            { backgroundColor: isDark ? '#F4F4F5' : '#18181B' },
+                          ]}
+                        />
+                      ) : payerFriend?.avatar ? (
+                        <Image
+                          source={{ uri: payerFriend.avatar }}
+                          style={styles.payerAvatar}
+                        />
+                      ) : (
+                        <View style={[styles.payerDot, { backgroundColor: '#10B981' }]} />
+                      )}
+                      <Text style={[styles.payerText, { color: textColor }]} numberOfLines={1}>
+                        Paid by {payerFirstName}
+                      </Text>
+                    </View>
                     <Text
                       style={[
                         styles.txAmount,
@@ -182,7 +221,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
                     >
                       {formatAmount(tx.amount, true)}
                     </Text>
-                  </View>
+                  </AnimatedPressable>
                   {showDivider ? (
                     <View style={[styles.divider, { backgroundColor: dividerColor }]} />
                   ) : null}
@@ -366,6 +405,29 @@ const styles = StyleSheet.create({
   },
   txAmount: {
     fontSize: 15,
+    fontWeight: '500',
+  },
+  payerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+    gap: 5,
+    maxWidth: 120,
+  },
+  payerDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  payerAvatar: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+  },
+  payerText: {
+    fontSize: 11,
     fontWeight: '500',
   },
   divider: {

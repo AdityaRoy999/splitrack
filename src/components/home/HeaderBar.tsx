@@ -7,6 +7,7 @@ import { ImpactStyle, triggerImpact } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassSurface } from '../glass/GlassSurface';
+import { NativeGlassContainer } from '../common/AppleNativeControls';
 
 interface HeaderBarProps {
   onOpenSettings: () => void;
@@ -57,7 +58,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       </View>
 
       {/* Action Icons: Quick Theme Toggle & Settings */}
-      <View style={styles.actionsRow}>
+      <NativeGlassContainer spacing={8} style={styles.actionsRow}>
         <AnimatedPressable
           onPress={handleToggleTheme}
           scaleTo={0.9}
@@ -95,7 +96,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             <SettingsMinimalisticIcon size={18} color={textColor} />
           </GlassSurface>
         </AnimatedPressable>
-      </View>
+      </NativeGlassContainer>
     </View>
   );
 };

@@ -10,6 +10,7 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { triggerSelection } from '../../utils/haptics';
 import { AnimatedPressable } from './MotionPrimitives';
 import { JellyRadio } from './JellyRadio';
+import { AppleGraphicalCalendar } from './AppleNativeControls';
 
 interface CalendarDatePickerModalProps {
   visible: boolean;
@@ -91,12 +92,16 @@ const toISODate = (year: number, monthIndex: number, day: number): string => {
 
 export const CalendarDatePickerModal: React.FC<CalendarDatePickerModalProps> = (props) => {
   const { visible, selectedDate, onClose } = props;
+  const { isLiquidGlassEnabled } = useLiquidGlass();
   if (!visible) return null;
+
+  const useNativeAppleCalendar = Platform.OS === 'ios' && isLiquidGlassEnabled;
 
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={!useNativeAppleCalendar}
+      presentationStyle={useNativeAppleCalendar ? 'pageSheet' : undefined}
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
@@ -113,8 +118,9 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
   allowClear = true,
   title = 'Select Date',
 }) => {
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
+  const useNativeAppleCalendar = Platform.OS === 'ios' && isLiquidGlassEnabled;
 
   const initialYM = parseYearMonth(selectedDate || getTodayLocalISO());
   const [viewYear, setViewYear] = useState<number>(initialYM.year);
@@ -239,6 +245,53 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
     onSelectDate(null);
     onClose();
   };
+
+  if (useNativeAppleCalendar) {
+    const sheetBg = isDark ? '#09090B' : '#F2F2F7';
+    return (
+      <View style={[styles.overlay, { backgroundColor: sheetBg, justifyContent: 'flex-start', paddingTop: 22 }]}>
+        <View style={[styles.card, { backgroundColor: cardBg, maxWidth: 460 }]}>
+          <View style={styles.headerRow}>
+            <View style={styles.titleWrap}>
+              <View style={[styles.iconBadge, { backgroundColor: surfaceBg }]}>
+                <CalendarDateIcon size={18} color={textColor} />
+              </View>
+              <View>
+                <Text style={[styles.titleText, { color: textColor }]}>{title}</Text>
+                <Text style={[styles.subtitleText, { color: mutedText }]}>
+                  {selectedDate ? formatDisplayDate(selectedDate, true) : 'Showing all recorded dates'}
+                </Text>
+              </View>
+            </View>
+            <AnimatedPressable
+              onPress={onClose}
+              scaleTo={0.9}
+              accessibilityLabel="Close calendar modal"
+              contentStyle={[styles.closeBtn, { backgroundColor: surfaceBg }]}
+            >
+              <CloseCircleIcon size={20} color={textColor} />
+            </AnimatedPressable>
+          </View>
+
+          <View style={[styles.hairline, { backgroundColor: dividerColor }]} />
+
+          <AppleGraphicalCalendar
+            title={title}
+            selectedDate={selectedDate}
+            onSelectDate={(iso) => {
+              triggerSelection();
+              onSelectDate(iso);
+              onClose();
+            }}
+            onToday={handleToday}
+            onClear={allowClear ? handleClear : undefined}
+            allowClear={allowClear}
+            isDark={isDark}
+          />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.overlay}>

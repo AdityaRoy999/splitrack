@@ -154,15 +154,30 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
         } as any)
       : undefined;
 
+  const isIOS = Platform.OS === 'ios';
+
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={!isIOS}
+      presentationStyle={isIOS ? 'pageSheet' : undefined}
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.sheetContainer, { backgroundColor: bgSheet }]}>
+      <View style={[styles.modalOverlay, isIOS && { backgroundColor: bgSheet }]}>
+        <View
+          style={[
+            styles.sheetContainer,
+            { backgroundColor: bgSheet },
+            isIOS && {
+              flex: 1,
+              maxHeight: '100%',
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              paddingTop: 18,
+            },
+          ]}
+        >
           <View style={styles.dragHandleWrap}>
             <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
           </View>

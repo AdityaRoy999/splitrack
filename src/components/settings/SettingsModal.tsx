@@ -17,7 +17,6 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
-import { GlassSurface } from '../glass/GlassSurface';
 import { CurrencyCode, ThemeMode } from '../../types';
 
 interface SettingsModalProps {
@@ -114,21 +113,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
     { value: 'GBP', label: '£ GBP' },
   ];
 
+  const isIOS = Platform.OS === 'ios';
+
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={!isIOS}
+      presentationStyle={isIOS ? 'pageSheet' : undefined}
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <GlassSurface
-          borderRadius={28}
-          glassStyle="regular"
-          intensity={isDark ? 72 : 88}
-          tintColor={isDark ? 'rgba(16, 16, 22, 0.72)' : 'rgba(246, 248, 252, 0.78)'}
-          matteColor={bgSheet}
-          style={styles.sheetContainer}
+      <View style={[styles.modalOverlay, isIOS && { backgroundColor: bgSheet }]}>
+        <View
+          style={[
+            styles.sheetContainer,
+            { backgroundColor: bgSheet },
+            isIOS && {
+              flex: 1,
+              maxHeight: '100%',
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              paddingTop: 22,
+            },
+          ]}
         >
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: textColor }]}>Settings & Display</Text>
@@ -228,7 +235,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
               <Text style={styles.resetBtnText}>Restore Default Sample Expenses</Text>
             </TouchableOpacity>
           </ScrollView>
-        </GlassSurface>
+        </View>
       </View>
     </Modal>
   );

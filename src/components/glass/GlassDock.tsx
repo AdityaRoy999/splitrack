@@ -18,6 +18,7 @@ import { PieChart2Icon } from '@solar-icons/react-native/bold/pie-chart-2';
 import { ImpactStyle, triggerImpact } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassSurface } from './GlassSurface';
+import { NativeGlassContainer } from '../common/AppleNativeControls';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -122,7 +123,9 @@ export const GlassDock: React.FC<GlassDockProps> = ({
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
-  const capsuleWidth = Math.min(windowWidth - 28, 396);
+  const useSplitLiquidDock = Platform.OS === 'ios' && isLiquidGlassEnabled;
+  const maxTotalWidth = Math.min(windowWidth - 28, 396);
+  const capsuleWidth = useSplitLiquidDock ? maxTotalWidth - 74 : maxTotalWidth;
   const [rowWidth, setRowWidth] = useState(capsuleWidth - 12);
 
   const navItems: NavItemConfig[] = [
@@ -154,9 +157,14 @@ export const GlassDock: React.FC<GlassDockProps> = ({
     },
   ];
 
-  const activeIndexRaw = navItems.findIndex((item) => item.key === currentTab);
+  const mainNavItems = useSplitLiquidDock
+    ? navItems.filter((item) => !item.isAction)
+    : navItems;
+  const splitActionItem = navItems.find((item) => item.isAction);
+
+  const activeIndexRaw = mainNavItems.findIndex((item) => item.key === currentTab);
   const activeIndex = activeIndexRaw >= 0 ? activeIndexRaw : 0;
-  const slotWidth = rowWidth / navItems.length;
+  const slotWidth = rowWidth / mainNavItems.length;
 
   const [slideX] = useState(() => new Animated.Value(activeIndex * slotWidth));
   const [stretchX] = useState(() => new Animated.Value(1));
@@ -214,40 +222,63 @@ export const GlassDock: React.FC<GlassDockProps> = ({
 
   return (
     <View style={[styles.outerContainer, { bottom: bottomOffset }]} pointerEvents="box-none">
-      <GlassSurface
-        borderRadius={999}
-        glassStyle="regular"
-        interactive
-        intensity={isDark ? 65 : 85}
-        tintColor={isDark ? 'rgba(22, 22, 28, 0.65)' : 'rgba(255, 255, 255, 0.72)'}
-        matteColor={isDark ? '#141418' : '#FFFFFF'}
-        style={[styles.navbarCapsule, { width: capsuleWidth }]}
-      >
-        <View style={styles.navRow} onLayout={handleRowLayout}>
-          {/* Sliding active section pill indicator */}
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.activeSliderPill,
-              {
-                width: slotWidth,
-                backgroundColor: activePillBg,
-                transform: [{ translateX: slideX }, { scaleX: stretchX }],
-              },
-            ]}
-          />
-
-          {navItems.map((item) => (
-            <DockTabButton
-              key={item.key}
-              item={item}
-              isActive={currentTab === item.key}
-              isDark={isDark}
-              onPress={() => handlePress(item)}
+      <NativeGlassContainer spacing={10} style={styles.dockGroup}>
+        <GlassSurface
+          borderRadius={999}
+          glassStyle="regular"
+          interactive
+          intensity={isDark ? 65 : 85}
+          tintColor={isDark ? 'rgba(22, 22, 28, 0.65)' : 'rgba(255, 255, 255, 0.72)'}
+          matteColor={isDark ? '#141418' : '#FFFFFF'}
+          style={[styles.navbarCapsule, { width: capsuleWidth }]}
+        >
+          <View style={styles.navRow} onLayout={handleRowLayout}>
+            {/* Sliding active section pill indicator */}
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.activeSliderPill,
+                {
+                  width: slotWidth,
+                  backgroundColor: activePillBg,
+                  transform: [{ translateX: slideX }, { scaleX: stretchX }],
+                },
+              ]}
             />
-          ))}
-        </View>
-      </GlassSurface>
+
+            {mainNavItems.map((item) => (
+              <DockTabButton
+                key={item.key}
+                item={item}
+                isActive={currentTab === item.key}
+                isDark={isDark}
+                onPress={() => handlePress(item)}
+              />
+            ))}
+          </View>
+        </GlassSurface>
+
+        {useSplitLiquidDock && splitActionItem && (
+          <GlassSurface
+            borderRadius={32}
+            glassStyle="regular"
+            interactive
+            intensity={isDark ? 65 : 85}
+            tintColor={isDark ? 'rgba(22, 22, 28, 0.65)' : 'rgba(255, 255, 255, 0.72)'}
+            matteColor={isDark ? '#141418' : '#FFFFFF'}
+            style={styles.splitOrb}
+          >
+            <TouchableOpacity
+              onPress={() => handlePress(splitActionItem)}
+              activeOpacity={0.8}
+              accessibilityLabel="Add split expense"
+              style={styles.splitOrbTouch}
+            >
+              <AddCircleIcon size={24} color={isDark ? '#FFFFFF' : '#09090B'} />
+            </TouchableOpacity>
+          </GlassSurface>
+        )}
+      </NativeGlassContainer>
     </View>
   );
 };
@@ -260,6 +291,27 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     zIndex: 100,
+  },
+  dockGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  splitOrb: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  splitOrbTouch: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   navbarCapsule: {
     height: 64,

@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { triggerSelection } from '../../utils/haptics';
+import { useLiquidGlass } from '../../theme/LiquidGlassContext';
+import { AppleToggleSwitch } from './AppleNativeControls';
 
 export type StrikeSide = 'left' | 'center' | 'right' | 'none';
 
@@ -60,6 +62,7 @@ export const SpringCheck: React.FC<SpringCheckProps> = ({
   style,
   trailing,
 }) => {
+  const { isLiquidGlassEnabled, themeMode } = useLiquidGlass();
   const controlled = checked !== undefined;
   const [inner, setInner] = useState(defaultChecked);
   const on = controlled ? !!checked : inner;
@@ -171,6 +174,64 @@ export const SpringCheck: React.FC<SpringCheckProps> = ({
   const effectiveRadius = boxRadius >= boxSize / 2 ? boxSize / 2 : boxRadius;
   const accessibleName =
     ariaLabel || (typeof label === 'string' ? label : 'Checkbox');
+
+  if (Platform.OS === 'ios' && isLiquidGlassEnabled) {
+    const handleNativeSwitch = (next: boolean) => {
+      if (disabled) return;
+      triggerSelection();
+      if (!controlled) {
+        setInner(next);
+      }
+      onChange?.(next);
+    };
+
+    return (
+      <Pressable
+        onPress={handleToggle}
+        disabled={disabled}
+        accessibilityRole="switch"
+        accessibilityLabel={accessibleName}
+        accessibilityState={{ checked: on, disabled }}
+        style={[
+          styles.row,
+          {
+            justifyContent: 'space-between',
+            width: '100%',
+            gap: 10,
+            opacity: disabled ? 0.45 : 1,
+          },
+          style,
+        ]}
+      >
+        <View style={styles.labelContainer}>
+          {typeof label === 'string' || typeof label === 'number' ? (
+            <Animated.Text
+              numberOfLines={1}
+              style={[
+                styles.labelText,
+                {
+                  color,
+                  fontSize,
+                },
+              ]}
+            >
+              {label}
+            </Animated.Text>
+          ) : (
+            <View>{label}</View>
+          )}
+        </View>
+        {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
+        <AppleToggleSwitch
+          checked={on}
+          onChange={handleNativeSwitch}
+          disabled={disabled}
+          isDark={themeMode === 'dark'}
+          tintColor="#10B981"
+        />
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable

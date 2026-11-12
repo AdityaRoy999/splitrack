@@ -17,7 +17,6 @@ import { QrCodeIcon } from '@solar-icons/react-native/bold/qr-code';
 import { ImpactStyle, NotificationType, triggerImpact, triggerNotification } from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
-import { GlassCard } from '../glass/GlassCard';
 import { GlassPill } from '../glass/GlassPill';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { UpiQrModal } from '../upi/UpiQrModal';
@@ -31,14 +30,32 @@ interface SettleModalProps {
 export const SettleModal: React.FC<SettleModalProps> = ({
   visible,
   onClose,
+  targetFriendId,
 }) => {
-  const { accounts, selectedAccountId, getSimplifiedDebts, settleWithFriend } = useSplitTrack();
+  const { accounts, friends, selectedAccountId, getSimplifiedDebts, settleWithFriend } = useSplitTrack();
   const { formatAmount, themeMode } = useLiquidGlass();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
 
   const isDark = themeMode === 'dark';
-  const simplifiedDebts = getSimplifiedDebts();
+  const isIOS = Platform.OS === 'ios';
+  const rawDebts = getSimplifiedDebts();
+  const targetFriend = targetFriendId
+    ? friends.find((f) => f.id === targetFriendId) || null
+    : null;
+  const simplifiedDebts = targetFriendId
+    ? [...rawDebts].sort((a, b) => {
+        const aMatch = a.fromId === targetFriendId || a.toId === targetFriendId ? 1 : 0;
+        const bMatch = b.fromId === targetFriendId || b.toId === targetFriendId ? 1 : 0;
+        return bMatch - aMatch;
+      })
+    : rawDebts;
+  const targetHasPendingDebt = Boolean(
+    targetFriendId &&
+      simplifiedDebts.some(
+        (d) => d.fromId === targetFriendId || d.toId === targetFriendId,
+      ),
+  );
   const activeAccount = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
   const activeUpiAccount =
     (activeAccount?.upiId ? activeAccount : accounts.find((a) => Boolean(a.upiId))) ||
@@ -71,25 +88,38 @@ export const SettleModal: React.FC<SettleModalProps> = ({
   };
 
   const bgSheet = isDark ? '#09090B' : '#F2F2F7';
+  const cardSurface = isDark ? '#141418' : '#FFFFFF';
+  const cardBorder = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
-  const pillSurface = isDark ? '#1B1B20' : '#FFFFFF';
+  const pillSurface = isDark ? '#1B1B20' : '#F2F2F7';
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
 
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={!isIOS}
+      presentationStyle={isIOS ? 'pageSheet' : undefined}
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.sheetContainer, { backgroundColor: bgSheet }]}>
+      <View style={[styles.modalOverlay, isIOS && { backgroundColor: bgSheet }]}>
+        <View
+          style={[
+            styles.sheetContainer,
+            { backgroundColor: bgSheet },
+            isIOS && { flex: 1, maxHeight: '100%', borderTopLeftRadius: 0, borderTopRightRadius: 0, paddingTop: 22 },
+          ]}
+        >
           <View style={styles.headerRow}>
-            <View>
-              <Text style={[styles.title, { color: textColor }]}>Who Needs to Pay Whom</Text>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={[styles.title, { color: textColor }]}>
+                {targetFriend ? `Settle with ${targetFriend.name}` : 'Who Needs to Pay Whom'}
+              </Text>
               <Text style={[styles.subtitle, { color: mutedText }]}>
-                Auto-simplified expense balances
+                {targetFriend
+                  ? 'Prioritized balances & simplified trip splits'
+                  : 'Auto-simplified expense balances'}
               </Text>
             </View>
             <TouchableOpacity
@@ -102,13 +132,23 @@ export const SettleModal: React.FC<SettleModalProps> = ({
           </View>
 
           {activeAccount && (
-            <GlassCard borderRadius={18} style={styles.activeProfileStrip}>
+            <View
+              style={[
+                styles.activeProfileStrip,
+                {
+                  backgroundColor: cardSurface,
+                  borderRadius: 18,
+                  borderWidth: StyleSheet.hairlineWidth,
+                  borderColor: cardBorder,
+                },
+              ]}
+            >
               <View style={styles.activeProfileLeft}>
                 <Text style={[styles.activeProfileLabel, { color: mutedText }]}>
                   Receiving UPI Profile
                 </Text>
                 <Text style={[styles.activeProfileValue, { color: textColor }]} numberOfLines={1}>
-                  {activeAccount.title} • {activeAccount.upiId}
+                  {activeAccount.title} • {activeAccount.upiId || activeAccount.bankName || 'Default'}
                 </Text>
               </View>
               <AnimatedPressable
@@ -122,7 +162,16 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                 <QrCodeIcon size={14} color={textColor} />
                 <Text style={[styles.qrMiniText, { color: textColor }]}>QR</Text>
               </AnimatedPressable>
-            </GlassCard>
+            </View>
+          )}
+
+          {targetFriend && !targetHasPendingDebt && simplifiedDebts.length > 0 && (
+            <View style={styles.successBanner}>
+              <CheckCircleIcon size={16} color="#10B981" />
+              <Text style={styles.successText}>
+                You and {targetFriend.name} have no unsettled balance right now.
+              </Text>
+            </View>
           )}
 
           {successMsg && (
@@ -142,15 +191,41 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                 </Text>
               </View>
             ) : (
-              <GlassCard borderRadius={22} intensity={20} style={styles.debtsGroupCard}>
+              <View
+                style={[
+                  styles.debtsGroupCard,
+                  {
+                    backgroundColor: cardSurface,
+                    borderRadius: 22,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: cardBorder,
+                  },
+                ]}
+              >
                 {simplifiedDebts.map((item, idx) => {
                   const isUserDebtor = item.fromId === 'user';
                   const isUserCreditor = item.toId === 'user';
+                  const isFocused = Boolean(
+                    targetFriendId &&
+                      (item.fromId === targetFriendId || item.toId === targetFriendId),
+                  );
                   const showDivider = idx < simplifiedDebts.length - 1;
 
                   return (
                     <React.Fragment key={`${item.fromId}-${item.toId}-${idx}`}>
-                      <View style={styles.debtCardInner}>
+                      <View
+                        style={[
+                          styles.debtCardInner,
+                          isFocused && {
+                            backgroundColor: isDark
+                              ? 'rgba(16, 185, 129, 0.08)'
+                              : 'rgba(16, 185, 129, 0.06)',
+                            marginHorizontal: -10,
+                            paddingHorizontal: 10,
+                            borderRadius: 16,
+                          },
+                        ]}
+                      >
                         <View style={styles.partiesRow}>
                           <View style={styles.partyBoxLeft}>
                             <Text style={[styles.partyName, { color: textColor }]} numberOfLines={1}>
@@ -226,7 +301,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                     </React.Fragment>
                   );
                 })}
-              </GlassCard>
+              </View>
             )}
           </ScrollView>
         </View>

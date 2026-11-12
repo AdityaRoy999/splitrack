@@ -89,15 +89,41 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
     onClose();
   };
 
+  const isIOS = Platform.OS === 'ios';
+
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={!isIOS}
+      presentationStyle={isIOS ? 'pageSheet' : undefined}
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={[styles.backdrop, { backgroundColor: isDark ? 'rgba(0,0,0,0.72)' : 'rgba(15,23,42,0.35)' }]}>
-        <View style={[styles.sheet, { backgroundColor: sheetBg }]}>
+      <View
+        style={[
+          styles.backdrop,
+          {
+            backgroundColor: isIOS
+              ? sheetBg
+              : isDark
+                ? 'rgba(0,0,0,0.72)'
+                : 'rgba(15,23,42,0.35)',
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.sheet,
+            { backgroundColor: sheetBg },
+            isIOS && {
+              flex: 1,
+              maxHeight: '100%',
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              paddingTop: 18,
+            },
+          ]}
+        >
           <View style={styles.dragHandleWrap}>
             <View
               style={[

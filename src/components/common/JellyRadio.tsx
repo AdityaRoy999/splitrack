@@ -11,6 +11,8 @@ import {
   ViewStyle,
 } from 'react-native';
 import { triggerSelection } from '../../utils/haptics';
+import { useLiquidGlass } from '../../theme/LiquidGlassContext';
+import { AppleRadioControl } from './AppleNativeControls';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -351,6 +353,7 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   scrollable = false,
   style,
 }) => {
+  const { isLiquidGlassEnabled, themeMode } = useLiquidGlass();
   const normalizedItems: JellyRadioItem[] =
     items === 'levels'
       ? LEVELS_PRESET
@@ -368,6 +371,34 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
     0,
     normalizedItems.findIndex((i) => i.value === currentValue)
   );
+
+  if (Platform.OS === 'ios' && isLiquidGlassEnabled && normalizedItems.length > 0) {
+    return (
+      <AppleRadioControl
+        items={normalizedItems.map((entry) => ({
+          value: entry.value,
+          label: entry.label,
+          disabled: entry.disabled,
+        }))}
+        value={currentValue}
+        onChange={(pickedValue, idx) => {
+          if (disabled) return;
+          triggerSelection();
+          if (value === undefined) {
+            setInnerValue(pickedValue);
+          }
+          onChange?.(pickedValue, idx);
+        }}
+        size={size}
+        gap={gap}
+        columns={columns}
+        scrollable={scrollable}
+        disabled={disabled}
+        isDark={themeMode === 'dark'}
+        style={style}
+      />
+    );
+  }
 
   const handleSelect = (index: number) => {
     const picked = normalizedItems[index];

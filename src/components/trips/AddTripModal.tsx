@@ -116,15 +116,30 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
 
+  const isIOS = Platform.OS === 'ios';
+
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={!isIOS}
+      presentationStyle={isIOS ? 'pageSheet' : undefined}
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.sheetContainer, { backgroundColor: bgSheet }]}>
+      <View style={[styles.modalOverlay, isIOS && { backgroundColor: bgSheet }]}>
+        <View
+          style={[
+            styles.sheetContainer,
+            { backgroundColor: bgSheet },
+            isIOS && {
+              flex: 1,
+              maxHeight: '100%',
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              paddingTop: 22,
+            },
+          ]}
+        >
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: textColor }]}>Create New Trip or Group</Text>
             <TouchableOpacity

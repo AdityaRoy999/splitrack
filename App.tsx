@@ -75,6 +75,7 @@ function MainAppContent() {
     totalOwedToYou,
     totalYouOwe,
     trips,
+    friends,
     transactions,
     categories,
     getSimplifiedDebts,
@@ -445,6 +446,17 @@ function MainAppContent() {
                 setShowAddExpense(true);
               }}
               onOpenSettle={() => setShowSettle(true)}
+              onSelectTransaction={(tx) => {
+                const targetId =
+                  tx.paidBy !== 'user'
+                    ? tx.paidBy
+                    : tx.splits?.find((s) => s.friendId !== 'user')?.friendId;
+                const matched = targetId
+                  ? friends.find((f) => f.id === targetId) || null
+                  : null;
+                setSelectedFriendForSettle(matched);
+                setShowSettle(true);
+              }}
             />
           </FadeInSlide>
         </ScrollView>
