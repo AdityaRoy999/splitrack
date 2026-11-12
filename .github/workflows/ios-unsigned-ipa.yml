@@ -35,15 +35,18 @@ jobs:
       - name: Read app version and prepare build number
         id: app
         run: |
-          APP_VERSION=$(node -p "require('./app.json').expo.version")
+          RAW_VERSION=$(node -p "require('./app.json').expo.version")
           BUNDLE_ID=$(node -p "require('./app.json').expo.ios.bundleIdentifier")
           BUILD_NUMBER="$GITHUB_RUN_NUMBER"
           RELEASE_TAG="splittrack-ios-$BUILD_NUMBER"
 
-          if [ -z "$APP_VERSION" ] || [ -z "$BUNDLE_ID" ]; then
+          if [ -z "$RAW_VERSION" ] || [ -z "$BUNDLE_ID" ]; then
             echo "Error: Missing expo.version or expo.ios.bundleIdentifier in app.json"
             exit 1
           fi
+
+          # Derive monotonically increasing semantic version (e.g. 1.0.10) so SideStore update comparator triggers
+          APP_VERSION=$(node -p "const p = '$RAW_VERSION'.split('.'); (p.length >= 2 ? p.slice(0, 2).join('.') : '1.0') + '.' + '$BUILD_NUMBER'")
 
           echo "version=$APP_VERSION" >> "$GITHUB_OUTPUT"
           echo "bundle_id=$BUNDLE_ID" >> "$GITHUB_OUTPUT"

@@ -11,14 +11,14 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.0",
+      "version": "1.0.10",
       "versionDate": "2026-11-12T20:34:33Z",
       "versionDescription": "feat: anchor card bottom gradient, integrate React Bits Aurora web, persist auth session, and pure solar icons",
       "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-10/Splittrack-unsigned.ipa",
       "size": 12417716,
       "versions": [
         {
-          "version": "1.0.0",
+          "version": "1.0.10",
           "buildVersion": "10",
           "date": "2026-11-12T20:34:33Z",
           "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-10/Splittrack-unsigned.ipa",
@@ -26,7 +26,7 @@
           "localizedDescription": "feat: anchor card bottom gradient, integrate React Bits Aurora web, persist auth session, and pure solar icons"
         },
         {
-          "version": "1.0.0",
+          "version": "1.0.9",
           "buildVersion": "9",
           "date": "2026-11-12T19:59:59Z",
           "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-9/Splittrack-unsigned.ipa",
