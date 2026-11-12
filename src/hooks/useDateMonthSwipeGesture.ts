@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GestureResponderEvent, Platform } from 'react-native';
+import { Animated, GestureResponderEvent, Platform } from 'react-native';
 import { triggerSelection } from '../utils/haptics';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 /** Shifts an ISO `YYYY-MM-DD` date string cleanly by `deltaDays` (handles month/year boundaries). */
 export function shiftIsoDate(isoDate: string, deltaDays: number): string {
@@ -41,6 +43,7 @@ export function useDateMonthSwipeGesture({
   swipeThreshold = 34,
 }: UseDateMonthSwipeOptions) {
   const [isMonthHoldReady, setIsMonthHoldReady] = useState(false);
+  const [dragAnim] = useState(() => new Animated.Value(0));
 
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointRef = useRef<GesturePointState>({
@@ -63,7 +66,13 @@ export function useDateMonthSwipeGesture({
     pointRef.current.active = false;
     pointRef.current.monthUnlocked = false;
     setIsMonthHoldReady(false);
-  }, [clearHoldTimer]);
+    Animated.spring(dragAnim, {
+      toValue: 0,
+      friction: 8,
+      tension: 110,
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [clearHoldTimer, dragAnim]);
 
   const startTrack = useCallback(
     (x: number, y: number) => {
@@ -90,13 +99,19 @@ export function useDateMonthSwipeGesture({
   const moveTrack = useCallback(
     (x: number, y: number) => {
       const state = pointRef.current;
-      if (!state.active || state.monthUnlocked) return;
-      const dist = Math.hypot(x - state.startX, y - state.startY);
-      if (dist > 14 && Date.now() - state.startAt < holdDurationMs) {
+      if (!state.active) return;
+      const dx = x - state.startX;
+      const dy = y - state.startY;
+      const dist = Math.hypot(dx, dy);
+      if (!state.monthUnlocked && dist > 14 && Date.now() - state.startAt < holdDurationMs) {
         clearHoldTimer();
       }
+      if (Math.abs(dx) > Math.abs(dy) * 1.1 && Math.abs(dx) > 6) {
+        const damped = Math.max(-26, Math.min(26, dx * 0.28));
+        dragAnim.setValue(damped);
+      }
     },
-    [clearHoldTimer, holdDurationMs]
+    [clearHoldTimer, dragAnim, holdDurationMs]
   );
 
   const endTrack = useCallback(
@@ -115,16 +130,22 @@ export function useDateMonthSwipeGesture({
       if (Math.abs(dx) >= swipeThreshold && Math.abs(dx) > Math.abs(dy) * 1.15) {
         const delta: -1 | 1 = dx < 0 ? 1 : -1;
         triggerSelection();
+        clearHoldTimer();
+        pointRef.current.active = false;
+        pointRef.current.monthUnlocked = false;
+        setIsMonthHoldReady(false);
+        dragAnim.setValue(0);
         if (useMonthMode) {
           onStepMonth(delta);
         } else {
           onStepDay(delta);
         }
+        return;
       }
 
       resetGesture();
     },
-    [holdDurationMs, onStepDay, onStepMonth, resetGesture, swipeThreshold]
+    [clearHoldTimer, dragAnim, holdDurationMs, onStepDay, onStepMonth, resetGesture, swipeThreshold]
   );
 
   useEffect(() => clearHoldTimer, [clearHoldTimer]);
@@ -193,5 +214,5 @@ export function useDateMonthSwipeGesture({
           onTouchCancel: resetGesture,
         };
 
-  return { gestureHandlers, isMonthHoldReady };
+  return { gestureHandlers, isMonthHoldReady, dragAnim };
 }

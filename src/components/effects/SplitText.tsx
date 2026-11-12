@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   Easing,
+  Platform,
   StyleProp,
   StyleSheet,
   TextStyle,
@@ -191,7 +192,7 @@ export const SplitText: React.FC<SplitTextProps> = ({
         duration: durationMs,
         delay: Math.max(0, Math.round(ranks[idx] * delay)),
         easing: customEase,
-        useNativeDriver: !accentColor,
+        useNativeDriver: Platform.OS !== 'web' && !accentColor,
       })
     );
 

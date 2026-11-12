@@ -36,10 +36,11 @@ export interface JellyRadioProps {
   activeColor?: string;
   textColor?: string;
   activeTextColor?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   gap?: number;
   radius?: number;
   columns?: number;
+  noWrap?: boolean;
   swell?: number;
   barge?: number;
   shrink?: number;
@@ -60,6 +61,7 @@ const LEVELS_PRESET: JellyRadioItem[] = [
 ];
 
 const SIZE_METRICS = {
+  xs: { paddingHorizontal: 10, paddingVertical: 5, fontSize: 11, minHeight: 28, iconGap: 4 },
   sm: { paddingHorizontal: 13, paddingVertical: 7, fontSize: 12, minHeight: 32, iconGap: 5 },
   md: { paddingHorizontal: 16, paddingVertical: 9, fontSize: 13, minHeight: 38, iconGap: 6 },
   lg: { paddingHorizontal: 19, paddingVertical: 11, fontSize: 14, minHeight: 44, iconGap: 7 },
@@ -75,7 +77,7 @@ interface JellyChipProps {
   activeColor: string;
   textColor: string;
   activeTextColor: string;
-  size: 'sm' | 'md' | 'lg';
+  size: 'xs' | 'sm' | 'md' | 'lg';
   radius: number;
   swell: number;
   barge: number;
@@ -344,6 +346,7 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   gap = 8,
   radius = 999,
   columns,
+  noWrap = false,
   swell = 0.26,
   barge = 7,
   shrink = 0.06,
@@ -420,7 +423,7 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
       accessibilityRole="radiogroup"
       style={[
         styles.row,
-        scrollable ? styles.rowNoWrap : styles.rowWrap,
+        scrollable || noWrap ? styles.rowNoWrap : styles.rowWrap,
         { gap },
         !scrollable && style,
       ]}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
+import Svg, { ClipPath, Defs, Image as SvgImage, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { ImpactStyle, triggerImpact } from '../../utils/haptics';
@@ -8,6 +9,38 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { Friend } from '../../types';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GradualBlur } from '../effects/GradualBlur';
+
+const AVATAR_SIZE = 54;
+const CHECK_ICON_SIZE = 16;
+const CUTOUT_CENTER_X = 45.5;
+const CUTOUT_CENTER_Y = 45.5;
+const CUTOUT_RADIUS = 10.8;
+
+/** Computes a closed SVG path of a circle with a true transparent circular cutout at the bottom-right corner. */
+function buildCircleNotchPath(size: number, cutX: number, cutY: number, cutR: number): string {
+  const r = size / 2;
+  const cx = r;
+  const cy = r;
+  const dx = cutX - cx;
+  const dy = cutY - cy;
+  const d = Math.hypot(dx, dy);
+  const a = (r * r - cutR * cutR + d * d) / (2 * d);
+  const h = Math.sqrt(Math.max(0, r * r - a * a));
+  const mx = cx + (a * dx) / d;
+  const my = cy + (a * dy) / d;
+  const p1x = (mx - (h * dy) / d).toFixed(3);
+  const p1y = (my + (h * dx) / d).toFixed(3);
+  const p2x = (mx + (h * dy) / d).toFixed(3);
+  const p2y = (my - (h * dx) / d).toFixed(3);
+  return `M ${p1x},${p1y} A ${r},${r} 0 1 1 ${p2x},${p2y} A ${cutR},${cutR} 0 0 0 ${p1x},${p1y} Z`;
+}
+
+const SETTLED_AVATAR_CUTOUT_PATH = buildCircleNotchPath(
+  AVATAR_SIZE,
+  CUTOUT_CENTER_X,
+  CUTOUT_CENTER_Y,
+  CUTOUT_RADIUS
+);
 
 interface QuickSendTrayProps {
   onSelectFriend: (friend: Friend) => void;
@@ -60,6 +93,9 @@ export const QuickSendTray: React.FC<QuickSendTrayProps> = ({
         {friends.map((friend) => {
           const isOwed = friend.netBalance > 0;
           const isOwing = friend.netBalance < 0;
+          const isSettled = friend.netBalance === 0;
+          const avatarBg = isDark ? '#1E1E24' : '#E5E7EB';
+          const clipId = `quick-cutout-${friend.id.replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
           return (
             <AnimatedPressable
@@ -69,20 +105,71 @@ export const QuickSendTray: React.FC<QuickSendTrayProps> = ({
               contentStyle={styles.friendItem}
             >
               <View style={styles.avatarWrapper}>
-                {friend.avatar ? (
+                {isSettled ? (
+                  <Svg
+                    width={AVATAR_SIZE}
+                    height={AVATAR_SIZE}
+                    viewBox={`0 0 ${AVATAR_SIZE} ${AVATAR_SIZE}`}
+                  >
+                    <Defs>
+                      <ClipPath id={clipId}>
+                        <Path d={SETTLED_AVATAR_CUTOUT_PATH} />
+                      </ClipPath>
+                    </Defs>
+                    {friend.avatar ? (
+                      <>
+                        <Rect
+                          x={0}
+                          y={0}
+                          width={AVATAR_SIZE}
+                          height={AVATAR_SIZE}
+                          fill={avatarBg}
+                          clipPath={`url(#${clipId})`}
+                        />
+                        <SvgImage
+                          href={friend.avatar}
+                          x={0}
+                          y={0}
+                          width={AVATAR_SIZE}
+                          height={AVATAR_SIZE}
+                          preserveAspectRatio="xMidYMid slice"
+                          clipPath={`url(#${clipId})`}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <Rect
+                          x={0}
+                          y={0}
+                          width={AVATAR_SIZE}
+                          height={AVATAR_SIZE}
+                          fill={avatarBg}
+                          clipPath={`url(#${clipId})`}
+                        />
+                        <SvgText
+                          x={AVATAR_SIZE / 2}
+                          y={AVATAR_SIZE / 2 + 6}
+                          fontSize={18}
+                          fontWeight="600"
+                          fill={textColor}
+                          textAnchor="middle"
+                        >
+                          {friend.name.charAt(0).toUpperCase()}
+                        </SvgText>
+                      </>
+                    )}
+                  </Svg>
+                ) : friend.avatar ? (
                   <Image
                     source={{ uri: friend.avatar }}
-                    style={[
-                      styles.avatar,
-                      { backgroundColor: isDark ? '#1E1E24' : '#E5E7EB' },
-                    ]}
+                    style={[styles.avatar, { backgroundColor: avatarBg }]}
                   />
                 ) : (
                   <View
                     style={[
                       styles.avatar,
                       styles.avatarFallback,
-                      { backgroundColor: isDark ? '#1E1E24' : '#E5E7EB' },
+                      { backgroundColor: avatarBg },
                     ]}
                   >
                     <Text style={[styles.avatarInitial, { color: textColor }]}>
@@ -100,14 +187,12 @@ export const QuickSendTray: React.FC<QuickSendTrayProps> = ({
                     <Text style={styles.badgeText}>-{Math.round(Math.abs(friend.netBalance))}</Text>
                   </View>
                 )}
-                {friend.netBalance === 0 && (
-                  <View
-                    style={[
-                      styles.badgeSettledCircle,
-                      { backgroundColor: isDark ? '#3F3F46' : '#71717A' },
-                    ]}
-                  >
-                    <CheckCircleIcon size={12} color="#FFFFFF" />
+                {isSettled && (
+                  <View pointerEvents="none" style={styles.badgeSettledIcon}>
+                    <CheckCircleIcon
+                      size={CHECK_ICON_SIZE}
+                      color={isDark ? '#FFFFFF' : '#18181B'}
+                    />
                   </View>
                 )}
               </View>
@@ -200,12 +285,14 @@ const styles = StyleSheet.create({
   },
   avatarWrapper: {
     position: 'relative',
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
     marginBottom: 6,
   },
   avatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
     borderWidth: 0, // completely borderless
   },
   avatarFallback: {
@@ -233,16 +320,14 @@ const styles = StyleSheet.create({
   badgeOwing: {
     backgroundColor: '#EF4444',
   },
-  badgeSettledCircle: {
+  badgeSettledIcon: {
     position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    left: CUTOUT_CENTER_X - CHECK_ICON_SIZE / 2,
+    top: CUTOUT_CENTER_Y - CHECK_ICON_SIZE / 2,
+    width: CHECK_ICON_SIZE,
+    height: CHECK_ICON_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 0,
   },
   badgeText: {
     color: '#FFFFFF',

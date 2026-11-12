@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, Platform, TouchableOpacity, Share } from 'react-native';
-import Svg, { Rect } from 'react-native-svg';
+import {
+  Modal,
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  type ViewStyle,
+} from 'react-native';
+import { BlurView } from 'expo-blur';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { CopyIcon } from '@solar-icons/react-native/bold/copy';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
@@ -9,6 +19,8 @@ import { ImpactStyle, NotificationType, triggerImpact, triggerNotification } fro
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { UpiAccount } from '../../types';
 import { GlassPill } from '../glass/GlassPill';
+import { StyledUpiQr } from './StyledUpiQr';
+import { getUpiBrandMeta } from './upiBrandLogo';
 
 interface UpiQrModalProps {
   visible: boolean;
@@ -51,49 +63,62 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
     } catch {}
   };
 
+  const brandMeta = getUpiBrandMeta(account.provider, account.bankBrand);
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
+        {Platform.OS === 'web' ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.backdropFill,
+              {
+                backgroundColor: isDark ? 'rgba(6, 7, 11, 0.56)' : 'rgba(15, 23, 42, 0.34)',
+                backdropFilter: 'blur(18px) saturate(140%)',
+                WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+              } as unknown as ViewStyle,
+            ]}
+          />
+        ) : (
+          <View pointerEvents="none" style={styles.backdropFill}>
+            <BlurView
+              intensity={isDark ? 36 : 32}
+              tint={isDark ? 'dark' : 'light'}
+              style={styles.backdropFill}
+            />
+            <View
+              style={[
+                styles.backdropFill,
+                { backgroundColor: isDark ? 'rgba(6, 7, 11, 0.44)' : 'rgba(15, 23, 42, 0.24)' },
+              ]}
+            />
+          </View>
+        )}
+
+        <Pressable
+          accessibilityLabel="Close QR modal backdrop"
+          onPress={onClose}
+          style={styles.backdropFill}
+        />
+
         <View style={[styles.contentCard, { backgroundColor: cardBg }]}>
           <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: pillBg }]}>
             <CloseCircleIcon size={20} color={textColor} />
           </TouchableOpacity>
 
           <View style={styles.header}>
+            <View style={[styles.appBadgePill, { backgroundColor: pillBg }]}>
+              <View style={[styles.appDot, { backgroundColor: brandMeta.primary }]} />
+              <Text style={[styles.appBadgeText, { color: textColor }]}>{brandMeta.label}</Text>
+            </View>
             <Text style={[styles.title, { color: textColor }]}>Scan to Pay via UPI</Text>
             <Text style={[styles.subtitle, { color: mutedText }]}>{account.title}</Text>
           </View>
 
-          {/* Borderless High contrast QR Box */}
+          {/* Stylish Scannable QR Code with UPI App Image in Center */}
           <View style={styles.qrBox}>
-            <Svg width={180} height={180} viewBox="0 0 180 180">
-              <Rect width={180} height={180} fill="#FFFFFF" />
-              {/* Corner position markers */}
-              <Rect x={10} y={10} width={40} height={40} fill="#000000" rx={8} />
-              <Rect x={18} y={18} width={24} height={24} fill="#FFFFFF" rx={4} />
-              <Rect x={24} y={24} width={12} height={12} fill="#000000" rx={2} />
-
-              <Rect x={130} y={10} width={40} height={40} fill="#000000" rx={8} />
-              <Rect x={138} y={18} width={24} height={24} fill="#FFFFFF" rx={4} />
-              <Rect x={144} y={24} width={12} height={12} fill="#000000" rx={2} />
-
-              <Rect x={10} y={130} width={40} height={40} fill="#000000" rx={8} />
-              <Rect x={18} y={138} width={24} height={24} fill="#FFFFFF" rx={4} />
-              <Rect x={24} y={144} width={12} height={12} fill="#000000" rx={2} />
-
-              {/* QR modules */}
-              <Rect x={65} y={20} width={10} height={10} fill="#000000" />
-              <Rect x={85} y={15} width={12} height={12} fill="#000000" />
-              <Rect x={105} y={30} width={10} height={10} fill="#000000" />
-              <Rect x={60} y={60} width={25} height={25} fill="#000000" rx={4} />
-              <Rect x={100} y={70} width={20} height={10} fill="#000000" />
-              <Rect x={135} y={65} width={15} height={20} fill="#000000" />
-              <Rect x={70} y={100} width={30} height={10} fill="#000000" />
-              <Rect x={110} y={105} width={15} height={15} fill="#000000" />
-              <Rect x={65} y={135} width={20} height={20} fill="#000000" />
-              <Rect x={100} y={140} width={25} height={12} fill="#000000" />
-              <Rect x={135} y={130} width={30} height={30} fill="#000000" rx={4} />
-            </Svg>
+            <StyledUpiQr account={account} size={216} />
           </View>
 
           {/* UPI ID Pill */}
@@ -132,10 +157,16 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+  },
+  backdropFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   contentCard: {
     width: '100%',
@@ -148,6 +179,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
     borderWidth: 0,
+    zIndex: 2,
   },
   closeBtn: {
     position: 'absolute',
@@ -161,7 +193,26 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
+  },
+  appBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    marginBottom: 8,
+  },
+  appDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  appBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   title: {
     fontSize: 18,
@@ -176,9 +227,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   qrBox: {
-    padding: 14,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 20,
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
     marginBottom: 16,
     borderWidth: 0,
   },

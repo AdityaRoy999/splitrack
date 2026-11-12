@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Animated,
+  Platform,
 } from 'react-native';
 import { Aurora } from '../effects/Aurora';
 import { GlassSurface } from '../glass/GlassSurface';
@@ -18,6 +19,7 @@ import { UpiAccount } from '../../types';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 
 const CARD_HEIGHT = 180;
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 export const StackedCardDeck: React.FC<{
   onSelectAccount?: (acc: UpiAccount) => void;
@@ -28,16 +30,26 @@ export const StackedCardDeck: React.FC<{
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [copiedUpi, setCopiedUpi] = useState<string | null>(null);
 
-  const [expandAnim] = useState(() => new Animated.Value(0));
+  const [expandHeightAnim] = useState(() => new Animated.Value(0));
+  const [expandTransformAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    Animated.spring(expandAnim, {
-      toValue: isExpanded ? 1 : 0,
-      friction: 8,
-      tension: 40,
-      useNativeDriver: false,
-    }).start();
-  }, [isExpanded, expandAnim]);
+    const target = isExpanded ? 1 : 0;
+    Animated.parallel([
+      Animated.spring(expandHeightAnim, {
+        toValue: target,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: false,
+      }),
+      Animated.spring(expandTransformAnim, {
+        toValue: target,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+    ]).start();
+  }, [isExpanded, expandHeightAnim, expandTransformAnim]);
 
   const isDark = themeMode === 'dark';
 
@@ -64,7 +76,7 @@ export const StackedCardDeck: React.FC<{
     ['#7C3AED', '#EC4899', '#6366F1'],
   ];
 
-  const containerHeight = expandAnim.interpolate({
+  const containerHeight = expandHeightAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [CARD_HEIGHT + 70, accounts.length * 155 + 40],
   });
@@ -97,11 +109,11 @@ export const StackedCardDeck: React.FC<{
       <Animated.View style={[styles.deckContainer, { height: containerHeight }]}>
         {accounts.map((acc, index) => {
           const isSelected = acc.id === selectedAccountId;
-          const offsetTop = expandAnim.interpolate({
+          const offsetY = expandTransformAnim.interpolate({
             inputRange: [0, 1],
             outputRange: [index * 26, index * 150],
           });
-          const scale = expandAnim.interpolate({
+          const scale = expandTransformAnim.interpolate({
             inputRange: [0, 1],
             outputRange: [1 - index * 0.04, 1],
           });
@@ -114,9 +126,8 @@ export const StackedCardDeck: React.FC<{
               style={[
                 styles.cardWrapper,
                 {
-                  top: offsetTop,
                   zIndex: isSelected ? 99 : zIndex,
-                  transform: [{ scale }],
+                  transform: [{ translateY: offsetY }, { scale }],
                 },
               ]}
             >
@@ -260,6 +271,7 @@ const styles = StyleSheet.create({
   },
   cardWrapper: {
     position: 'absolute',
+    top: 0,
     left: 0,
     right: 0,
     height: CARD_HEIGHT,

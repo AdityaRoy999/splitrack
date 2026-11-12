@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ScrollView,
   StatusBar,
@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { ViewRefNode } from './src/utils/measureWindow';
 import { CardReceiveIcon } from '@solar-icons/react-native/bold/card-receive';
 import { CardSendIcon } from '@solar-icons/react-native/bold/card-send';
 import { ShieldCheckIcon } from '@solar-icons/react-native/bold/shield-check';
@@ -32,7 +33,7 @@ import { GlassPill } from './src/components/glass/GlassPill';
 import { GlassMetricTile } from './src/components/glass/GlassMetricTile';
 
 // Screen Components
-import { HeaderBar } from './src/components/home/HeaderBar';
+import { HeaderBar, type HeaderLogoRect } from './src/components/home/HeaderBar';
 import { HeroBalanceCard } from './src/components/home/HeroBalanceCard';
 import { QuickSendTray } from './src/components/home/QuickSendTray';
 import { RecentTransactions } from './src/components/home/RecentTransactions';
@@ -74,7 +75,15 @@ function getLedgerIcon(
   return renderSolarIcon(catMatch?.iconKey || tx.categoryIcon, 18, iconColor);
 }
 
-function MainAppContent() {
+function MainAppContent({
+  hideHeaderLogo = false,
+  onHeaderLogoLayout,
+  onHeaderLogoNode,
+}: {
+  hideHeaderLogo?: boolean;
+  onHeaderLogoLayout?: (rect: HeaderLogoRect) => void;
+  onHeaderLogoNode?: (node: ViewRefNode | null) => void;
+}) {
   const insets = useSafeAreaInsets();
   const { palette, themeMode, formatAmount, isLiquidGlassEnabled } = useLiquidGlass();
   const {
@@ -214,6 +223,9 @@ function MainAppContent() {
           <HeaderBar
             onOpenSettings={() => setShowSettings(true)}
             userName="Jfiqw Alex"
+            hideLogo={hideHeaderLogo}
+            onLogoLayout={onHeaderLogoLayout}
+            onLogoNode={onHeaderLogoNode}
           />
 
           <HeroBalanceCard
@@ -1032,6 +1044,9 @@ function MainAppContent() {
 
 export default function App() {
   const [showPreloader, setShowPreloader] = useState(true);
+  const [hideHeaderLogo, setHideHeaderLogo] = useState(true);
+  const [headerLogoRect, setHeaderLogoRect] = useState<HeaderLogoRect | null>(null);
+  const headerLogoNodeRef = useRef<ViewRefNode | null>(null);
 
   return (
     <SafeAreaProvider>
@@ -1039,9 +1054,23 @@ export default function App() {
         <LiquidGlassProvider>
           <SplitTrackProvider>
             <View style={styles.appRoot}>
-              <MainAppContent />
+              <MainAppContent
+                hideHeaderLogo={hideHeaderLogo}
+                onHeaderLogoLayout={setHeaderLogoRect}
+                onHeaderLogoNode={(node) => {
+                  headerLogoNodeRef.current = node;
+                }}
+              />
               {showPreloader ? (
-                <PreloaderSplash onFinish={() => setShowPreloader(false)} />
+                <PreloaderSplash
+                  targetLogoRect={headerLogoRect}
+                  targetLogoNodeRef={headerLogoNodeRef}
+                  onRevealHeaderLogo={() => setHideHeaderLogo(false)}
+                  onFinish={() => {
+                    setHideHeaderLogo(false);
+                    setShowPreloader(false);
+                  }}
+                />
               ) : null}
             </View>
           </SplitTrackProvider>

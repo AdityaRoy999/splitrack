@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -38,36 +38,49 @@ export const SettleModal: React.FC<SettleModalProps> = ({
   const { accounts, friends, selectedAccountId, getSimplifiedDebts, settleWithFriend } = useSplitTrack();
   const { formatAmount, themeMode } = useLiquidGlass();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [toastSeq, setToastSeq] = useState(0);
   const [showQrModal, setShowQrModal] = useState(false);
   const [toastAnim] = useState(() => new Animated.Value(0));
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const useNativeDriver = Platform.OS !== 'web';
 
   useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
+    if (!successMsg || toastSeq === 0) return undefined;
+    toastAnim.setValue(0);
+    Animated.spring(toastAnim, {
+      toValue: 1,
+      friction: 8,
+      tension: 85,
+      useNativeDriver,
+    }).start();
+
+    const timer = setTimeout(() => {
+      Animated.timing(toastAnim, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver,
+      }).start(({ finished }) => {
+        if (finished) setSuccessMsg(null);
+      });
+    }, 2600);
+
+    return () => clearTimeout(timer);
+  }, [successMsg, toastSeq, toastAnim, useNativeDriver]);
 
   const isDark = themeMode === 'dark';
   const isIOS = Platform.OS === 'ios';
-  const useNativeDriver = Platform.OS !== 'web';
   const rawDebts = getSimplifiedDebts();
   const targetFriend = targetFriendId
     ? friends.find((f) => f.id === targetFriendId) || null
     : null;
-  const simplifiedDebts = targetFriendId
-    ? [...rawDebts].sort((a, b) => {
-        const aMatch = a.fromId === targetFriendId || a.toId === targetFriendId ? 1 : 0;
-        const bMatch = b.fromId === targetFriendId || b.toId === targetFriendId ? 1 : 0;
-        return bMatch - aMatch;
-      })
+  const targetDebts = targetFriendId
+    ? rawDebts.filter((d) => d.fromId === targetFriendId || d.toId === targetFriendId)
     : rawDebts;
-  const targetHasPendingDebt = Boolean(
-    targetFriendId &&
-      simplifiedDebts.some(
-        (d) => d.fromId === targetFriendId || d.toId === targetFriendId,
-      ),
-  );
+  const otherDebts = targetFriendId
+    ? rawDebts.filter((d) => d.fromId !== targetFriendId && d.toId !== targetFriendId)
+    : [];
+  const simplifiedDebts = rawDebts;
+  const targetHasPendingDebt = targetDebts.length > 0;
   const activeAccount = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
   const activeUpiAccount =
     (activeAccount?.upiId ? activeAccount : accounts.find((a) => Boolean(a.upiId))) ||
@@ -79,29 +92,8 @@ export const SettleModal: React.FC<SettleModalProps> = ({
     const friendId = fromId === 'user' ? toId : fromId;
     settleWithFriend(friendId, amount);
 
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-
     setSuccessMsg(`Settled ${formatAmount(amount)} successfully!`);
-    toastAnim.setValue(0);
-    Animated.spring(toastAnim, {
-      toValue: 1,
-      friction: 8,
-      tension: 85,
-      useNativeDriver,
-    }).start();
-
-    toastTimerRef.current = setTimeout(() => {
-      Animated.timing(toastAnim, {
-        toValue: 0,
-        duration: 220,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver,
-      }).start(({ finished }) => {
-        if (finished) setSuccessMsg(null);
-      });
-    }, 2600);
+    setToastSeq((seq) => seq + 1);
   };
 
   const handleSendReminder = async (debtorName: string, amount: number) => {
@@ -126,6 +118,119 @@ export const SettleModal: React.FC<SettleModalProps> = ({
   const mutedText = isDark ? '#8E8E93' : '#71717A';
   const pillSurface = isDark ? '#1B1B20' : '#F2F2F7';
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
+
+  const renderDebtGroup = (
+    items: typeof rawDebts,
+    highlighted: boolean,
+    keyPrefix: string
+  ) => (
+    <View
+      style={[
+        styles.debtsGroupCard,
+        {
+          backgroundColor: cardSurface,
+          borderRadius: 22,
+          borderWidth: 0,
+        },
+      ]}
+    >
+      {items.map((item, idx) => {
+        const isUserDebtor = item.fromId === 'user';
+        const isUserCreditor = item.toId === 'user';
+        const showDivider = idx < items.length - 1;
+
+        return (
+          <React.Fragment key={`${keyPrefix}-${item.fromId}-${item.toId}-${idx}`}>
+            <View
+              style={[
+                styles.debtCardInner,
+                highlighted && {
+                  backgroundColor: isDark
+                    ? 'rgba(16, 185, 129, 0.08)'
+                    : 'rgba(16, 185, 129, 0.06)',
+                  marginHorizontal: -10,
+                  paddingHorizontal: 10,
+                  borderRadius: 16,
+                },
+              ]}
+            >
+              <View style={styles.partiesRow}>
+                <View style={styles.partyBoxLeft}>
+                  <Text style={[styles.partyName, { color: textColor }]} numberOfLines={1}>
+                    {item.fromName}
+                  </Text>
+                  <Text style={[styles.partyRole, { color: mutedText }]}>owes</Text>
+                </View>
+
+                <View style={styles.arrowIconWrapper}>
+                  <ArrowRightIcon size={18} color={mutedText} />
+                </View>
+
+                <View style={styles.partyBoxRight}>
+                  <Text
+                    style={[styles.partyName, styles.partyNameRight, { color: textColor }]}
+                    numberOfLines={1}
+                  >
+                    {item.toName}
+                  </Text>
+                  <Text style={[styles.partyRole, styles.partyRoleRight, { color: mutedText }]}>
+                    receives
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.amountActionRow}>
+                <Text style={[styles.debtAmount, { color: textColor }]}>
+                  {formatAmount(item.amount)}
+                </Text>
+
+                <View style={styles.actionsGroup}>
+                  {isUserDebtor ? (
+                    <GlassPill
+                      label="Mark Settled"
+                      icon={<CheckCircleIcon size={14} color={isDark ? '#000000' : '#FFFFFF'} />}
+                      variant="accent"
+                      size="sm"
+                      onPress={() => handleSettle(item.fromId, item.toId, item.amount)}
+                    />
+                  ) : isUserCreditor ? (
+                    <View style={styles.creditorBtnRow}>
+                      <GlassPill
+                        label="Remind"
+                        icon={<ChatRoundDotsIcon size={14} color={textColor} />}
+                        variant="dark"
+                        size="sm"
+                        onPress={() => handleSendReminder(item.fromName, item.amount)}
+                      />
+                      <GlassPill
+                        label="Mark Settled"
+                        icon={<CheckCircleIcon size={14} color={isDark ? '#000000' : '#FFFFFF'} />}
+                        variant="accent"
+                        size="sm"
+                        onPress={() => handleSettle(item.fromId, item.toId, item.amount)}
+                      />
+                    </View>
+                  ) : (
+                    <GlassPill
+                      label="Mark Settled"
+                      icon={<CheckCircleIcon size={14} color={textColor} />}
+                      variant="dark"
+                      size="sm"
+                      onPress={() => handleSettle(item.fromId, item.toId, item.amount)}
+                    />
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {showDivider && (
+              <View style={[styles.rowDivider, { backgroundColor: dividerColor }]} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </View>
+  );
 
   return (
     <Modal
@@ -198,7 +303,9 @@ export const SettleModal: React.FC<SettleModalProps> = ({
 
           {targetFriend && !targetHasPendingDebt && simplifiedDebts.length > 0 && (
             <View style={styles.successBanner}>
-              <CheckCircleIcon size={16} color="#10B981" />
+              <View style={styles.successIconWrap}>
+                <CheckCircleIcon size={17} color="#10B981" />
+              </View>
               <Text style={styles.successText}>
                 You and {targetFriend.name} have no unsettled balance right now.
               </Text>
@@ -216,120 +323,23 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                 </Text>
               </View>
             ) : (
-              <View
-                style={[
-                  styles.debtsGroupCard,
-                  {
-                    backgroundColor: cardSurface,
-                    borderRadius: 22,
-                    borderWidth: 0,
-                  },
-                ]}
-              >
-                {simplifiedDebts.map((item, idx) => {
-                  const isUserDebtor = item.fromId === 'user';
-                  const isUserCreditor = item.toId === 'user';
-                  const isFocused = Boolean(
-                    targetFriendId &&
-                      (item.fromId === targetFriendId || item.toId === targetFriendId),
-                  );
-                  const showDivider = idx < simplifiedDebts.length - 1;
+              <>
+                {targetDebts.length > 0 &&
+                  renderDebtGroup(targetDebts, Boolean(targetFriendId), 'focus')}
 
-                  return (
-                    <React.Fragment key={`${item.fromId}-${item.toId}-${idx}`}>
-                      <View
-                        style={[
-                          styles.debtCardInner,
-                          isFocused && {
-                            backgroundColor: isDark
-                              ? 'rgba(16, 185, 129, 0.08)'
-                              : 'rgba(16, 185, 129, 0.06)',
-                            marginHorizontal: -10,
-                            paddingHorizontal: 10,
-                            borderRadius: 16,
-                          },
-                        ]}
-                      >
-                        <View style={styles.partiesRow}>
-                          <View style={styles.partyBoxLeft}>
-                            <Text style={[styles.partyName, { color: textColor }]} numberOfLines={1}>
-                              {item.fromName}
-                            </Text>
-                            <Text style={[styles.partyRole, { color: mutedText }]}>owes</Text>
-                          </View>
-
-                          <View style={styles.arrowIconWrapper}>
-                            <ArrowRightIcon size={18} color={mutedText} />
-                          </View>
-
-                          <View style={styles.partyBoxRight}>
-                            <Text
-                              style={[styles.partyName, styles.partyNameRight, { color: textColor }]}
-                              numberOfLines={1}
-                            >
-                              {item.toName}
-                            </Text>
-                            <Text style={[styles.partyRole, styles.partyRoleRight, { color: mutedText }]}>
-                              receives
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.amountActionRow}>
-                          <Text style={[styles.debtAmount, { color: textColor }]}>
-                            {formatAmount(item.amount)}
-                          </Text>
-
-                          <View style={styles.actionsGroup}>
-                            {isUserDebtor ? (
-                              <GlassPill
-                                label="Mark Settled"
-                                icon={<CheckCircleIcon size={14} color={isDark ? '#000000' : '#FFFFFF'} />}
-                                variant="accent"
-                                size="sm"
-                                onPress={() => handleSettle(item.fromId, item.toId, item.amount)}
-                              />
-                            ) : isUserCreditor ? (
-                              <View style={styles.creditorBtnRow}>
-                                <GlassPill
-                                  label="Remind"
-                                  icon={<ChatRoundDotsIcon size={14} color={textColor} />}
-                                  variant="dark"
-                                  size="sm"
-                                  onPress={() => handleSendReminder(item.fromName, item.amount)}
-                                />
-                                <GlassPill
-                                  label="Mark Settled"
-                                  icon={<CheckCircleIcon size={14} color={isDark ? '#000000' : '#FFFFFF'} />}
-                                  variant="accent"
-                                  size="sm"
-                                  onPress={() => handleSettle(item.fromId, item.toId, item.amount)}
-                                />
-                              </View>
-                            ) : (
-                              <GlassPill
-                                label="Mark Settled"
-                                icon={<CheckCircleIcon size={14} color={textColor} />}
-                                variant="dark"
-                                size="sm"
-                                onPress={() => handleSettle(item.fromId, item.toId, item.amount)}
-                              />
-                            )}
-                          </View>
-                        </View>
-                      </View>
-
-                      {showDivider && (
-                        <View style={[styles.rowDivider, { backgroundColor: dividerColor }]} />
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </View>
+                {otherDebts.length > 0 && (
+                  <View style={styles.otherSectionWrap}>
+                    <Text style={[styles.otherSectionLabel, { color: mutedText }]}>
+                      Other Unsettled Balances ({otherDebts.length})
+                    </Text>
+                    {renderDebtGroup(otherDebts, false, 'other')}
+                  </View>
+                )}
+              </>
             )}
             </ScrollView>
-            <GradualBlur position="top" height={20} strength={1.2} layers={5} tint={bgSheet} />
-            <GradualBlur position="bottom" height={24} strength={1.3} layers={5} tint={bgSheet} />
+            <GradualBlur position="top" height={14} strength={1} layers={4} tint={bgSheet} />
+            <GradualBlur position="bottom" height={22} strength={1.2} layers={5} tint={bgSheet} />
           </View>
         </View>
 
@@ -428,21 +438,37 @@ const styles = StyleSheet.create({
   successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingVertical: 10,
+    backgroundColor: 'rgba(16, 185, 129, 0.14)',
+    paddingVertical: 12,
     paddingHorizontal: 14,
-    borderRadius: 12,
-    marginBottom: 12,
-    gap: 8,
+    borderRadius: 16,
+    marginBottom: 10,
+    gap: 10,
+  },
+  successIconWrap: {
+    flexShrink: 0,
   },
   successText: {
+    flex: 1,
+    flexShrink: 1,
     color: '#10B981',
     fontSize: 13,
+    lineHeight: 18,
     fontWeight: '500',
+  },
+  otherSectionWrap: {
+    marginTop: 6,
+    gap: 8,
+  },
+  otherSectionLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    paddingHorizontal: 4,
   },
   debtsList: {
     gap: 10,
-    paddingVertical: 12,
+    paddingTop: 14,
+    paddingBottom: 28,
   },
   scrollAreaWrap: {
     position: 'relative',

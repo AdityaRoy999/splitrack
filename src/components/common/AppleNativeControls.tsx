@@ -21,7 +21,7 @@ export interface AppleRadioControlProps {
   items: AppleRadioOption[];
   value: string;
   onChange: (value: string, index: number) => void;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   gap?: number;
   columns?: number;
   scrollable?: boolean;

@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   GestureResponderEvent,
   Platform,
   StyleSheet,
@@ -25,6 +27,8 @@ import {
   shiftIsoDate,
   useDateMonthSwipeGesture,
 } from '../../hooks/useDateMonthSwipeGesture';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 type CashFlowGranularity = 'Date' | 'Month' | 'Year';
 
@@ -116,51 +120,119 @@ export const SplineChart: React.FC = () => {
   const [drawProgress, setDrawProgress] = useState<number>(() =>
     typeof requestAnimationFrame !== 'undefined' ? 0 : 1
   );
+  const [plotBoxWidth, setPlotBoxWidth] = useState<number>(() =>
+    Math.max(240, Math.min(windowWidth - 64, 416))
+  );
+  const [swipeX] = useState(() => new Animated.Value(0));
+  const [swipeOpacity] = useState(() => new Animated.Value(1));
+  const [combinedTranslateX] = useState(() => new Animated.Value(0));
+  const transitionBusyRef = useRef(false);
 
   const isDark = themeMode === 'dark';
-  const width = Math.min(windowWidth - 68, 380);
+  const width = plotBoxWidth;
   const height = 154;
-  const paddingHorizontal = 20;
+  const paddingHorizontal = 22;
   const paddingTop = 34;
   const paddingBottom = 26;
 
+  const runSwipeTransition = useCallback(
+    (delta: -1 | 1, commit: () => void) => {
+      if (transitionBusyRef.current) return;
+      transitionBusyRef.current = true;
+      Animated.parallel([
+        Animated.timing(swipeOpacity, {
+          toValue: 0,
+          duration: 130,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+        Animated.timing(swipeX, {
+          toValue: -delta * 26,
+          duration: 130,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+      ]).start(() => {
+        setDrawProgress(0);
+        commit();
+        swipeX.setValue(delta * 30);
+        Animated.parallel([
+          Animated.timing(swipeOpacity, {
+            toValue: 1,
+            duration: 320,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+          Animated.timing(swipeX, {
+            toValue: 0,
+            duration: 340,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+        ]).start(() => {
+          transitionBusyRef.current = false;
+        });
+      });
+    },
+    [swipeOpacity, swipeX]
+  );
+
   const stepDay = useCallback(
     (delta: -1 | 1) => {
-      const base = selectedDate || getTodayLocalISO();
-      const nextIso = shiftIsoDate(base, delta);
-      const [yStr, mStr] = nextIso.split('-');
-      setSelectedIndex(null);
-      setSelectedDate(nextIso);
-      setSelectedYear(Number(yStr) || selectedYear);
-      setSelectedMonth(Math.max(0, Math.min(11, (Number(mStr) || 1) - 1)));
-      setGranularity('Date');
+      runSwipeTransition(delta, () => {
+        const base = selectedDate || getTodayLocalISO();
+        const nextIso = shiftIsoDate(base, delta);
+        const [yStr, mStr] = nextIso.split('-');
+        setSelectedIndex(null);
+        setSelectedDate(nextIso);
+        setSelectedYear(Number(yStr) || selectedYear);
+        setSelectedMonth(Math.max(0, Math.min(11, (Number(mStr) || 1) - 1)));
+        setGranularity('Date');
+      });
     },
-    [selectedDate, selectedYear]
+    [runSwipeTransition, selectedDate, selectedYear]
   );
 
   const stepMonth = useCallback(
     (delta: -1 | 1) => {
-      let nextMonth = selectedMonth + delta;
-      let nextYear = selectedYear;
-      if (nextMonth < 0) {
-        nextMonth = 11;
-        nextYear -= 1;
-      } else if (nextMonth > 11) {
-        nextMonth = 0;
-        nextYear += 1;
-      }
-      setSelectedIndex(null);
-      setSelectedMonth(nextMonth);
-      setSelectedYear(nextYear);
-      setGranularity('Month');
+      runSwipeTransition(delta, () => {
+        let nextMonth = selectedMonth + delta;
+        let nextYear = selectedYear;
+        if (nextMonth < 0) {
+          nextMonth = 11;
+          nextYear -= 1;
+        } else if (nextMonth > 11) {
+          nextMonth = 0;
+          nextYear += 1;
+        }
+        setSelectedIndex(null);
+        setSelectedMonth(nextMonth);
+        setSelectedYear(nextYear);
+        setGranularity('Month');
+      });
     },
-    [selectedMonth, selectedYear]
+    [runSwipeTransition, selectedMonth, selectedYear]
   );
 
-  const { gestureHandlers, isMonthHoldReady } = useDateMonthSwipeGesture({
+  const { gestureHandlers, isMonthHoldReady, dragAnim } = useDateMonthSwipeGesture({
     onStepDay: stepDay,
     onStepMonth: stepMonth,
   });
+
+  useEffect(() => {
+    const id = swipeX.addListener(({ value }) => {
+      combinedTranslateX.setValue(value);
+    });
+    const dragId = dragAnim.addListener(({ value }) => {
+      if (!transitionBusyRef.current) {
+        combinedTranslateX.setValue(value);
+      }
+    });
+    return () => {
+      swipeX.removeListener(id);
+      dragAnim.removeListener(dragId);
+    };
+  }, [combinedTranslateX, dragAnim, swipeX]);
 
   const pointsData = useMemo<TrajectoryPoint[]>(() => {
     if (granularity === 'Date') {
@@ -445,10 +517,20 @@ export const SplineChart: React.FC = () => {
         {/* Header with Stats on left + Calendar Button & Date/Month/Year Selector on right */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={[styles.statSublabel, { color: isDark ? '#FFFFFF' : '#18181B' }]}>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              style={[styles.statSublabel, { color: isDark ? '#FFFFFF' : '#18181B' }]}
+            >
               {activePoint ? `${formatAmount(activePoint.income)} Income` : `${formatAmount(0)} Income`}
             </Text>
-            <Text style={[styles.statSublabelExpense, { color: mutedText }]}>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              style={[styles.statSublabelExpense, { color: mutedText }]}
+            >
               {activePoint ? `${formatAmount(activePoint.expense)} Expenses` : `${formatAmount(0)} Expenses`}
             </Text>
           </View>
@@ -467,7 +549,7 @@ export const SplineChart: React.FC = () => {
               ]}
             >
               <CalendarDateIcon
-                size={15}
+                size={14}
                 color={
                   granularity === 'Date' && selectedDate ? activeText : textColor
                 }
@@ -479,17 +561,19 @@ export const SplineChart: React.FC = () => {
               value={granularity}
               onChange={(val) => {
                 setSelectedIndex(null);
+                setDrawProgress(0);
                 setGranularity(val as CashFlowGranularity);
               }}
               chipColor={surfacePill}
               activeColor={activeBg}
               textColor={mutedText}
               activeTextColor={activeText}
-              size="sm"
+              size="xs"
+              noWrap
               gap={4}
               radius={999}
-              swell={0.18}
-              barge={5}
+              swell={0.14}
+              barge={4}
             />
           </View>
         </View>
@@ -533,6 +617,19 @@ export const SplineChart: React.FC = () => {
           )}
         </View>
 
+        <Animated.View
+          style={{
+            width: '100%',
+            opacity: swipeOpacity,
+            transform: [{ translateX: combinedTranslateX }],
+          }}
+          onLayout={(e) => {
+            const measured = Math.floor(e.nativeEvent.layout.width);
+            if (measured > 100 && Math.abs(measured - plotBoxWidth) > 1) {
+              setPlotBoxWidth(measured);
+            }
+          }}
+        >
         {pointsData.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={[styles.emptyText, { color: mutedText }]}>
@@ -543,6 +640,7 @@ export const SplineChart: React.FC = () => {
               scaleTo={0.95}
               onPress={() => {
                 setSelectedIndex(null);
+                setDrawProgress(0);
                 setSelectedDate(null);
               }}
               contentStyle={[styles.clearChip, { backgroundColor: surfacePill, marginTop: 10, paddingHorizontal: 14, paddingVertical: 6 }]}
@@ -696,41 +794,54 @@ export const SplineChart: React.FC = () => {
               />
             </View>
 
-            {/* Labels Row */}
-            <View style={styles.labelsRow}>
-              {pointsData.map((d, i) => (
-                <TouchableOpacity
-                  key={`${d.key}-${i}`}
-                  onPress={() => handleSelectPoint(i)}
-                  {...(Platform.OS === 'web'
-                    ? ({ onMouseEnter: () => handleSelectPoint(i) } as any)
-                    : {})}
-                  style={styles.labelBtn}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.axisLabel,
-                      {
-                        color:
-                          safeIndex === i
-                            ? isDark
-                              ? '#FFFFFF'
-                              : '#000000'
-                            : isDark
-                              ? '#52525B'
-                              : '#9CA3AF',
-                        fontWeight: safeIndex === i ? '500' : '400',
-                      },
-                    ]}
+            {/* Labels Row aligned precisely to each point's X coordinate */}
+            <View style={[styles.labelsRow, { width }]}>
+              {pointsData.map((d, i) => {
+                const ptX =
+                  expenseCoords[i]?.x ??
+                  (pointsData.length > 1
+                    ? paddingHorizontal +
+                      i * (Math.max(40, width - paddingHorizontal * 2) / (pointsData.length - 1))
+                    : width / 2);
+                const labelW = 46;
+                const left = Math.max(0, Math.min(width - labelW, ptX - labelW / 2));
+
+                return (
+                  <TouchableOpacity
+                    key={`${d.key}-${i}`}
+                    onPress={() => handleSelectPoint(i)}
+                    {...(Platform.OS === 'web'
+                      ? ({ onMouseEnter: () => handleSelectPoint(i) } as any)
+                      : {})}
+                    style={[styles.labelBtnPositioned, { left, width: labelW }]}
                   >
-                    {d.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.axisLabel,
+                        {
+                          textAlign: 'center',
+                          color:
+                            safeIndex === i
+                              ? isDark
+                                ? '#FFFFFF'
+                                : '#000000'
+                              : isDark
+                                ? '#52525B'
+                                : '#9CA3AF',
+                          fontWeight: safeIndex === i ? '600' : '400',
+                        },
+                      ]}
+                    >
+                      {d.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         )}
+        </Animated.View>
       </View>
 
       <CalendarDatePickerModal
@@ -738,6 +849,7 @@ export const SplineChart: React.FC = () => {
         selectedDate={selectedDate}
         onSelectDate={(iso) => {
           setSelectedIndex(null);
+          setDrawProgress(0);
           setSelectedDate(iso);
           if (iso) {
             const [yStr, mStr] = iso.split('-');
@@ -768,12 +880,11 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
-    rowGap: 8,
-    columnGap: 8,
+    columnGap: 6,
   },
   headerLeft: {
     flex: 1,
@@ -781,14 +892,15 @@ const styles = StyleSheet.create({
   },
   headerRightControls: {
     flexDirection: 'row',
+    flexWrap: 'nowrap',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     flexShrink: 0,
   },
   calendarIconBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 0,
@@ -864,14 +976,15 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   labelsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 6,
+    position: 'relative',
+    height: 24,
     marginTop: 8,
   },
-  labelBtn: {
+  labelBtnPositioned: {
+    position: 'absolute',
+    top: 0,
     paddingVertical: 4,
-    paddingHorizontal: 4,
+    alignItems: 'center',
   },
   axisLabel: {
     fontSize: 11,

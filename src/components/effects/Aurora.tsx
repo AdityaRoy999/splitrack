@@ -171,7 +171,7 @@ const GAUSSIAN_FALLOFF = [
  * backed by Gaussian radial diffusion on Web and legacy OS versions so every
  * Aurora card renders silky smooth with zero visible bands or contours.
  */
-export const Aurora: React.FC<AuroraProps> = ({
+export const Aurora: React.FC<AuroraProps> = React.memo(({
   colorStops = ['#5227FF', '#7cff67', '#5227FF'],
   amplitude = 1,
   blend = 0.5,
@@ -446,7 +446,9 @@ export const Aurora: React.FC<AuroraProps> = ({
       </Animated.View>
     </View>
   );
-};
+});
+
+Aurora.displayName = 'Aurora';
 
 export default Aurora;
 

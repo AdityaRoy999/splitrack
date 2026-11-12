@@ -22,6 +22,7 @@ import { UpiQrModal } from './UpiQrModal';
 const CARD_HEIGHT = 152;
 const STACK_PEEK = 24;
 const EXPAND_GAP = 12;
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 const PROVIDER_AURORA_STOPS: Record<string, [string, string, string]> = {
   slice: ['#5227FF', '#7cff67', '#5227FF'],
@@ -127,18 +128,18 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
         toValue: targetTop,
         tension: 60,
         friction: 9,
-        useNativeDriver: false,
+        useNativeDriver: USE_NATIVE_DRIVER,
       }),
       Animated.spring(scaleAnim, {
         toValue: targetScale,
         tension: 60,
         friction: 9,
-        useNativeDriver: false,
+        useNativeDriver: USE_NATIVE_DRIVER,
       }),
       Animated.timing(footerOpacityAnim, {
         toValue: targetFooterOpacity,
         duration: 180,
-        useNativeDriver: false,
+        useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
   }, [targetTop, targetScale, targetFooterOpacity, topAnim, scaleAnim, footerOpacityAnim]);
@@ -153,9 +154,8 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
       style={[
         styles.cardWrapper,
         {
-          top: topAnim,
           zIndex: cardZIndex,
-          transform: [{ scale: scaleAnim }],
+          transform: [{ translateY: topAnim }, { scale: scaleAnim }],
         },
       ]}
     >
@@ -540,6 +540,7 @@ const styles = StyleSheet.create({
   },
   cardWrapper: {
     position: 'absolute',
+    top: 0,
     left: 0,
     right: 0,
     height: CARD_HEIGHT,

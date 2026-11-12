@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
+import { measureNodeInWindow, type ViewRefNode, type WindowRect } from '../../utils/measureWindow';
 import { Sun2Icon } from '@solar-icons/react-native/bold/sun-2';
 import { MoonIcon } from '@solar-icons/react-native/bold/moon';
 import { SettingsMinimalisticIcon } from '@solar-icons/react-native/bold/settings-minimalistic';
@@ -9,19 +10,43 @@ import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassSurface } from '../glass/GlassSurface';
 import { NativeGlassContainer } from '../common/AppleNativeControls';
 
+export type HeaderLogoRect = WindowRect;
+
 interface HeaderBarProps {
   onOpenSettings: () => void;
   onOpenNotifications?: () => void;
   userName?: string;
+  hideLogo?: boolean;
+  onLogoLayout?: (rect: HeaderLogoRect) => void;
+  onLogoNode?: (node: ViewRefNode | null) => void;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
   onOpenSettings,
   onOpenNotifications,
   userName = 'Jfiqw Alex',
+  hideLogo = false,
+  onLogoLayout,
+  onLogoNode,
 }) => {
   const { themeMode, toggleTheme } = useLiquidGlass();
   const isDark = themeMode === 'dark';
+  const logoAnchorRef = useRef<ViewRefNode>(null);
+
+  const setLogoRef = useCallback(
+    (node: ViewRefNode | null) => {
+      logoAnchorRef.current = node;
+      onLogoNode?.(node);
+    },
+    [onLogoNode]
+  );
+
+  const reportLogoLayout = useCallback(() => {
+    if (!onLogoLayout) return;
+    requestAnimationFrame(() => {
+      measureNodeInWindow(logoAnchorRef.current, onLogoLayout);
+    });
+  }, [onLogoLayout]);
 
   const handleSettings = () => {
     triggerImpact(ImpactStyle.Light);
@@ -41,18 +66,28 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       {/* User Avatar + Greeting */}
       <View style={styles.userSection}>
         <AnimatedPressable scaleTo={0.94} onPress={handleSettings} style={styles.avatarWrapper}>
-          <Image
-            source={
-              isDark
-                ? require('../../../assets/icon-dark.png')
-                : require('../../../assets/icon-light.png')
-            }
-            resizeMode="cover"
-            style={[
-              styles.avatar,
-              { backgroundColor: isDark ? '#000000' : '#FFFFFF' },
-            ]}
-          />
+          <View
+            ref={setLogoRef}
+            collapsable={false}
+            onLayout={reportLogoLayout}
+            style={styles.avatarSlot}
+          >
+            <Image
+              source={
+                isDark
+                  ? require('../../../assets/icon-dark.png')
+                  : require('../../../assets/icon-light.png')
+              }
+              resizeMode="cover"
+              style={[
+                styles.avatar,
+                {
+                  backgroundColor: isDark ? '#000000' : '#FFFFFF',
+                  opacity: hideLogo ? 0 : 1,
+                },
+              ]}
+            />
+          </View>
         </AnimatedPressable>
         <View style={styles.greetingCol}>
           <Text style={[styles.userName, { color: textColor }]}>{userName}</Text>
@@ -122,6 +157,11 @@ const styles = StyleSheet.create({
   },
   avatarWrapper: {
     marginRight: 10,
+  },
+  avatarSlot: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
   },
   avatar: {
     width: 42,

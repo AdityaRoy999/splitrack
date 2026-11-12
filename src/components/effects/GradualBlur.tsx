@@ -82,7 +82,7 @@ function toRgbaWithAlpha(color: string, alphaFactor: number): string {
  * React-Bits inspired GradualBlur ported cleanly to React Native & React Native Web.
  * Renders stacked progressive CSS backdrop-filter masks on Web and layered BlurView + LinearGradient on iOS/Android.
  */
-export const GradualBlur: React.FC<GradualBlurProps> = ({
+export const GradualBlur: React.FC<GradualBlurProps> = React.memo(({
   position = 'bottom',
   height = 32,
   width,
@@ -240,6 +240,8 @@ export const GradualBlur: React.FC<GradualBlurProps> = ({
       )}
     </View>
   );
-};
+});
+
+GradualBlur.displayName = 'GradualBlur';
 
 export default GradualBlur;

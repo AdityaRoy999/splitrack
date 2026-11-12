@@ -15,6 +15,8 @@ interface AnimatedPressableProps {
   accessibilityLabel?: string;
 }
 
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
 /**
  * Lightweight spring-scale micro-interaction wrapper for buttons and cards.
  */
@@ -37,7 +39,7 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
       toValue,
       friction: 7,
       tension: 120,
-      useNativeDriver: false,
+      useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
   };
 
@@ -88,7 +90,7 @@ export const FadeInSlide: React.FC<FadeInSlideProps> = ({
     const animation = Animated.timing(anim, {
       toValue: 1,
       duration,
-      useNativeDriver: false,
+      useNativeDriver: USE_NATIVE_DRIVER,
     });
     animation.start();
     // Guarantee completion if Web animation frames throttle on tab switches

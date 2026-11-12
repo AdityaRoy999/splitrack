@@ -1,5 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, Platform, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle,
+} from 'react-native';
+import { BlurView } from 'expo-blur';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
@@ -90,22 +101,94 @@ const toISODate = (year: number, monthIndex: number, day: number): string => {
   return `${year}-${m}-${d}`;
 };
 
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
 export const CalendarDatePickerModal: React.FC<CalendarDatePickerModalProps> = (props) => {
   const { visible, selectedDate, onClose } = props;
-  const { isLiquidGlassEnabled } = useLiquidGlass();
+  const { themeMode } = useLiquidGlass();
+  const isDark = themeMode === 'dark';
+
+  const [cardAnim] = useState(() => new Animated.Value(visible ? 1 : 0));
+
+  useEffect(() => {
+    if (!visible) return;
+    cardAnim.setValue(0);
+    Animated.timing(cardAnim, {
+      toValue: 1,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [cardAnim, visible]);
+
   if (!visible) return null;
 
-  const useNativeAppleCalendar = Platform.OS === 'ios' && isLiquidGlassEnabled;
+  const cardScale = cardAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.94, 1],
+  });
 
   return (
     <Modal
       visible={visible}
-      transparent={!useNativeAppleCalendar}
-      presentationStyle={useNativeAppleCalendar ? 'pageSheet' : undefined}
-      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      transparent
+      animationType="none"
+      statusBarTranslucent
       onRequestClose={onClose}
     >
-      <CalendarDialogBody key={selectedDate || 'today'} {...props} />
+      <View style={styles.overlay}>
+        {Platform.OS === 'web' ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.backdropFill,
+              {
+                backgroundColor: isDark
+                  ? 'rgba(6, 7, 11, 0.56)'
+                  : 'rgba(15, 23, 42, 0.34)',
+                backdropFilter: 'blur(18px) saturate(145%)',
+                WebkitBackdropFilter: 'blur(18px) saturate(145%)',
+              } as unknown as ViewStyle,
+            ]}
+          />
+        ) : (
+          <View pointerEvents="none" style={styles.backdropFill}>
+            <BlurView
+              intensity={isDark ? 38 : 34}
+              tint={isDark ? 'dark' : 'light'}
+              style={styles.backdropFill}
+            />
+            <View
+              style={[
+                styles.backdropFill,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(6, 7, 11, 0.44)'
+                    : 'rgba(15, 23, 42, 0.24)',
+                },
+              ]}
+            />
+          </View>
+        )}
+
+        <Pressable
+          accessibilityLabel="Close calendar backdrop"
+          onPress={onClose}
+          style={styles.backdropFill}
+        />
+
+        <Animated.View
+          style={[
+            styles.modalWrap,
+            {
+              opacity: cardAnim,
+              transform: [{ scale: cardScale }],
+            },
+          ]}
+        >
+          <CalendarDialogBody key={selectedDate || 'today'} {...props} />
+        </Animated.View>
+      </View>
     </Modal>
   );
 };
@@ -247,56 +330,52 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
   };
 
   if (useNativeAppleCalendar) {
-    const sheetBg = isDark ? '#09090B' : '#F2F2F7';
     return (
-      <View style={[styles.overlay, { backgroundColor: sheetBg, justifyContent: 'flex-start', paddingTop: 22 }]}>
-        <View style={[styles.card, { backgroundColor: cardBg, maxWidth: 460 }]}>
-          <View style={styles.headerRow}>
-            <View style={styles.titleWrap}>
-              <View style={[styles.iconBadge, { backgroundColor: surfaceBg }]}>
-                <CalendarDateIcon size={18} color={textColor} />
-              </View>
-              <View>
-                <Text style={[styles.titleText, { color: textColor }]}>{title}</Text>
-                <Text style={[styles.subtitleText, { color: mutedText }]}>
-                  {selectedDate ? formatDisplayDate(selectedDate, true) : 'Showing all recorded dates'}
-                </Text>
-              </View>
+      <View style={[styles.card, { backgroundColor: cardBg }]}>
+        <View style={styles.headerRow}>
+          <View style={styles.titleWrap}>
+            <View style={[styles.iconBadge, { backgroundColor: surfaceBg }]}>
+              <CalendarDateIcon size={18} color={textColor} />
             </View>
-            <AnimatedPressable
-              onPress={onClose}
-              scaleTo={0.9}
-              accessibilityLabel="Close calendar modal"
-              contentStyle={[styles.closeBtn, { backgroundColor: surfaceBg }]}
-            >
-              <CloseCircleIcon size={20} color={textColor} />
-            </AnimatedPressable>
+            <View>
+              <Text style={[styles.titleText, { color: textColor }]}>{title}</Text>
+              <Text style={[styles.subtitleText, { color: mutedText }]}>
+                {selectedDate ? formatDisplayDate(selectedDate, true) : 'Showing all recorded dates'}
+              </Text>
+            </View>
           </View>
-
-          <View style={[styles.hairline, { backgroundColor: dividerColor }]} />
-
-          <AppleGraphicalCalendar
-            title={title}
-            selectedDate={selectedDate}
-            onSelectDate={(iso) => {
-              triggerSelection();
-              onSelectDate(iso);
-              onClose();
-            }}
-            onToday={handleToday}
-            onClear={allowClear ? handleClear : undefined}
-            allowClear={allowClear}
-            isDark={isDark}
-          />
+          <AnimatedPressable
+            onPress={onClose}
+            scaleTo={0.9}
+            accessibilityLabel="Close calendar modal"
+            contentStyle={[styles.closeBtn, { backgroundColor: surfaceBg }]}
+          >
+            <CloseCircleIcon size={20} color={textColor} />
+          </AnimatedPressable>
         </View>
+
+        <View style={[styles.hairline, { backgroundColor: dividerColor }]} />
+
+        <AppleGraphicalCalendar
+          title={title}
+          selectedDate={selectedDate}
+          onSelectDate={(iso) => {
+            triggerSelection();
+            onSelectDate(iso);
+            onClose();
+          }}
+          onToday={handleToday}
+          onClear={allowClear ? handleClear : undefined}
+          allowClear={allowClear}
+          isDark={isDark}
+        />
       </View>
     );
   }
 
   return (
-    <View style={styles.overlay}>
-      <View style={[styles.card, { backgroundColor: cardBg }]}>
-          {/* Header */}
+    <View style={[styles.card, { backgroundColor: cardBg }]}>
+        {/* Header */}
           <View style={styles.headerRow}>
             <View style={styles.titleWrap}>
               <View style={[styles.iconBadge, { backgroundColor: surfaceBg }]}>
@@ -541,7 +620,6 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
               </AnimatedPressable>
             )}
           </View>
-        </View>
     </View>
   );
 };
@@ -549,14 +627,25 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 18,
   },
-  card: {
+  backdropFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  modalWrap: {
     width: '100%',
     maxWidth: 400,
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  card: {
+    width: '100%',
     borderRadius: 26,
     padding: 18,
     borderWidth: 0,

@@ -48,7 +48,7 @@ export interface AppleRadioControlProps {
   items: AppleRadioOption[];
   value: string;
   onChange: (value: string, index: number) => void;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   gap?: number;
   columns?: number;
   scrollable?: boolean;
@@ -155,16 +155,23 @@ export const AppleRadioControl: React.FC<AppleRadioControlProps> = ({
 }) => {
   const hasGlass = isLiquidGlassAvailable();
   const colorScheme = isDark ? 'dark' : 'light';
-  const ctrlSize = size === 'sm' ? 'small' : size === 'lg' ? 'large' : 'regular';
+  const ctrlSize = size === 'xs' || size === 'sm' ? 'small' : size === 'lg' ? 'large' : 'regular';
 
   // Use Apple's native segmented control for compact non-grid radio groups (up to 4 items)
   if (!scrollable && !columns && items.length >= 2 && items.length <= 4) {
-    const segHeight = size === 'sm' ? 32 : size === 'lg' ? 40 : 35;
+    const segHeight = size === 'xs' ? 28 : size === 'sm' ? 32 : size === 'lg' ? 40 : 35;
+    const isCompactInline = size === 'xs';
+    const compactWidth = items.length <= 3 ? 154 : 198;
     return (
-      <View style={[{ width: '100%' }, style]}>
+      <View
+        style={[
+          isCompactInline ? { width: compactWidth, flexShrink: 0 } : { width: '100%' },
+          style,
+        ]}
+      >
         <Host
           colorScheme={colorScheme}
-          style={{ width: '100%', height: segHeight }}
+          style={{ width: isCompactInline ? compactWidth : '100%', height: segHeight }}
         >
           <Picker
             label="Selection"
