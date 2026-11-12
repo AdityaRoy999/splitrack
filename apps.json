@@ -12,11 +12,19 @@
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
       "version": "1.0.0",
-      "versionDate": "2026-11-12T19:59:59Z",
-      "versionDescription": "feat: automated SideStore AltSource iOS distribution and borderless onboarding auth screen",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-9/Splittrack-unsigned.ipa",
-      "size": 12866923,
+      "versionDate": "2026-11-12T20:34:33Z",
+      "versionDescription": "feat: anchor card bottom gradient, integrate React Bits Aurora web, persist auth session, and pure solar icons",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-10/Splittrack-unsigned.ipa",
+      "size": 12417716,
       "versions": [
+        {
+          "version": "1.0.0",
+          "buildVersion": "10",
+          "date": "2026-11-12T20:34:33Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-10/Splittrack-unsigned.ipa",
+          "size": 12417716,
+          "localizedDescription": "feat: anchor card bottom gradient, integrate React Bits Aurora web, persist auth session, and pure solar icons"
+        },
         {
           "version": "1.0.0",
           "buildVersion": "9",
