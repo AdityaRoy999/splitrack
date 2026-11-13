@@ -11,12 +11,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.16",
-      "versionDate": "2026-11-13T09:13:11Z",
-      "versionDescription": "fix: ground native iOS gradient to eliminate floating box, resolve category twitching, and add search to Paid By",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-16/Splittrack-unsigned.ipa",
-      "size": 12417980,
+      "version": "1.0.17",
+      "versionDate": "2026-11-13T10:01:19Z",
+      "versionDescription": "fix(jelly-radio): restore authentic elastic jelly physics, remove iOS hijack, and prevent font-weight layout shift",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-17/Splittrack-unsigned.ipa",
+      "size": 12417564,
       "versions": [
+        {
+          "version": "1.0.17",
+          "buildVersion": "17",
+          "date": "2026-11-13T10:01:19Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-17/Splittrack-unsigned.ipa",
+          "size": 12417564,
+          "localizedDescription": "fix(jelly-radio): restore authentic elastic jelly physics, remove iOS hijack, and prevent font-weight layout shift"
+        },
         {
           "version": "1.0.16",
           "buildVersion": "16",
