@@ -141,6 +141,22 @@ function MainAppContent({
   const activeText = isDark ? '#18181B' : '#FFFFFF';
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
 
+  const categoryFilterItems = useMemo(
+    () => [
+      { value: 'All', label: 'All Categories' },
+      ...categories.map((cat) => ({
+        value: cat.name,
+        label: cat.name,
+        icon: renderSolarIcon(
+          cat.iconKey,
+          13,
+          selectedCategoryFilter === cat.name ? activeText : mutedText
+        ),
+      })),
+    ],
+    [categories, selectedCategoryFilter, activeText, mutedText]
+  );
+
   const renderHomeTab = () => {
     const activeMember = selectedMemberId
       ? friends.find((f) => f.id === selectedMemberId)
@@ -299,22 +315,6 @@ function MainAppContent({
       if (expenseFilter === 'Income') return tx.type === 'income' || tx.type === 'settlement';
       return true;
     });
-
-    const categoryFilterItems = useMemo(
-      () => [
-        { value: 'All', label: 'All Categories' },
-        ...categories.map((cat) => ({
-          value: cat.name,
-          label: cat.name,
-          icon: renderSolarIcon(
-            cat.iconKey,
-            13,
-            selectedCategoryFilter === cat.name ? activeText : mutedText
-          ),
-        })),
-      ],
-      [categories, selectedCategoryFilter, activeText, mutedText]
-    );
 
     return (
       <ScrollView
