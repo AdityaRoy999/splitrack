@@ -11,12 +11,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.12",
-      "versionDate": "2026-11-13T07:45:09Z",
-      "versionDescription": "fix: restore vibrant universal aurora gradient engine with full-width grounded baseline",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-12/Splittrack-unsigned.ipa",
-      "size": 12417323,
+      "version": "1.0.13",
+      "versionDate": "2026-11-13T07:59:25Z",
+      "versionDescription": "fix(web): resolve WebGL shader syntax error and ground horizon baseline in Aurora.web.tsx",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-13/Splittrack-unsigned.ipa",
+      "size": 12417327,
       "versions": [
+        {
+          "version": "1.0.13",
+          "buildVersion": "13",
+          "date": "2026-11-13T07:59:25Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-13/Splittrack-unsigned.ipa",
+          "size": 12417327,
+          "localizedDescription": "fix(web): resolve WebGL shader syntax error and ground horizon baseline in Aurora.web.tsx"
+        },
         {
           "version": "1.0.12",
           "buildVersion": "12",
