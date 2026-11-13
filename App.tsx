@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ScrollView,
@@ -300,18 +300,21 @@ function MainAppContent({
       return true;
     });
 
-    const categoryFilterItems = [
-      { value: 'All', label: 'All Categories' },
-      ...categories.map((cat) => ({
-        value: cat.name,
-        label: cat.name,
-        icon: renderSolarIcon(
-          cat.iconKey,
-          13,
-          selectedCategoryFilter === cat.name ? activeText : mutedText
-        ),
-      })),
-    ];
+    const categoryFilterItems = useMemo(
+      () => [
+        { value: 'All', label: 'All Categories' },
+        ...categories.map((cat) => ({
+          value: cat.name,
+          label: cat.name,
+          icon: renderSolarIcon(
+            cat.iconKey,
+            13,
+            selectedCategoryFilter === cat.name ? activeText : mutedText
+          ),
+        })),
+      ],
+      [categories, selectedCategoryFilter, activeText, mutedText]
+    );
 
     return (
       <ScrollView

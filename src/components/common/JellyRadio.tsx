@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { triggerSelection } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
-import { AppleRadioControl } from './AppleNativeControls';
 import { GradualBlur } from '../effects/GradualBlur';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -124,38 +123,43 @@ const JellyChip: React.FC<JellyChipProps> = ({
   useEffect(() => {
     if (selectionSeq === 0) return;
 
-    if (index === activeIndex) {
-      scaleX.stopAnimation();
-      scaleY.stopAnimation();
-      translateX.stopAnimation();
+    scaleX.stopAnimation();
+    scaleY.stopAnimation();
+    translateX.stopAnimation();
 
-      const xPeak = 1 + Math.min(0.08, swell * 0.4);
+    if (index === activeIndex) {
+      // Juicy Jelly Squash & Stretch rebound
+      const effectiveSwell = Math.max(0.18, Math.min(0.4, swell));
+      const effectiveJelly = Math.max(0.8, Math.min(1.8, jelly));
+      const xPeak = 1 + effectiveSwell * 0.78 * effectiveJelly;
+      const yPeak = 1 - effectiveSwell * 0.35 * effectiveJelly;
+
       Animated.parallel([
         Animated.sequence([
           Animated.timing(scaleX, {
             toValue: xPeak,
-            duration: 60,
+            duration: 75,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.spring(scaleX, {
             toValue: 1,
-            stiffness: 450,
-            damping: 24,
-            mass: 0.75,
+            stiffness: 300,
+            damping: 11,
+            mass: 0.8,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ]),
         Animated.sequence([
           Animated.timing(scaleY, {
-            toValue: xPeak,
-            duration: 60,
+            toValue: yPeak,
+            duration: 75,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.spring(scaleY, {
             toValue: 1,
-            stiffness: 450,
-            damping: 24,
-            mass: 0.75,
+            stiffness: 300,
+            damping: 11,
+            mass: 0.8,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ]),
@@ -163,42 +167,70 @@ const JellyChip: React.FC<JellyChipProps> = ({
       return;
     }
 
-    if (barge > 0) {
-      const distance = Math.abs(index - activeIndex);
-      const delay = distance * stagger;
-      const timer = setTimeout(() => {
-        scaleX.stopAnimation();
-        scaleY.stopAnimation();
-        translateX.stopAnimation();
+    // Neighbor chips: Organic synchronized jelly ripple
+    const distance = Math.abs(index - activeIndex);
+    if (distance > 0 && distance <= 3) {
+      const effectiveJelly = Math.max(0.8, Math.min(1.8, jelly));
+      const falloff = Math.pow(0.55, distance);
+      const direction = index < activeIndex ? -1 : 1;
+      const shift = barge > 0 ? direction * barge * falloff * 0.5 : 0;
+      const squash = 1 - shrink * 0.8 * falloff;
+      const stretch = 1 + shrink * 0.5 * falloff * effectiveJelly;
 
-        const direction = index < activeIndex ? -1 : 1;
-        const falloff = Math.max(0.32, 1 - (distance - 1) * 0.25);
-        const shift = direction * barge * falloff;
-
+      Animated.parallel([
         Animated.sequence([
-          Animated.timing(translateX, {
-            toValue: shift,
-            duration: 70,
+          Animated.timing(scaleX, {
+            toValue: squash,
+            duration: 75,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
-          Animated.spring(translateX, {
-            toValue: 0,
-            stiffness: 350,
-            damping: 22,
+          Animated.spring(scaleX, {
+            toValue: 1,
+            stiffness: 340,
+            damping: 14,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
-        ]).start();
-      }, delay);
-
-      return () => clearTimeout(timer);
+        ]),
+        Animated.sequence([
+          Animated.timing(scaleY, {
+            toValue: stretch,
+            duration: 75,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+          Animated.spring(scaleY, {
+            toValue: 1,
+            stiffness: 340,
+            damping: 14,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+        ]),
+        ...(shift !== 0
+          ? [
+              Animated.sequence([
+                Animated.timing(translateX, {
+                  toValue: shift,
+                  duration: 75,
+                  useNativeDriver: USE_NATIVE_DRIVER,
+                }),
+                Animated.spring(translateX, {
+                  toValue: 0,
+                  stiffness: 340,
+                  damping: 16,
+                  useNativeDriver: USE_NATIVE_DRIVER,
+                }),
+              ]),
+            ]
+          : []),
+      ]).start();
     }
   }, [
     selectionSeq,
     activeIndex,
     index,
-    stagger,
     swell,
     barge,
+    shrink,
+    jelly,
     scaleX,
     scaleY,
     translateX,
@@ -208,15 +240,15 @@ const JellyChip: React.FC<JellyChipProps> = ({
     if (isDisabled) return;
     Animated.parallel([
       Animated.spring(scaleX, {
-        toValue: 1 - shrink * 1.25,
-        stiffness: 650,
-        damping: 26,
+        toValue: 1.05,
+        stiffness: 600,
+        damping: 24,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
       Animated.spring(scaleY, {
-        toValue: 1 - shrink * 1.25,
-        stiffness: 650,
-        damping: 26,
+        toValue: 0.92,
+        stiffness: 600,
+        damping: 24,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
@@ -227,14 +259,14 @@ const JellyChip: React.FC<JellyChipProps> = ({
     Animated.parallel([
       Animated.spring(scaleX, {
         toValue: 1,
-        stiffness: stiffness,
-        damping: 20,
+        stiffness: 320,
+        damping: 16,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
       Animated.spring(scaleY, {
         toValue: 1,
-        stiffness: stiffness,
-        damping: 20,
+        stiffness: 320,
+        damping: 16,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
@@ -284,7 +316,7 @@ const JellyChip: React.FC<JellyChipProps> = ({
             {
               color: isSelected ? activeTextColor : textColor,
               fontSize: metrics.fontSize,
-              fontWeight: isSelected ? '500' : '400',
+              fontWeight: '500',
             },
           ]}
         >
@@ -309,19 +341,19 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   radius = 999,
   columns,
   noWrap = false,
-  swell = 0.2,
-  barge = 0,
-  shrink = 0.04,
-  jelly = 1.0,
-  bounce = 0.2,
+  swell = 0.28,
+  barge = 3,
+  shrink = 0.05,
+  jelly = 1.25,
+  bounce = 0.35,
   stagger = 0,
-  stiffness = 500,
+  stiffness = 320,
   disabled = false,
   scrollable = false,
   fadeColor,
   style,
 }) => {
-  const { isLiquidGlassEnabled, themeMode } = useLiquidGlass();
+  const { themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
   const normalizedItems: JellyRadioItem[] =
     items === 'levels'
@@ -340,34 +372,6 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
     0,
     normalizedItems.findIndex((i) => i.value === currentValue)
   );
-
-  if (Platform.OS === 'ios' && isLiquidGlassEnabled && !scrollable && normalizedItems.length > 0) {
-    return (
-      <AppleRadioControl
-        items={normalizedItems.map((entry) => ({
-          value: entry.value,
-          label: entry.label,
-          disabled: entry.disabled,
-        }))}
-        value={currentValue}
-        onChange={(pickedValue, idx) => {
-          if (disabled) return;
-          triggerSelection();
-          if (value === undefined) {
-            setInnerValue(pickedValue);
-          }
-          onChange?.(pickedValue, idx);
-        }}
-        size={size}
-        gap={gap}
-        columns={columns}
-        scrollable={scrollable}
-        disabled={disabled}
-        isDark={themeMode === 'dark'}
-        style={style}
-      />
-    );
-  }
 
   const handleSelect = (index: number) => {
     const picked = normalizedItems[index];
