@@ -334,17 +334,26 @@ export const Aurora: React.FC<AuroraProps> = React.memo(({
     ];
   }, [fourStops, isBottom, lightMode, strength]);
 
-  // Dedicated permanent baseline strip colors across the full card width
-  const baselineStripColors = useMemo<[string, string, ...string[]]>(() => {
+  // Dedicated permanent cross-horizon grounding wash (full card height, continuous diagonal ramp, NO hard edges)
+  const baselineWashColors = useMemo<[string, string, ...string[]]>(() => {
     const [c0, c1, c2, c3] = fourStops;
-    const a = lightMode ? 0.48 : 0.68 * strength;
+    const a = lightMode ? 0.36 : 0.55 * strength;
+    const aFade = 0;
+    if (isBottom) {
+      return [
+        hexWithAlpha(c3, aFade),
+        hexWithAlpha(c2, a * 0.35),
+        hexWithAlpha(c1, a * 0.75),
+        hexWithAlpha(c0, a),
+      ];
+    }
     return [
-      hexWithAlpha(c0, a * 0.75),
-      hexWithAlpha(c1, a),
-      hexWithAlpha(c2, a * 0.95),
-      hexWithAlpha(c3, a * 0.8),
+      hexWithAlpha(c0, a),
+      hexWithAlpha(c1, a * 0.75),
+      hexWithAlpha(c2, a * 0.35),
+      hexWithAlpha(c3, aFade),
     ];
-  }, [fourStops, lightMode, strength]);
+  }, [fourStops, isBottom, lightMode, strength]);
 
   const svgWidth = boxSize.width * 1.34;
   const svgHeight = boxSize.height;
@@ -367,19 +376,12 @@ export const Aurora: React.FC<AuroraProps> = React.memo(({
           style={[styles.fill, { opacity: clampedOpacity * 0.85 }]}
         />
 
-        {/* Layer 2: Dedicated Permanent Grounding Baseline Strip */}
+        {/* Layer 2: Dedicated Permanent Grounding Horizon Wash (full card height, diagonal cross-wash, NO hard edges) */}
         <ExpoLinearGradient
-          colors={baselineStripColors}
-          start={{ x: 0, y: isBottom ? 1 : 0 }}
-          end={{ x: 1, y: isBottom ? 1 : 0 }}
-          style={[
-            styles.baselineStrip,
-            isBottom ? { bottom: 0 } : { top: 0 },
-            {
-              height: Math.max(50, boxSize.height * 0.42),
-              opacity: clampedOpacity * 0.9,
-            },
-          ]}
+          colors={baselineWashColors}
+          start={{ x: 0.95, y: isBottom ? 0.15 : 0 }}
+          end={{ x: 0.05, y: isBottom ? 1 : 0.85 }}
+          style={[styles.fill, { opacity: clampedOpacity * 0.85 }]}
         />
 
         {/* Layer 3: Dynamic Primary Aurora Curtain (drifting & breathing) */}
@@ -518,11 +520,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-  },
-  baselineStrip: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
   },
   curtainLayer: {
     position: 'absolute',

@@ -581,7 +581,7 @@ export const Aurora = ({
       className={['relative h-full w-full overflow-hidden', className].filter(Boolean).join(' ')}
       style={containerStyle}
     >
-      {/* Permanent atmospheric horizon wash backing */}
+      {/* Permanent full-height atmospheric horizon wash backing */}
       <div
         style={{
           position: 'absolute',
@@ -594,17 +594,23 @@ export const Aurora = ({
         }}
       />
 
-      {/* Permanent full-width grounding baseline strip */}
+      {/* Permanent full-width grounding baseline wash with continuous vertical fade (NO hard line / seam) */}
       <div
         style={{
           position: 'absolute',
+          top: 0,
           left: 0,
           right: 0,
-          ...(isBottom ? { bottom: 0 } : { top: 0 }),
-          height: '45%',
+          bottom: 0,
           background: baselineStrip,
           pointerEvents: 'none',
           opacity: 0.85,
+          maskImage: isBottom
+            ? 'linear-gradient(to bottom, transparent 0%, transparent 25%, rgba(0,0,0,0.35) 60%, black 100%)'
+            : 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.35) 40%, transparent 75%, transparent 100%)',
+          WebkitMaskImage: isBottom
+            ? 'linear-gradient(to bottom, transparent 0%, transparent 25%, rgba(0,0,0,0.35) 60%, black 100%)'
+            : 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.35) 40%, transparent 75%, transparent 100%)',
         }}
       />
 
