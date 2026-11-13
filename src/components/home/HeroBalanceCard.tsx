@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, Platform, View, Text, StyleSheet } from 'react-native';
-import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import { Aurora } from '../effects/Aurora';
 import { EyeIcon } from '@solar-icons/react-native/bold/eye';
 import { EyeClosedIcon } from '@solar-icons/react-native/bold/eye-closed';
@@ -94,40 +93,20 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
         matteColor={isDark ? '#111114' : '#FFFFFF'}
         style={styles.heroCard}
       >
-        {/* Permanent grounding baseline gradient: always stays flush with the bottom edge */}
-        <ExpoLinearGradient
-          colors={
-            isDark
-              ? ['transparent', 'rgba(82, 39, 255, 0.24)', 'rgba(124, 255, 103, 0.44)']
-              : ['transparent', 'rgba(56, 189, 248, 0.28)', 'rgba(52, 211, 153, 0.5)']
-          }
-          start={{ x: 0, y: 0.12 }}
-          end={{ x: 0.85, y: 1 }}
-          style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
-        />
-
-        {/* Anchored bottom strip guaranteeing the lower part never moves away from the bottom line */}
-        <ExpoLinearGradient
-          colors={
-            isDark
-              ? ['transparent', 'rgba(82, 39, 255, 0.32)', 'rgba(124, 255, 103, 0.48)']
-              : ['transparent', 'rgba(56, 189, 248, 0.38)', 'rgba(52, 211, 153, 0.54)']
-          }
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.bottomAnchorGradient}
-        />
-
         <Aurora
-          colorStops={['#5227FF', '#7cff67', '#5227FF']}
-          amplitude={0.95}
-          blend={0.62}
+          colorStops={
+            isDark
+              ? ['#5227FF', '#00E5FF', '#7CFF67', '#5227FF']
+              : ['#38BDF8', '#818CF8', '#34D399', '#38BDF8']
+          }
+          amplitude={1.1}
+          blend={0.65}
           height={0.88}
           speed={0.85}
-          glow={0.7}
+          glow={0.72}
           layers={2}
           direction="bottom"
-          opacity={isDark ? 0.88 : 0.76}
+          opacity={isDark ? 0.92 : 0.78}
           lightMode={!isDark}
           style={{ borderRadius: 24 }}
         />
@@ -315,15 +294,6 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     shadowOpacity: 0,
     elevation: 0,
-  },
-  bottomAnchorGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 100,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
   },
   cardContent: {
     paddingTop: 20,

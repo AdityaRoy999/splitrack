@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
-import { AuroraMesh } from './AuroraMesh';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 const MAX_STOPS = 5;
@@ -157,29 +156,29 @@ const hexWithAlpha = (hex: string, alpha: number): string => {
 
 const GAUSSIAN_FALLOFF = [
   { offset: '0%', factor: 1.0 },
-  { offset: '14%', factor: 0.92 },
-  { offset: '28%', factor: 0.78 },
-  { offset: '44%', factor: 0.58 },
-  { offset: '60%', factor: 0.36 },
-  { offset: '75%', factor: 0.18 },
-  { offset: '88%', factor: 0.06 },
+  { offset: '12%', factor: 0.94 },
+  { offset: '25%', factor: 0.82 },
+  { offset: '40%', factor: 0.64 },
+  { offset: '56%', factor: 0.42 },
+  { offset: '72%', factor: 0.22 },
+  { offset: '86%', factor: 0.08 },
   { offset: '100%', factor: 0 },
 ];
 
 /**
- * Hardware-accelerated SwiftUI MeshGradient on iOS 18+/26+ and Android,
- * backed by Gaussian radial diffusion on Web and legacy OS versions so every
- * Aurora card renders silky smooth with zero visible bands or contours.
+ * Universal dynamic Aurora engine:
+ * Renders rich, vibrant, flowing northern lights with permanent bottom grounding
+ * across iOS, Android, and Web with zero gaps and silky smooth animations.
  */
 export const Aurora: React.FC<AuroraProps> = React.memo(({
   colorStops = ['#5227FF', '#7cff67', '#5227FF'],
   amplitude = 1,
   blend = 0.5,
-  height = 0.45,
+  height = 0.55,
   speed = 1,
-  glow = 0.6,
+  glow = 0.65,
   brightness = 1,
-  direction = 'top',
+  direction = 'bottom',
   intro = true,
   opacity = 0.9,
   lightMode = false,
@@ -190,7 +189,8 @@ export const Aurora: React.FC<AuroraProps> = React.memo(({
   const uid = useMemo(() => rawId.replace(/[^a-zA-Z0-9_-]/g, '') || 'aurora', [rawId]);
   const [boxSize, setBoxSize] = useState({ width: 340, height: 180 });
 
-  const [driftAnim] = useState(() => new Animated.Value(0));
+  const [driftAnim1] = useState(() => new Animated.Value(0));
+  const [driftAnim2] = useState(() => new Animated.Value(0));
   const [breatheAnim] = useState(() => new Animated.Value(0));
   const [revealAnim] = useState(() => new Animated.Value(intro ? 0 : 1));
 
@@ -211,17 +211,35 @@ export const Aurora: React.FC<AuroraProps> = React.memo(({
   useEffect(() => {
     if (paused) return;
     const safeSpeed = Math.max(0.25, speed);
-    const driftLoop = Animated.loop(
+
+    const driftLoop1 = Animated.loop(
       Animated.sequence([
-        Animated.timing(driftAnim, {
+        Animated.timing(driftAnim1, {
           toValue: 1,
-          duration: 8500 / safeSpeed,
+          duration: 7800 / safeSpeed,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
-        Animated.timing(driftAnim, {
+        Animated.timing(driftAnim1, {
           toValue: 0,
-          duration: 8500 / safeSpeed,
+          duration: 7800 / safeSpeed,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+      ])
+    );
+
+    const driftLoop2 = Animated.loop(
+      Animated.sequence([
+        Animated.timing(driftAnim2, {
+          toValue: 1,
+          duration: 9400 / safeSpeed,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+        Animated.timing(driftAnim2, {
+          toValue: 0,
+          duration: 9400 / safeSpeed,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
@@ -232,26 +250,28 @@ export const Aurora: React.FC<AuroraProps> = React.memo(({
       Animated.sequence([
         Animated.timing(breatheAnim, {
           toValue: 1,
-          duration: 6200 / safeSpeed,
+          duration: 5400 / safeSpeed,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(breatheAnim, {
           toValue: 0,
-          duration: 6200 / safeSpeed,
+          duration: 5400 / safeSpeed,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ])
     );
 
-    driftLoop.start();
+    driftLoop1.start();
+    driftLoop2.start();
     breatheLoop.start();
     return () => {
-      driftLoop.stop();
+      driftLoop1.stop();
+      driftLoop2.stop();
       breatheLoop.stop();
     };
-  }, [driftAnim, breatheAnim, speed, paused]);
+  }, [driftAnim1, driftAnim2, breatheAnim, speed, paused]);
 
   const handleLayout = (e: LayoutChangeEvent) => {
     const { width: w, height: h } = e.nativeEvent.layout;
@@ -268,181 +288,211 @@ export const Aurora: React.FC<AuroraProps> = React.memo(({
     [colorStops, lightMode]
   );
 
-  // Build 4x3 cubic MeshGradient colors & organic points anchored on top or bottom
-  const meshConfig = useMemo(() => {
-    const [c0, c1, c2, c3] = fourStops;
-    const primaryAlpha = clamp((lightMode ? 0.84 : 0.94) * strength, 0.25, 0.98);
-    const midAlpha = clamp((lightMode ? 0.36 : 0.5) * strength * (0.7 + blend * 0.4), 0.12, 0.72);
-    const tailAlpha = glow > 0.7 ? (lightMode ? 0.05 : 0.08) : 0;
+  const isBottom = direction === 'bottom';
 
-    const strongRow = [
-      hexWithAlpha(c0, primaryAlpha),
-      hexWithAlpha(c1, primaryAlpha),
-      hexWithAlpha(c2, primaryAlpha),
-      hexWithAlpha(c3, primaryAlpha),
-    ];
-    const midRow = [
-      hexWithAlpha(c1, midAlpha),
-      hexWithAlpha(c2, midAlpha),
-      hexWithAlpha(c0, midAlpha),
-      hexWithAlpha(c3, midAlpha * 0.85),
-    ];
-    const fadeRow = [
-      hexWithAlpha(c0, tailAlpha),
-      hexWithAlpha(c1, tailAlpha),
-      hexWithAlpha(c2, tailAlpha),
-      hexWithAlpha(c3, tailAlpha),
-    ];
-
-    const reachY = clamp(0.32 + height * 0.44 + blend * 0.12, 0.35, 0.82);
-    const waveTilt = clamp(amplitude * 0.08, 0.02, 0.14);
-
-    if (direction === 'top') {
-      return {
-        colors: [...strongRow, ...midRow, ...fadeRow],
-        points: [
-          [0.0, 0.0], [0.33, 0.0], [0.67, 0.0], [1.0, 0.0],
-          [0.0, clamp(reachY - waveTilt, 0.2, 0.85)],
-          [0.36, clamp(reachY + waveTilt, 0.25, 0.9)],
-          [0.64, clamp(reachY - waveTilt * 0.7, 0.2, 0.85)],
-          [1.0, clamp(reachY + waveTilt * 0.5, 0.22, 0.88)],
-          [0.0, 1.0], [0.33, 1.0], [0.67, 1.0], [1.0, 1.0],
-        ],
-      };
-    }
-
-    const invY = 1 - reachY;
-    return {
-      colors: [...fadeRow, ...midRow, ...strongRow],
-      points: [
-        [0.0, 0.0], [0.33, 0.0], [0.67, 0.0], [1.0, 0.0],
-        [0.0, clamp(invY + waveTilt * 0.5, 0.12, 0.78)],
-        [0.34, clamp(invY - waveTilt, 0.1, 0.75)],
-        [0.68, clamp(invY + waveTilt, 0.14, 0.8)],
-        [1.0, clamp(invY - waveTilt * 0.6, 0.12, 0.78)],
-        [0.0, 1.0], [0.33, 1.0], [0.67, 1.0], [1.0, 1.0],
-      ],
-    };
-  }, [fourStops, direction, height, blend, glow, amplitude, lightMode, strength]);
-
-  const txDrift = driftAnim.interpolate({
+  // Layer 1 Horizontal Drift: spans overscan width
+  const txDrift1 = driftAnim1.interpolate({
     inputRange: [0, 1],
-    outputRange: [-boxSize.width * 0.14, 0],
+    outputRange: [-boxSize.width * 0.18, boxSize.width * 0.08],
   });
-  const syBreathe = breatheAnim.interpolate({
+
+  // Layer 2 Horizontal Drift: counter-directional motion
+  const txDrift2 = driftAnim2.interpolate({
+    inputRange: [0, 1],
+    outputRange: [boxSize.width * 0.06, -boxSize.width * 0.16],
+  });
+
+  // Breathing vertical expansion
+  const syBreathe1 = breatheAnim.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: [0.98, 1.06, 0.98],
+    outputRange: [0.94, 1.12, 0.94],
   });
 
-  const canUseMesh = Platform.OS === 'ios' || Platform.OS === 'android';
+  const syBreathe2 = breatheAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [1.1, 0.95, 1.1],
+  });
 
-  // Soft anchor wash so both native and Gaussian fallback melt gently into background
-  const edgeWashColors = useMemo(() => {
-    const midHex = fourStops[1] || colorStops[0] || '#5227FF';
-    const strongTint = hexWithAlpha(midHex, lightMode ? 0.14 : 0.2);
-    const faintTint = hexWithAlpha(midHex, lightMode ? 0.04 : 0.06);
-    const clear = hexWithAlpha(midHex, 0);
-    return direction === 'top'
-      ? ([strongTint, faintTint, clear] as const)
-      : ([clear, faintTint, strongTint] as const);
-  }, [colorStops, direction, fourStops, lightMode]);
+  // Foundational grounding colors across the horizon
+  const horizonColors = useMemo<[string, string, ...string[]]>(() => {
+    const [c0, c1, c2, c3] = fourStops;
+    const aBase = lightMode ? 0.38 : 0.52 * strength;
+    const aFade = 0;
+    if (isBottom) {
+      return [
+        hexWithAlpha(c0, aFade),
+        hexWithAlpha(c1, aBase * 0.4),
+        hexWithAlpha(c2, aBase * 0.8),
+        hexWithAlpha(c3, aBase),
+      ];
+    }
+    return [
+      hexWithAlpha(c0, aBase),
+      hexWithAlpha(c1, aBase * 0.8),
+      hexWithAlpha(c2, aBase * 0.4),
+      hexWithAlpha(c3, aFade),
+    ];
+  }, [fourStops, isBottom, lightMode, strength]);
 
-  const blobAnchorY = direction === 'top' ? boxSize.height * 0.18 : boxSize.height * 0.82;
+  // Dedicated permanent baseline strip colors across the full card width
+  const baselineStripColors = useMemo<[string, string, ...string[]]>(() => {
+    const [c0, c1, c2, c3] = fourStops;
+    const a = lightMode ? 0.48 : 0.68 * strength;
+    return [
+      hexWithAlpha(c0, a * 0.75),
+      hexWithAlpha(c1, a),
+      hexWithAlpha(c2, a * 0.95),
+      hexWithAlpha(c3, a * 0.8),
+    ];
+  }, [fourStops, lightMode, strength]);
+
+  const svgWidth = boxSize.width * 1.34;
+  const svgHeight = boxSize.height;
+
+  // Primary energy nodes anchor coordinates
+  const anchorY1 = isBottom ? boxSize.height * 0.94 : boxSize.height * 0.06;
+  const anchorY2 = isBottom ? boxSize.height * 0.82 : boxSize.height * 0.18;
+
+  const ry1 = boxSize.height * (0.75 + height * 0.42);
+  const ry2 = boxSize.height * (0.62 + height * 0.36);
 
   return (
     <View onLayout={handleLayout} pointerEvents="none" style={[styles.container, style]}>
       <Animated.View style={[styles.fill, { opacity: revealAnim }]}>
+        {/* Layer 1: Ambient Horizon Linear Gradient Wash */}
         <ExpoLinearGradient
-          colors={[...edgeWashColors]}
-          locations={direction === 'top' ? [0, 0.55, 0.96] : [0.04, 0.45, 1]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={[styles.fill, { opacity: clampedOpacity }]}
+          colors={horizonColors}
+          start={{ x: 0.05, y: isBottom ? 0.1 : 0 }}
+          end={{ x: 0.95, y: isBottom ? 1 : 0.9 }}
+          style={[styles.fill, { opacity: clampedOpacity * 0.85 }]}
         />
 
-        {canUseMesh ? (
-          <Animated.View
-            style={[
-              styles.meshOverscan,
-              {
-                width: boxSize.width * 1.18,
-                height: boxSize.height,
-                opacity: clampedOpacity,
-                transform: [{ translateX: txDrift }, { scaleY: syBreathe }],
-              },
-            ]}
-          >
-            <AuroraMesh
-              columns={4}
-              rows={3}
-              colors={meshConfig.colors}
-              points={meshConfig.points}
-              style={StyleSheet.absoluteFill}
-            />
-          </Animated.View>
-        ) : null}
+        {/* Layer 2: Dedicated Permanent Grounding Baseline Strip */}
+        <ExpoLinearGradient
+          colors={baselineStripColors}
+          start={{ x: 0, y: isBottom ? 1 : 0 }}
+          end={{ x: 1, y: isBottom ? 1 : 0 }}
+          style={[
+            styles.baselineStrip,
+            isBottom ? { bottom: 0 } : { top: 0 },
+            {
+              height: Math.max(50, boxSize.height * 0.42),
+              opacity: clampedOpacity * 0.9,
+            },
+          ]}
+        />
 
-        {/* Smooth Gaussian Radial Blobs (always shown on Web + legacy OS, and seamlessly blends on all platforms) */}
-        {!canUseMesh && (
-          <Animated.View
-            style={[
-              styles.meshOverscan,
-              {
-                width: boxSize.width * 1.24,
-                height: boxSize.height,
-                opacity: clampedOpacity,
-                transform: [{ translateX: txDrift }, { scaleY: syBreathe }],
-              },
-              Platform.OS === 'web'
-                ? ({ filter: 'blur(26px)' } as unknown as ViewStyle)
-                : undefined,
-            ]}
-          >
-            <Svg width={boxSize.width * 1.24} height={boxSize.height}>
-              <Defs>
-                {fourStops.map((hex, idx) => (
-                  <RadialGradient
-                    key={`${uid}-rg-${idx}`}
-                    id={`${uid}-rg-${idx}`}
-                    cx="50%"
-                    cy="50%"
-                    r="50%"
-                  >
-                    {GAUSSIAN_FALLOFF.map((step, sIdx) => (
-                      <Stop
-                        key={`${uid}-rg-${idx}-s-${sIdx}`}
-                        offset={step.offset}
-                        stopColor={hex}
-                        stopOpacity={step.factor * (lightMode ? 0.65 : 0.78)}
-                      />
-                    ))}
-                  </RadialGradient>
-                ))}
-              </Defs>
+        {/* Layer 3: Dynamic Primary Aurora Curtain (drifting & breathing) */}
+        <Animated.View
+          style={[
+            styles.curtainLayer,
+            {
+              width: svgWidth,
+              height: svgHeight,
+              opacity: clampedOpacity,
+              transform: [{ translateX: txDrift1 }, { scaleY: syBreathe1 }],
+            },
+            Platform.OS === 'web' ? ({ filter: 'blur(20px)' } as unknown as ViewStyle) : undefined,
+          ]}
+        >
+          <Svg width={svgWidth} height={svgHeight}>
+            <Defs>
+              {fourStops.map((hex, idx) => (
+                <RadialGradient
+                  key={`${uid}-rg1-${idx}`}
+                  id={`${uid}-rg1-${idx}`}
+                  cx="50%"
+                  cy="50%"
+                  r="50%"
+                >
+                  {GAUSSIAN_FALLOFF.map((step, sIdx) => (
+                    <Stop
+                      key={`${uid}-rg1-${idx}-s-${sIdx}`}
+                      offset={step.offset}
+                      stopColor={hex}
+                      stopOpacity={step.factor * (lightMode ? 0.7 : 0.88) * strength}
+                    />
+                  ))}
+                </RadialGradient>
+              ))}
+            </Defs>
 
-              {fourStops.map((_, idx) => {
-                const w = boxSize.width * 1.24;
-                const cx = w * (0.18 + idx * 0.22);
-                const cy =
-                  direction === 'top'
-                    ? blobAnchorY + (idx % 2 === 0 ? -8 : 14)
-                    : blobAnchorY + (idx % 2 === 0 ? 8 : -14);
-                const rx = boxSize.width * (0.46 + (idx % 2) * 0.1);
-                const ry = boxSize.height * (0.58 + height * 0.34);
-                return (
-                  <Ellipse
-                    key={`${uid}-el-${idx}`}
-                    cx={cx}
-                    cy={cy}
-                    rx={rx}
-                    ry={ry}
-                    fill={`url(#${uid}-rg-${idx})`}
-                  />
-                );
-              })}
-            </Svg>
-          </Animated.View>
-        )}
+            {fourStops.map((_, idx) => {
+              const cx = svgWidth * (0.14 + idx * 0.24);
+              const cy = isBottom
+                ? anchorY1 + (idx % 2 === 0 ? 6 : -10) * amplitude
+                : anchorY1 + (idx % 2 === 0 ? -6 : 10) * amplitude;
+              const rx = svgWidth * (0.42 + (idx % 2) * 0.08);
+
+              return (
+                <Ellipse
+                  key={`${uid}-el1-${idx}`}
+                  cx={cx}
+                  cy={cy}
+                  rx={rx}
+                  ry={ry1}
+                  fill={`url(#${uid}-rg1-${idx})`}
+                />
+              );
+            })}
+          </Svg>
+        </Animated.View>
+
+        {/* Layer 4: Dynamic Secondary Aurora Shimmer (counter-motion for depth) */}
+        <Animated.View
+          style={[
+            styles.curtainLayer,
+            {
+              width: svgWidth,
+              height: svgHeight,
+              opacity: clampedOpacity * 0.82,
+              transform: [{ translateX: txDrift2 }, { scaleY: syBreathe2 }],
+            },
+            Platform.OS === 'web' ? ({ filter: 'blur(28px)' } as unknown as ViewStyle) : undefined,
+          ]}
+        >
+          <Svg width={svgWidth} height={svgHeight}>
+            <Defs>
+              {fourStops.slice(0, 3).map((hex, idx) => (
+                <RadialGradient
+                  key={`${uid}-rg2-${idx}`}
+                  id={`${uid}-rg2-${idx}`}
+                  cx="50%"
+                  cy="50%"
+                  r="50%"
+                >
+                  {GAUSSIAN_FALLOFF.map((step, sIdx) => (
+                    <Stop
+                      key={`${uid}-rg2-${idx}-s-${sIdx}`}
+                      offset={step.offset}
+                      stopColor={hex}
+                      stopOpacity={step.factor * (lightMode ? 0.58 : 0.76) * strength}
+                    />
+                  ))}
+                </RadialGradient>
+              ))}
+            </Defs>
+
+            {fourStops.slice(0, 3).map((_, idx) => {
+              const cx = svgWidth * (0.24 + idx * 0.28);
+              const cy = isBottom
+                ? anchorY2 + (idx % 2 === 0 ? -12 : 8) * amplitude
+                : anchorY2 + (idx % 2 === 0 ? 12 : -8) * amplitude;
+              const rx = svgWidth * 0.38;
+
+              return (
+                <Ellipse
+                  key={`${uid}-el2-${idx}`}
+                  cx={cx}
+                  cy={cy}
+                  rx={rx}
+                  ry={ry2}
+                  fill={`url(#${uid}-rg2-${idx})`}
+                />
+              );
+            })}
+          </Svg>
+        </Animated.View>
       </Animated.View>
     </View>
   );
@@ -469,7 +519,12 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  meshOverscan: {
+  baselineStrip: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+  curtainLayer: {
     position: 'absolute',
     top: 0,
     left: 0,
