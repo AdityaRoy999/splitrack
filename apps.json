@@ -11,12 +11,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.14",
-      "versionDate": "2026-11-13T08:10:04Z",
-      "versionDescription": "fix(aurora): eliminate sharp horizontal line by replacing static cutoff box with seamless continuous grounding wash",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-14/Splittrack-unsigned.ipa",
-      "size": 12417439,
+      "version": "1.0.15",
+      "versionDate": "2026-11-13T08:36:10Z",
+      "versionDescription": "fix: remove prefilled background washes and lime-yellow stops to preserve clean default black upper card",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-15/Splittrack-unsigned.ipa",
+      "size": 12415854,
       "versions": [
+        {
+          "version": "1.0.15",
+          "buildVersion": "15",
+          "date": "2026-11-13T08:36:10Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-15/Splittrack-unsigned.ipa",
+          "size": 12415854,
+          "localizedDescription": "fix: remove prefilled background washes and lime-yellow stops to preserve clean default black upper card"
+        },
         {
           "version": "1.0.14",
           "buildVersion": "14",
