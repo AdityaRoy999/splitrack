@@ -415,6 +415,7 @@ interface SplitTrackContextType {
   selectedAccountId: string;
   setSelectedAccountId: (id: string) => void;
   addTransaction: (tx: Omit<Transaction, 'id'>) => void;
+  importTransactions: (txs: Omit<Transaction, 'id'>[]) => number;
   addFriend: (friend: Omit<Friend, 'id' | 'netBalance'>) => Friend;
   updateFriend: (
     friendId: string,
@@ -427,9 +428,12 @@ interface SplitTrackContextType {
   addTrip: (trip: Omit<Trip, 'id' | 'totalSpend'>) => void;
   addUpiAccount: (acc: Omit<UpiAccount, 'id' | 'totalSpent'>) => UpiAccount;
   addCategory: (name: string, iconKey: string, color?: string) => ExpenseCategory;
+  updateCategory: (id: string, name: string, iconKey: string, color?: string) => ExpenseCategory | null;
+  deleteCategory: (id: string) => boolean;
   settleWithFriend: (friendId: string, amount?: number) => void;
   getSimplifiedDebts: () => DebtSimplification[];
   resetDemoData: () => void;
+  eraseAllData: () => void;
 }
 
 const SplitTrackContext = createContext<SplitTrackContextType | undefined>(undefined);
@@ -584,6 +588,42 @@ export const SplitTrackProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     saveState(nextAcc, nextFriends, nextTrips, nextTx);
   };
 
+  const importTransactions = (imported: Omit<Transaction, 'id'>[]): number => {
+    if (!imported || imported.length === 0) return 0;
+    const now = Date.now();
+    const newItems: Transaction[] = imported.map((txData, index) => ({
+      ...txData,
+      id: `imported-${now}-${index}-${Math.random().toString(36).slice(2, 6)}`,
+    }));
+
+    const nextTx = [...newItems, ...transactions];
+    setTransactions(nextTx);
+
+    const accountSpentDelta: Record<string, number> = {};
+    for (const tx of newItems) {
+      const accId = tx.upiAccountId || accounts[0]?.id;
+      if (accId) {
+        accountSpentDelta[accId] = (accountSpentDelta[accId] || 0) + Math.abs(tx.amount);
+      }
+    }
+
+    const nextAcc = accounts.map((acc) => {
+      if (accountSpentDelta[acc.id]) {
+        return {
+          ...acc,
+          totalSpent: acc.totalSpent + accountSpentDelta[acc.id],
+          balance: acc.balance - accountSpentDelta[acc.id],
+        };
+      }
+      return acc;
+    });
+    setAccounts(nextAcc);
+
+    triggerNotification(NotificationType.Success);
+    saveState(nextAcc, friends, trips, nextTx, categories);
+    return newItems.length;
+  };
+
   // Add friend
   const addFriend = (friendData: Omit<Friend, 'id' | 'netBalance'>): Friend => {
     const newFriend: Friend = {
@@ -709,6 +749,40 @@ export const SplitTrackProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return newCat;
   };
 
+  // Update Existing Category
+  const updateCategory = (
+    id: string,
+    name: string,
+    iconKey: string,
+    color: string = '#6366F1'
+  ): ExpenseCategory | null => {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    let updatedCat: ExpenseCategory | null = null;
+    const nextCats = categories.map((c) => {
+      if (c.id === id) {
+        updatedCat = { ...c, name: trimmed, iconKey, color };
+        return updatedCat;
+      }
+      return c;
+    });
+    if (!updatedCat) return null;
+    setCategories(nextCats);
+    saveState(accounts, friends, trips, transactions, nextCats);
+    triggerNotification(NotificationType.Success);
+    return updatedCat;
+  };
+
+  // Delete Category
+  const deleteCategory = (id: string): boolean => {
+    if (categories.length <= 1) return false;
+    const nextCats = categories.filter((c) => c.id !== id);
+    setCategories(nextCats);
+    saveState(accounts, friends, trips, transactions, nextCats);
+    triggerNotification(NotificationType.Success);
+    return true;
+  };
+
   // Settle up with a friend
   const settleWithFriend = (friendId: string, customAmount?: number) => {
     const friend = friends.find((f) => f.id === friendId);
@@ -816,6 +890,28 @@ export const SplitTrackProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     triggerNotification(NotificationType.Warning);
   };
 
+  const eraseAllData = () => {
+    const zeroedAccounts = accounts.map((acc) => ({
+      ...acc,
+      balance: 0,
+      totalSpent: 0,
+    }));
+    const zeroedFriends = friends.map((f) => ({
+      ...f,
+      balance: 0,
+    }));
+    const zeroedTrips = trips.map((t) => ({
+      ...t,
+      totalSpend: 0,
+    }));
+    setAccounts(zeroedAccounts);
+    setFriends(zeroedFriends);
+    setTrips(zeroedTrips);
+    setTransactions([]);
+    saveState(zeroedAccounts, zeroedFriends, zeroedTrips, [], categories);
+    triggerNotification(NotificationType.Warning);
+  };
+
   return (
     <SplitTrackContext.Provider
       value={{
@@ -836,15 +932,19 @@ export const SplitTrackProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         selectedAccountId,
         setSelectedAccountId,
         addTransaction,
+        importTransactions,
         addFriend,
         updateFriend,
         addMemberToTrip,
         addTrip,
         addUpiAccount,
         addCategory,
+        updateCategory,
+        deleteCategory,
         settleWithFriend,
         getSimplifiedDebts,
         resetDemoData,
+        eraseAllData,
       }}
     >
       {children}

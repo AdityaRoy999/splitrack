@@ -3,6 +3,7 @@ import {
   Image,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -49,7 +50,6 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   const { addFriend, updateFriend, addMemberToTrip } = useSplitTrack();
   const { themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
-  const isIOS = Platform.OS === 'ios';
   const isEditing = Boolean(editingFriend);
 
   const [name, setName] = useState(editingFriend?.name ?? '');
@@ -154,35 +154,30 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   return (
     <Modal
       visible={visible}
-      transparent={!isIOS}
-      presentationStyle={isIOS ? 'pageSheet' : undefined}
+      transparent
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={[styles.modalOverlay, isIOS && { backgroundColor: bgSheet }]}>
+      <View style={styles.modalOverlay}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Dismiss modal backdrop"
+        />
         <View
           style={[
             styles.sheetContainer,
             { backgroundColor: bgSheet },
-            isIOS && {
-              flex: 1,
-              maxHeight: '100%',
-              borderTopLeftRadius: 0,
-              borderTopRightRadius: 0,
-              paddingTop: 22,
-            },
           ]}
         >
-          {!isIOS && (
-            <View style={styles.dragHandleWrap}>
-              <View
-                style={[
-                  styles.dragHandle,
-                  { backgroundColor: isDark ? '#27272A' : '#D4D4D8' },
-                ]}
-              />
-            </View>
-          )}
+          <View style={styles.dragHandleWrap}>
+            <View
+              style={[
+                styles.dragHandle,
+                { backgroundColor: isDark ? '#27272A' : '#D4D4D8' },
+              ]}
+            />
+          </View>
 
           <View style={styles.headerRow}>
             <View>

@@ -18,6 +18,7 @@ import { BillListIcon } from '@solar-icons/react-native/bold/bill-list';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { UsersGroupTwoRoundedIcon } from '@solar-icons/react-native/bold/users-group-two-rounded';
+import { Pen2Icon } from '@solar-icons/react-native/bold/pen-2';
 import { InfoCircleIcon } from '@solar-icons/react-native/linear/info-circle';
 
 // Providers & Context
@@ -123,6 +124,7 @@ function MainAppContent({
   const [showAddTrip, setShowAddTrip] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [categoryToEdit, setCategoryToEdit] = useState<ExpenseCategory | null>(null);
   const [showSettle, setShowSettle] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showAnalyticsInfo, setShowAnalyticsInfo] = useState(false);
@@ -416,15 +418,39 @@ function MainAppContent({
                 />
               </View>
 
-              <AnimatedPressable
-                scaleTo={0.94}
-                onPress={() => setShowAddCategory(true)}
-                accessibilityLabel="Create custom category"
-                contentStyle={[styles.newCategoryBtn, { backgroundColor: chipBg }]}
-              >
-                <AddCircleIcon size={15} color={textColor} />
-                <Text style={[styles.newCategoryText, { color: textColor }]}>New</Text>
-              </AnimatedPressable>
+              <View style={styles.catActionsRow}>
+                {selectedCategoryFilter !== 'All' && (
+                  <AnimatedPressable
+                    scaleTo={0.94}
+                    onPress={() => {
+                      const match = categories.find(
+                        (c) => c.name.toLowerCase() === selectedCategoryFilter.toLowerCase()
+                      );
+                      if (match) {
+                        setCategoryToEdit(match);
+                        setShowAddCategory(true);
+                      }
+                    }}
+                    accessibilityLabel="Edit category"
+                    contentStyle={[styles.newCategoryBtn, { backgroundColor: chipBg }]}
+                  >
+                    <Pen2Icon size={14} color={textColor} />
+                    <Text style={[styles.newCategoryText, { color: textColor }]}>Edit</Text>
+                  </AnimatedPressable>
+                )}
+                <AnimatedPressable
+                  scaleTo={0.94}
+                  onPress={() => {
+                    setCategoryToEdit(null);
+                    setShowAddCategory(true);
+                  }}
+                  accessibilityLabel="Create custom category"
+                  contentStyle={[styles.newCategoryBtn, { backgroundColor: chipBg }]}
+                >
+                  <AddCircleIcon size={15} color={textColor} />
+                  <Text style={[styles.newCategoryText, { color: textColor }]}>New</Text>
+                </AnimatedPressable>
+              </View>
             </View>
 
             {selectedExpenseDate && (
@@ -1018,9 +1044,16 @@ function MainAppContent({
       />
 
       <AddCategoryModal
+        key={categoryToEdit ? `edit-${categoryToEdit.id}-${categoryToEdit.name}` : 'new-category'}
         visible={showAddCategory}
-        onClose={() => setShowAddCategory(false)}
+        categoryToEdit={categoryToEdit}
+        onClose={() => {
+          setShowAddCategory(false);
+          setCategoryToEdit(null);
+        }}
         onCreated={(cat) => setSelectedCategoryFilter(cat.name)}
+        onUpdated={(cat) => setSelectedCategoryFilter(cat.name)}
+        onDeleted={() => setSelectedCategoryFilter('All')}
       />
 
       <SettleModal
@@ -1278,6 +1311,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  catActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   newCategoryBtn: {
     flexDirection: 'row',

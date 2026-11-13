@@ -128,38 +128,38 @@ const JellyChip: React.FC<JellyChipProps> = ({
     translateX.stopAnimation();
 
     if (index === activeIndex) {
-      // Juicy Jelly Squash & Stretch rebound
-      const effectiveSwell = Math.max(0.18, Math.min(0.4, swell));
-      const effectiveJelly = Math.max(0.8, Math.min(1.8, jelly));
-      const xPeak = 1 + effectiveSwell * 0.78 * effectiveJelly;
-      const yPeak = 1 - effectiveSwell * 0.35 * effectiveJelly;
+      // Elastic Jelly Squash & Stretch (sweet-spot bounciness)
+      const effectiveSwell = Math.max(0.12, Math.min(0.24, swell));
+      const effectiveJelly = Math.max(0.8, Math.min(1.3, jelly));
+      const xPeak = 1 + effectiveSwell * 0.58 * effectiveJelly;
+      const yPeak = 1 - effectiveSwell * 0.32 * effectiveJelly;
 
       Animated.parallel([
         Animated.sequence([
           Animated.timing(scaleX, {
             toValue: xPeak,
-            duration: 75,
+            duration: 70,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.spring(scaleX, {
             toValue: 1,
-            stiffness: 300,
-            damping: 11,
-            mass: 0.8,
+            stiffness: 350,
+            damping: 14,
+            mass: 0.75,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ]),
         Animated.sequence([
           Animated.timing(scaleY, {
             toValue: yPeak,
-            duration: 75,
+            duration: 70,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.spring(scaleY, {
             toValue: 1,
-            stiffness: 300,
-            damping: 11,
-            mass: 0.8,
+            stiffness: 350,
+            damping: 14,
+            mass: 0.75,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ]),
@@ -167,60 +167,39 @@ const JellyChip: React.FC<JellyChipProps> = ({
       return;
     }
 
-    // Neighbor chips: Organic synchronized jelly ripple
+    // Neighbor chips: Gentle micro-ripple
     const distance = Math.abs(index - activeIndex);
-    if (distance > 0 && distance <= 3) {
-      const effectiveJelly = Math.max(0.8, Math.min(1.8, jelly));
-      const falloff = Math.pow(0.55, distance);
-      const direction = index < activeIndex ? -1 : 1;
-      const shift = barge > 0 ? direction * barge * falloff * 0.5 : 0;
-      const squash = 1 - shrink * 0.8 * falloff;
-      const stretch = 1 + shrink * 0.5 * falloff * effectiveJelly;
+    if (distance === 1) {
+      const squash = 1 - shrink * 0.6;
+      const stretch = 1 + shrink * 0.4;
 
       Animated.parallel([
         Animated.sequence([
           Animated.timing(scaleX, {
             toValue: squash,
-            duration: 75,
+            duration: 70,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.spring(scaleX, {
             toValue: 1,
-            stiffness: 340,
-            damping: 14,
+            stiffness: 350,
+            damping: 16,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ]),
         Animated.sequence([
           Animated.timing(scaleY, {
             toValue: stretch,
-            duration: 75,
+            duration: 70,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.spring(scaleY, {
             toValue: 1,
-            stiffness: 340,
-            damping: 14,
+            stiffness: 350,
+            damping: 16,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ]),
-        ...(shift !== 0
-          ? [
-              Animated.sequence([
-                Animated.timing(translateX, {
-                  toValue: shift,
-                  duration: 75,
-                  useNativeDriver: USE_NATIVE_DRIVER,
-                }),
-                Animated.spring(translateX, {
-                  toValue: 0,
-                  stiffness: 340,
-                  damping: 16,
-                  useNativeDriver: USE_NATIVE_DRIVER,
-                }),
-              ]),
-            ]
-          : []),
       ]).start();
     }
   }, [
@@ -228,7 +207,6 @@ const JellyChip: React.FC<JellyChipProps> = ({
     activeIndex,
     index,
     swell,
-    barge,
     shrink,
     jelly,
     scaleX,
@@ -240,14 +218,14 @@ const JellyChip: React.FC<JellyChipProps> = ({
     if (isDisabled) return;
     Animated.parallel([
       Animated.spring(scaleX, {
-        toValue: 1.05,
-        stiffness: 600,
+        toValue: 1.04,
+        stiffness: 650,
         damping: 24,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
       Animated.spring(scaleY, {
-        toValue: 0.92,
-        stiffness: 600,
+        toValue: 0.94,
+        stiffness: 650,
         damping: 24,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
@@ -259,14 +237,14 @@ const JellyChip: React.FC<JellyChipProps> = ({
     Animated.parallel([
       Animated.spring(scaleX, {
         toValue: 1,
-        stiffness: 320,
-        damping: 16,
+        stiffness: 350,
+        damping: 18,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
       Animated.spring(scaleY, {
         toValue: 1,
-        stiffness: 320,
-        damping: 16,
+        stiffness: 350,
+        damping: 18,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
@@ -341,13 +319,13 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   radius = 999,
   columns,
   noWrap = false,
-  swell = 0.28,
-  barge = 3,
-  shrink = 0.05,
-  jelly = 1.25,
-  bounce = 0.35,
+  swell = 0.20,
+  barge = 0,
+  shrink = 0.03,
+  jelly = 1.0,
+  bounce = 0.25,
   stagger = 0,
-  stiffness = 320,
+  stiffness = 350,
   disabled = false,
   scrollable = false,
   fadeColor,

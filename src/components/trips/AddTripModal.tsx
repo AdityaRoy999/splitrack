@@ -4,6 +4,7 @@ import {
   Image,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -173,30 +174,28 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
 
-  const isIOS = Platform.OS === 'ios';
-
   return (
     <Modal
       visible={visible}
-      transparent={!isIOS}
-      presentationStyle={isIOS ? 'pageSheet' : undefined}
+      transparent
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={[styles.modalOverlay, isIOS && { backgroundColor: bgSheet }]}>
+      <View style={styles.modalOverlay}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Dismiss modal backdrop"
+        />
         <View
           style={[
             styles.sheetContainer,
             { backgroundColor: bgSheet },
-            isIOS && {
-              flex: 1,
-              maxHeight: '100%',
-              borderTopLeftRadius: 0,
-              borderTopRightRadius: 0,
-              paddingTop: 22,
-            },
           ]}
         >
+          <View style={styles.dragHandleWrap}>
+            <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
+          </View>
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: textColor }]}>Create New Trip or Group</Text>
             <TouchableOpacity
@@ -427,11 +426,20 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingTop: 20,
+    paddingTop: 10,
     paddingHorizontal: 20,
     paddingBottom: 36,
     maxHeight: '85%',
     borderWidth: 0,
+  },
+  dragHandleWrap: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  dragHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
   },
   headerRow: {
     flexDirection: 'row',

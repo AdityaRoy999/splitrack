@@ -349,125 +349,140 @@ export const Aurora: React.FC<AuroraProps> = React.memo(({
           end={{ x: 0.96, y: isBottom ? 1.0 : 0.65 }}
           style={[styles.fill, { opacity: clampedOpacity }]}
         />
-        <ExpoLinearGradient
-          colors={nativeCounterColors}
-          locations={[0.0, 0.48, 0.80, 1.0]}
-          start={{ x: 0.96, y: isBottom ? 0.4 : 0.0 }}
-          end={{ x: 0.04, y: isBottom ? 1.0 : 0.6 }}
-          style={[styles.fill, { opacity: clampedOpacity * 0.78 }]}
-        />
-
-        {/* Layer 2: Dynamic Primary Aurora Curtain (drifting waves) */}
         <Animated.View
           style={[
-            styles.curtainLayer,
+            styles.fill,
             {
-              width: svgWidth,
-              height: svgHeight,
-              opacity: clampedOpacity * 0.9,
-              transform: [{ translateX: txDrift1 }],
+              opacity: breatheAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [clampedOpacity * 0.6, clampedOpacity * 0.92],
+              }),
             },
-            Platform.OS === 'web' ? ({ filter: 'blur(20px)' } as unknown as ViewStyle) : undefined,
           ]}
         >
-          <Svg width={svgWidth} height={svgHeight}>
-            <Defs>
-              {fourStops.map((hex, idx) => (
-                <RadialGradient
-                  key={`${uid}-rg1-${idx}`}
-                  id={`${uid}-rg1-${idx}`}
-                  cx="50%"
-                  cy="50%"
-                  r="50%"
-                >
-                  {GAUSSIAN_FALLOFF.map((step, sIdx) => (
-                    <Stop
-                      key={`${uid}-rg1-${idx}-s-${sIdx}`}
-                      offset={step.offset}
-                      stopColor={hex}
-                      stopOpacity={step.factor * (lightMode ? 0.7 : 0.88) * strength}
-                    />
-                  ))}
-                </RadialGradient>
-              ))}
-            </Defs>
-
-            {fourStops.map((_, idx) => {
-              const cx = svgWidth * (0.14 + idx * 0.24);
-              const cy = isBottom
-                ? anchorY1 + (idx % 2 === 0 ? 6 : -10) * amplitude
-                : anchorY1 + (idx % 2 === 0 ? -6 : 10) * amplitude;
-              const rx = svgWidth * (0.42 + (idx % 2) * 0.08);
-
-              return (
-                <Ellipse
-                  key={`${uid}-el1-${idx}`}
-                  cx={cx}
-                  cy={cy}
-                  rx={rx}
-                  ry={ry1}
-                  fill={`url(#${uid}-rg1-${idx})`}
-                />
-              );
-            })}
-          </Svg>
+          <ExpoLinearGradient
+            colors={nativeCounterColors}
+            locations={[0.0, 0.48, 0.80, 1.0]}
+            start={{ x: 0.96, y: isBottom ? 0.4 : 0.0 }}
+            end={{ x: 0.04, y: isBottom ? 1.0 : 0.6 }}
+            style={styles.fill}
+          />
         </Animated.View>
 
-        {/* Layer 3: Dynamic Secondary Aurora Shimmer (counter-motion for depth) */}
-        <Animated.View
-          style={[
-            styles.curtainLayer,
-            {
-              width: svgWidth,
-              height: svgHeight,
-              opacity: clampedOpacity * 0.82,
-              transform: [{ translateX: txDrift2 }],
-            },
-            Platform.OS === 'web' ? ({ filter: 'blur(28px)' } as unknown as ViewStyle) : undefined,
-          ]}
-        >
-          <Svg width={svgWidth} height={svgHeight}>
-            <Defs>
-              {fourStops.slice(0, 3).map((hex, idx) => (
-                <RadialGradient
-                  key={`${uid}-rg2-${idx}`}
-                  id={`${uid}-rg2-${idx}`}
-                  cx="50%"
-                  cy="50%"
-                  r="50%"
-                >
-                  {GAUSSIAN_FALLOFF.map((step, sIdx) => (
-                    <Stop
-                      key={`${uid}-rg2-${idx}-s-${sIdx}`}
-                      offset={step.offset}
-                      stopColor={hex}
-                      stopOpacity={step.factor * (lightMode ? 0.58 : 0.76) * strength}
-                    />
+        {/* Web Only: Dynamic Aurora Curtain with CSS Gaussian blur filters (disabled on native to prevent unblurred moving line artifacts) */}
+        {Platform.OS === 'web' && (
+          <>
+            <Animated.View
+              style={[
+                styles.curtainLayer,
+                {
+                  width: svgWidth,
+                  height: svgHeight,
+                  opacity: clampedOpacity * 0.9,
+                  transform: [{ translateX: txDrift1 }],
+                },
+                { filter: 'blur(20px)' } as unknown as ViewStyle,
+              ]}
+            >
+              <Svg width={svgWidth} height={svgHeight}>
+                <Defs>
+                  {fourStops.map((hex, idx) => (
+                    <RadialGradient
+                      key={`${uid}-rg1-${idx}`}
+                      id={`${uid}-rg1-${idx}`}
+                      cx="50%"
+                      cy="50%"
+                      r="50%"
+                    >
+                      {GAUSSIAN_FALLOFF.map((step, sIdx) => (
+                        <Stop
+                          key={`${uid}-rg1-${idx}-s-${sIdx}`}
+                          offset={step.offset}
+                          stopColor={hex}
+                          stopOpacity={step.factor * (lightMode ? 0.7 : 0.88) * strength}
+                        />
+                      ))}
+                    </RadialGradient>
                   ))}
-                </RadialGradient>
-              ))}
-            </Defs>
+                </Defs>
 
-            {fourStops.slice(0, 3).map((_, idx) => {
-              const cx = svgWidth * (0.24 + idx * 0.28);
-              const cy = isBottom
-                ? anchorY2 + (idx % 2 === 0 ? -12 : 8) * amplitude
-                : anchorY2 + (idx % 2 === 0 ? 12 : -8) * amplitude;
-              const rx = svgWidth * 0.38;
+                {fourStops.map((_, idx) => {
+                  const cx = svgWidth * (0.14 + idx * 0.24);
+                  const cy = isBottom
+                    ? anchorY1 + (idx % 2 === 0 ? 6 : -10) * amplitude
+                    : anchorY1 + (idx % 2 === 0 ? -6 : 10) * amplitude;
+                  const rx = svgWidth * (0.42 + (idx % 2) * 0.08);
 
-              return (
-                <Ellipse
-                  key={`${uid}-el2-${idx}`}
-                  cx={cx}
-                  cy={cy}
-                  rx={rx}
-                  ry={ry2}
-                  fill={`url(#${uid}-rg2-${idx})`}
-                />
-              );
-            })}
-          </Svg>
-        </Animated.View>
+                  return (
+                    <Ellipse
+                      key={`${uid}-el1-${idx}`}
+                      cx={cx}
+                      cy={cy}
+                      rx={rx}
+                      ry={ry1}
+                      fill={`url(#${uid}-rg1-${idx})`}
+                    />
+                  );
+                })}
+              </Svg>
+            </Animated.View>
+
+            <Animated.View
+              style={[
+                styles.curtainLayer,
+                {
+                  width: svgWidth,
+                  height: svgHeight,
+                  opacity: clampedOpacity * 0.82,
+                  transform: [{ translateX: txDrift2 }],
+                },
+                { filter: 'blur(28px)' } as unknown as ViewStyle,
+              ]}
+            >
+              <Svg width={svgWidth} height={svgHeight}>
+                <Defs>
+                  {fourStops.slice(0, 3).map((hex, idx) => (
+                    <RadialGradient
+                      key={`${uid}-rg2-${idx}`}
+                      id={`${uid}-rg2-${idx}`}
+                      cx="50%"
+                      cy="50%"
+                      r="50%"
+                    >
+                      {GAUSSIAN_FALLOFF.map((step, sIdx) => (
+                        <Stop
+                          key={`${uid}-rg2-${idx}-s-${sIdx}`}
+                          offset={step.offset}
+                          stopColor={hex}
+                          stopOpacity={step.factor * (lightMode ? 0.58 : 0.76) * strength}
+                        />
+                      ))}
+                    </RadialGradient>
+                  ))}
+                </Defs>
+
+                {fourStops.slice(0, 3).map((_, idx) => {
+                  const cx = svgWidth * (0.24 + idx * 0.28);
+                  const cy = isBottom
+                    ? anchorY2 + (idx % 2 === 0 ? -12 : 8) * amplitude
+                    : anchorY2 + (idx % 2 === 0 ? 12 : -8) * amplitude;
+                  const rx = svgWidth * 0.38;
+
+                  return (
+                    <Ellipse
+                      key={`${uid}-el2-${idx}`}
+                      cx={cx}
+                      cy={cy}
+                      rx={rx}
+                      ry={ry2}
+                      fill={`url(#${uid}-rg2-${idx})`}
+                    />
+                  );
+                })}
+              </Svg>
+            </Animated.View>
+          </>
+        )}
       </Animated.View>
     </View>
   );

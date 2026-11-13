@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -155,28 +156,23 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
         } as any)
       : undefined;
 
-  const isIOS = Platform.OS === 'ios';
-
   return (
     <Modal
       visible={visible}
-      transparent={!isIOS}
-      presentationStyle={isIOS ? 'pageSheet' : undefined}
+      transparent
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={[styles.modalOverlay, isIOS && { backgroundColor: bgSheet }]}>
+      <View style={styles.modalOverlay}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Dismiss modal backdrop"
+        />
         <View
           style={[
             styles.sheetContainer,
             { backgroundColor: bgSheet },
-            isIOS && {
-              flex: 1,
-              maxHeight: '100%',
-              borderTopLeftRadius: 0,
-              borderTopRightRadius: 0,
-              paddingTop: 18,
-            },
           ]}
         >
           <View style={styles.dragHandleWrap}>

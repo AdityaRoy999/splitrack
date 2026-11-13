@@ -37,8 +37,8 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   const animateTo = (toValue: number) => {
     Animated.spring(scaleAnim, {
       toValue,
-      friction: 7,
-      tension: 120,
+      friction: 10,
+      tension: 150,
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
   };

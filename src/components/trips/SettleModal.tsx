@@ -4,6 +4,7 @@ import {
   Easing,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   Share,
   StyleSheet,
@@ -68,7 +69,6 @@ export const SettleModal: React.FC<SettleModalProps> = ({
   }, [successMsg, toastSeq, toastAnim, useNativeDriver]);
 
   const isDark = themeMode === 'dark';
-  const isIOS = Platform.OS === 'ios';
   const rawDebts = getSimplifiedDebts();
   const targetFriend = targetFriendId
     ? friends.find((f) => f.id === targetFriendId) || null
@@ -235,19 +235,25 @@ export const SettleModal: React.FC<SettleModalProps> = ({
   return (
     <Modal
       visible={visible}
-      transparent={!isIOS}
-      presentationStyle={isIOS ? 'pageSheet' : undefined}
+      transparent
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={[styles.modalOverlay, isIOS && { backgroundColor: bgSheet }]}>
+      <View style={styles.modalOverlay}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Dismiss modal backdrop"
+        />
         <View
           style={[
             styles.sheetContainer,
             { backgroundColor: bgSheet },
-            isIOS && { flex: 1, maxHeight: '100%', borderTopLeftRadius: 0, borderTopRightRadius: 0, paddingTop: 22 },
           ]}
         >
+          <View style={styles.dragHandleWrap}>
+            <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
+          </View>
           <View style={styles.headerRow}>
             <View style={{ flex: 1, paddingRight: 10 }}>
               <Text style={[styles.title, { color: textColor }]}>
@@ -405,11 +411,20 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingTop: 20,
+    paddingTop: 14,
     paddingHorizontal: 20,
     paddingBottom: 40,
     maxHeight: '85%',
     borderWidth: 0,
+  },
+  dragHandleWrap: {
+    alignItems: 'center',
+    paddingBottom: 12,
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
   headerRow: {
     flexDirection: 'row',

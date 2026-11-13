@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,6 +11,7 @@ import {
 } from 'react-native';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { MinimalisticMagnifierIcon } from '@solar-icons/react-native/bold/minimalistic-magnifier';
+import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import {
@@ -19,7 +21,12 @@ import {
   renderSolarIcon,
 } from '../../constants/solarIconsCatalog';
 import { ExpenseCategory } from '../../types';
-import { ImpactStyle, NotificationType, triggerImpact, triggerNotification } from '../../utils/haptics';
+import {
+  ImpactStyle,
+  NotificationType,
+  triggerImpact,
+  triggerNotification,
+} from '../../utils/haptics';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { GlassPill } from '../glass/GlassPill';
@@ -28,7 +35,10 @@ import { GradualBlur } from '../effects/GradualBlur';
 interface AddCategoryModalProps {
   visible: boolean;
   onClose: () => void;
+  categoryToEdit?: ExpenseCategory | null;
   onCreated?: (category: ExpenseCategory) => void;
+  onUpdated?: (category: ExpenseCategory) => void;
+  onDeleted?: (categoryId: string) => void;
 }
 
 const ACCENT_PALETTE = [
@@ -45,17 +55,20 @@ const ACCENT_PALETTE = [
 export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
   visible,
   onClose,
+  categoryToEdit,
   onCreated,
+  onUpdated,
+  onDeleted,
 }) => {
-  const { addCategory } = useSplitTrack();
+  const { addCategory, updateCategory, deleteCategory } = useSplitTrack();
   const { themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
-  const [name, setName] = useState('');
+  const [name, setName] = useState(() => categoryToEdit?.name || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<SolarIconGroup>('All');
-  const [selectedIconKey, setSelectedIconKey] = useState('cup-hot');
-  const [selectedColor, setSelectedColor] = useState(ACCENT_PALETTE[0]);
+  const [selectedIconKey, setSelectedIconKey] = useState(() => categoryToEdit?.iconKey || 'cup-hot');
+  const [selectedColor, setSelectedColor] = useState(() => categoryToEdit?.color || ACCENT_PALETTE[0]);
   const [gridWidth, setGridWidth] = useState(0);
 
   const iconTileWidth = gridWidth > 0 ? Math.floor((gridWidth - 24) / 4) : undefined;
@@ -85,6 +98,14 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
       triggerNotification(NotificationType.Error);
       return;
     }
+    if (categoryToEdit) {
+      const updated = updateCategory(categoryToEdit.id, cleaned, selectedIconKey, selectedColor);
+      if (updated) {
+        onUpdated?.(updated);
+        onClose();
+      }
+      return;
+    }
     const created = addCategory(cleaned, selectedIconKey, selectedColor);
     setName('');
     setSearchQuery('');
@@ -93,13 +114,17 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
     onClose();
   };
 
-  const isIOS = Platform.OS === 'ios';
+  const handleDelete = () => {
+    if (!categoryToEdit) return;
+    deleteCategory(categoryToEdit.id);
+    onDeleted?.(categoryToEdit.id);
+    onClose();
+  };
 
   return (
     <Modal
       visible={visible}
-      transparent={!isIOS}
-      presentationStyle={isIOS ? 'pageSheet' : undefined}
+      transparent
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
@@ -107,25 +132,21 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
         style={[
           styles.backdrop,
           {
-            backgroundColor: isIOS
-              ? sheetBg
-              : isDark
-                ? 'rgba(0,0,0,0.72)'
-                : 'rgba(15,23,42,0.35)',
+            backgroundColor: isDark
+              ? 'rgba(0,0,0,0.72)'
+              : 'rgba(15,23,42,0.35)',
           },
         ]}
       >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Dismiss category modal backdrop"
+        />
         <View
           style={[
             styles.sheet,
             { backgroundColor: sheetBg },
-            isIOS && {
-              flex: 1,
-              maxHeight: '100%',
-              borderTopLeftRadius: 0,
-              borderTopRightRadius: 0,
-              paddingTop: 18,
-            },
           ]}
         >
           <View style={styles.dragHandleWrap}>
@@ -139,19 +160,35 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
 
           <View style={styles.header}>
             <View>
-              <Text style={[styles.title, { color: textColor }]}>New Category</Text>
+              <Text style={[styles.title, { color: textColor }]}>
+                {categoryToEdit ? 'Edit Category' : 'New Category'}
+              </Text>
               <Text style={[styles.subtitle, { color: mutedText }]}>
-                Pick a symbol from {SOLAR_ICON_CATALOG.length} Solar Bold icons
+                {categoryToEdit
+                  ? 'Update category name, icon, and accent color'
+                  : `Pick a symbol from ${SOLAR_ICON_CATALOG.length} Solar Bold icons`}
               </Text>
             </View>
-            <AnimatedPressable
-              scaleTo={0.9}
-              onPress={onClose}
-              accessibilityLabel="Close category modal"
-              contentStyle={[styles.closeBtn, { backgroundColor: inputBg }]}
-            >
-              <CloseCircleIcon size={20} color={textColor} />
-            </AnimatedPressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {categoryToEdit && (
+                <AnimatedPressable
+                  scaleTo={0.9}
+                  onPress={handleDelete}
+                  accessibilityLabel="Delete category"
+                  contentStyle={[styles.closeBtn, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2' }]}
+                >
+                  <TrashBinTrashIcon size={18} color="#EF4444" />
+                </AnimatedPressable>
+              )}
+              <AnimatedPressable
+                scaleTo={0.9}
+                onPress={onClose}
+                accessibilityLabel="Close category modal"
+                contentStyle={[styles.closeBtn, { backgroundColor: inputBg }]}
+              >
+                <CloseCircleIcon size={20} color={textColor} />
+              </AnimatedPressable>
+            </View>
           </View>
 
           <View style={styles.scrollAreaWrap}>
@@ -311,7 +348,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
           </View>
 
           <GlassPill
-            label="Create Category"
+            label={categoryToEdit ? 'Save Changes' : 'Create Category'}
             onPress={handleSave}
             variant="accent"
             size="lg"

@@ -4,6 +4,7 @@ import {
   Easing,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,7 +17,13 @@ import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
 import { MapPointIcon } from '@solar-icons/react-native/bold/map-point';
 import { MagnifierIcon } from '@solar-icons/react-native/bold/magnifier';
-import { NotificationType, triggerNotification } from '../../utils/haptics';
+import { Pen2Icon } from '@solar-icons/react-native/bold/pen-2';
+import {
+  ImpactStyle,
+  NotificationType,
+  triggerImpact,
+  triggerNotification,
+} from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { currencies } from '../../theme/colors';
@@ -25,6 +32,7 @@ import { GlassPill } from '../glass/GlassPill';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
+import { SmoothCollapsible, triggerSmoothLayout } from '../common/SmoothCollapsible';
 import { AddCategoryModal } from '../categories/AddCategoryModal';
 import { GradualBlur } from '../effects/GradualBlur';
 import {
@@ -32,7 +40,7 @@ import {
   formatDisplayDate,
   getTodayLocalISO,
 } from '../common/CalendarDatePickerModal';
-import { SplitMemberShare, SplitType } from '../../types';
+import { ExpenseCategory, SplitMemberShare, SplitType } from '../../types';
 
 interface AddExpenseModalProps {
   visible: boolean;
@@ -71,6 +79,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [paidBySearchExpandAnim] = useState(() => new Animated.Value(0));
 
   const toggleFriendSearch = () => {
+    triggerSmoothLayout(240);
     if (showFriendSearch) {
       Animated.timing(searchExpandAnim, {
         toValue: 0,
@@ -96,6 +105,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   };
 
   const togglePaidBySearch = () => {
+    triggerSmoothLayout(240);
     if (showPaidBySearch) {
       Animated.timing(paidBySearchExpandAnim, {
         toValue: 0,
@@ -119,7 +129,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       }).start();
     }
   };
-  const [splitType] = useState<SplitType>('equal');
+  const [splitType, setSplitType] = useState<SplitType>('equal');
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+  const [customPercentages, setCustomPercentages] = useState<Record<string, string>>({});
+  const [customShares, setCustomShares] = useState<Record<string, number>>({});
+  const [categoryToEdit, setCategoryToEdit] = useState<ExpenseCategory | null>(null);
   const [splitWithMembers, setSplitWithMembers] = useState<string[]>(() => {
     if (defaultTripId) {
       const matchTrip = trips.find((t) => t.id === defaultTripId);
@@ -161,10 +175,221 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     }
   };
 
+
+  const parsedAmount = parseFloat(amountStr) || 0;
+  const perPersonShare = splitWithMembers.length > 0 ? parsedAmount / splitWithMembers.length : 0;
+  const currSym = currencies[currency]?.symbol || '₹';
+
+  const splitTypeItems = [
+    { value: 'equal', label: '= Equal' },
+    { value: 'exact', label: `${currSym} Exact` },
+    { value: 'percentage', label: '% Percent' },
+    { value: 'shares', label: '# Shares' },
+  ];
+
+  const handleSplitTypeChange = (val: string) => {
+    triggerSmoothLayout(280);
+    const next = val as SplitType;
+    setSplitType(next);
+    triggerImpact(ImpactStyle.Light);
+    const total = parsedAmount;
+    const count = splitWithMembers.length;
+    if (next === 'exact') {
+      const per = count > 0 ? (total / count).toFixed(2) : '0';
+      const amounts: Record<string, string> = {};
+      splitWithMembers.forEach((id) => {
+        amounts[id] = customAmounts[id] || per;
+      });
+      setCustomAmounts(amounts);
+    } else if (next === 'percentage') {
+      const perPct = count > 0 ? Math.floor(100 / count).toString() : '0';
+      const pcts: Record<string, string> = {};
+      splitWithMembers.forEach((id) => {
+        pcts[id] = customPercentages[id] || perPct;
+      });
+      setCustomPercentages(pcts);
+    } else if (next === 'shares') {
+      const shs: Record<string, number> = {};
+      splitWithMembers.forEach((id) => {
+        shs[id] = customShares[id] ?? 1;
+      });
+      setCustomShares(shs);
+    }
+  };
+
+  const splitCalculations = useMemo(() => {
+    const total = parsedAmount;
+    const count = splitWithMembers.length;
+    if (count === 0) {
+      return {
+        memberAmounts: {} as Record<string, number>,
+        allocated: 0,
+        remaining: total,
+        isBalanced: true,
+        totalShares: 0,
+        totalPct: 0,
+      };
+    }
+
+    if (splitType === 'equal') {
+      const per = count > 0 ? Math.round((total / count) * 100) / 100 : 0;
+      const memberAmounts: Record<string, number> = {};
+      splitWithMembers.forEach((id) => {
+        memberAmounts[id] = per;
+      });
+      return {
+        memberAmounts,
+        allocated: Math.round(per * count * 100) / 100,
+        remaining: 0,
+        isBalanced: true,
+        totalShares: count,
+        totalPct: 100,
+      };
+    }
+
+    if (splitType === 'exact') {
+      let allocated = 0;
+      const memberAmounts: Record<string, number> = {};
+      splitWithMembers.forEach((id) => {
+        const val = parseFloat(customAmounts[id]) || 0;
+        memberAmounts[id] = val;
+        allocated += val;
+      });
+      allocated = Math.round(allocated * 100) / 100;
+      const remaining = Math.round((total - allocated) * 100) / 100;
+      return {
+        memberAmounts,
+        allocated,
+        remaining,
+        isBalanced: Math.abs(remaining) < 0.01,
+        totalShares: count,
+        totalPct: total > 0 ? Math.round((allocated / total) * 100) : 100,
+      };
+    }
+
+    if (splitType === 'percentage') {
+      let totalPct = 0;
+      const memberAmounts: Record<string, number> = {};
+      splitWithMembers.forEach((id) => {
+        const pct = parseFloat(customPercentages[id]) || 0;
+        totalPct += pct;
+        memberAmounts[id] = Math.round(((pct / 100) * total) * 100) / 100;
+      });
+      const allocated = Math.round(((totalPct / 100) * total) * 100) / 100;
+      const remaining = Math.round((total - allocated) * 100) / 100;
+      return {
+        memberAmounts,
+        allocated,
+        remaining,
+        isBalanced: Math.abs(100 - totalPct) < 0.01,
+        totalShares: count,
+        totalPct: Math.round(totalPct * 100) / 100,
+      };
+    }
+
+    if (splitType === 'shares') {
+      let totalShares = 0;
+      splitWithMembers.forEach((id) => {
+        totalShares += Math.max(1, customShares[id] ?? 1);
+      });
+      const memberAmounts: Record<string, number> = {};
+      splitWithMembers.forEach((id) => {
+        const sh = Math.max(1, customShares[id] ?? 1);
+        memberAmounts[id] = totalShares > 0 ? Math.round(((sh / totalShares) * total) * 100) / 100 : 0;
+      });
+      return {
+        memberAmounts,
+        allocated: total,
+        remaining: 0,
+        isBalanced: true,
+        totalShares,
+        totalPct: 100,
+      };
+    }
+
+    return {
+      memberAmounts: {} as Record<string, number>,
+      allocated: 0,
+      remaining: 0,
+      isBalanced: true,
+      totalShares: 0,
+      totalPct: 0,
+    };
+  }, [parsedAmount, splitWithMembers, splitType, customAmounts, customPercentages, customShares]);
+
+  const handleShiftExact = (memberId: string, delta: number) => {
+    triggerImpact(ImpactStyle.Light);
+    const curr = parseFloat(customAmounts[memberId]) || 0;
+    const nextVal = Math.max(0, Math.round((curr + delta) * 100) / 100);
+    setCustomAmounts((prev) => ({
+      ...prev,
+      [memberId]: nextVal.toString(),
+    }));
+  };
+
+  const handleShiftPercentage = (memberId: string, deltaPct: number) => {
+    triggerImpact(ImpactStyle.Light);
+    const curr = parseFloat(customPercentages[memberId]) || 0;
+    const nextVal = Math.max(0, Math.min(100, Math.round((curr + deltaPct) * 100) / 100));
+    setCustomPercentages((prev) => ({
+      ...prev,
+      [memberId]: nextVal.toString(),
+    }));
+  };
+
+  const handleShiftShare = (memberId: string, deltaShares: number) => {
+    triggerImpact(ImpactStyle.Light);
+    const curr = customShares[memberId] ?? 1;
+    const nextVal = Math.max(1, curr + deltaShares);
+    setCustomShares((prev) => ({
+      ...prev,
+      [memberId]: nextVal,
+    }));
+  };
+
+  const handleDistributeRemaining = () => {
+    triggerNotification(NotificationType.Success);
+    const count = splitWithMembers.length;
+    if (count === 0) return;
+
+    if (splitType === 'exact') {
+      const rem = splitCalculations.remaining;
+      const perDelta = Math.round((rem / count) * 100) / 100;
+      const nextAmounts: Record<string, string> = { ...customAmounts };
+      splitWithMembers.forEach((id, index) => {
+        const curr = parseFloat(nextAmounts[id]) || 0;
+        const add = index === count - 1 ? rem - perDelta * (count - 1) : perDelta;
+        nextAmounts[id] = Math.max(0, Math.round((curr + add) * 100) / 100).toString();
+      });
+      setCustomAmounts(nextAmounts);
+    } else if (splitType === 'percentage') {
+      const remPct = Math.round((100 - splitCalculations.totalPct) * 100) / 100;
+      const perDeltaPct = Math.floor(remPct / count);
+      const nextPcts: Record<string, string> = { ...customPercentages };
+      splitWithMembers.forEach((id, index) => {
+        const curr = parseFloat(nextPcts[id]) || 0;
+        const add = index === count - 1 ? remPct - perDeltaPct * (count - 1) : perDeltaPct;
+        nextPcts[id] = Math.max(0, Math.round((curr + add) * 100) / 100).toString();
+      });
+      setCustomPercentages(nextPcts);
+    }
+  };
+
   const handleMemberCheckedChange = (id: string, checked: boolean) => {
+    triggerSmoothLayout(280);
     if (checked) {
       if (!splitWithMembers.includes(id)) {
-        setSplitWithMembers([...splitWithMembers, id]);
+        const next = [...splitWithMembers, id];
+        setSplitWithMembers(next);
+        if (splitType === 'exact' && !customAmounts[id]) {
+          const per = (parsedAmount / next.length).toFixed(2);
+          setCustomAmounts((prev) => ({ ...prev, [id]: per }));
+        } else if (splitType === 'percentage' && !customPercentages[id]) {
+          const perPct = Math.floor(100 / next.length).toString();
+          setCustomPercentages((prev) => ({ ...prev, [id]: perPct }));
+        } else if (splitType === 'shares' && !customShares[id]) {
+          setCustomShares((prev) => ({ ...prev, [id]: 1 }));
+        }
       }
     } else if (splitWithMembers.length > 1) {
       setSplitWithMembers(splitWithMembers.filter((m) => m !== id));
@@ -177,10 +402,14 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
     triggerNotification(NotificationType.Success);
 
-    const perPerson = Math.round((amount / splitWithMembers.length) * 100) / 100;
     const splits: SplitMemberShare[] = splitWithMembers.map((memberId) => ({
       friendId: memberId,
-      amount: perPerson,
+      amount: splitCalculations.memberAmounts[memberId] ?? Math.round((amount / splitWithMembers.length) * 100) / 100,
+      share: splitType === 'shares' ? customShares[memberId] : undefined,
+      percentage:
+        splitType === 'percentage'
+          ? parseFloat(customPercentages[memberId]) || undefined
+          : undefined,
       paidAmount: memberId === paidBy ? amount : 0,
     }));
 
@@ -220,9 +449,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
 
-  const parsedAmount = parseFloat(amountStr) || 0;
-  const perPersonShare = splitWithMembers.length > 0 ? parsedAmount / splitWithMembers.length : 0;
-  const currSym = currencies[currency]?.symbol || '₹';
 
   const categoryItems = useMemo(
     () =>
@@ -291,28 +517,193 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     return results;
   }, [transactions, tripId, trips]);
 
-  const isIOS = Platform.OS === 'ios';
+  const renderParticipantRow = (id: string, name: string) => {
+    const inSplit = splitWithMembers.includes(id);
+    const assignedAmount = splitCalculations.memberAmounts[id] ?? 0;
+
+    return (
+      <View
+        key={id}
+        style={[
+          splitType === 'equal' ? styles.springCheckRow : styles.memberSplitCard,
+          { backgroundColor: inputBg },
+        ]}
+      >
+        <SpringCheck
+          label={name}
+          checked={inSplit}
+          onChange={(checked) => handleMemberCheckedChange(id, checked)}
+          color={textColor}
+          fillColor={activeBg}
+          checkColor={activeText}
+          boxSize={22}
+          boxRadius={999}
+          fontSize={14}
+          strike="none"
+          doneOpacity={1}
+          trailing={
+            inSplit && parsedAmount > 0 ? (
+              <Text
+                style={[
+                  styles.memberShareText,
+                  {
+                    color: splitType === 'equal' ? mutedText : textColor,
+                    fontWeight: splitType === 'equal' ? '400' : '600',
+                  },
+                ]}
+              >
+                {currSym}{assignedAmount.toFixed(2)}
+              </Text>
+            ) : null
+          }
+        />
+
+        <SmoothCollapsible expanded={inSplit && splitType !== 'equal'}>
+          {splitType === 'exact' && (
+            <View style={styles.dynamicControlsWrap}>
+              <View style={styles.exactInputRow}>
+                <View style={[styles.exactInputBox, { backgroundColor: cardBg }]}>
+                  <Text style={[styles.exactCurrPrefix, { color: mutedText }]}>{currSym}</Text>
+                  <TextInput
+                    style={[
+                      styles.exactTextInput,
+                      { color: textColor },
+                      Platform.OS === 'web' &&
+                        ({
+                          outlineStyle: 'none',
+                          outlineWidth: 0,
+                          outlineColor: 'transparent',
+                          outline: 'none',
+                          boxShadow: 'none',
+                        } as any),
+                    ]}
+                    keyboardType="decimal-pad"
+                    value={customAmounts[id] ?? ''}
+                    placeholder="0.00"
+                    placeholderTextColor={mutedText}
+                    onChangeText={(txt) => {
+                      setCustomAmounts((prev) => ({ ...prev, [id]: txt }));
+                    }}
+                  />
+                </View>
+
+                <View style={styles.marginChipsRow}>
+                  {[-50, -10, 10, 50].map((delta) => (
+                    <AnimatedPressable
+                      key={delta}
+                      scaleTo={0.92}
+                      onPress={() => handleShiftExact(id, delta)}
+                      contentStyle={[styles.marginChip, { backgroundColor: chipBg }]}
+                    >
+                      <Text style={[styles.marginChipText, { color: textColor }]}>
+                        {delta > 0 ? `+${delta}` : `${delta}`}
+                      </Text>
+                    </AnimatedPressable>
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
+
+          {splitType === 'percentage' && (
+            <View style={styles.dynamicControlsWrap}>
+              <View style={styles.exactInputRow}>
+                <View style={[styles.exactInputBox, { backgroundColor: cardBg }]}>
+                  <TextInput
+                    style={[
+                      styles.exactTextInput,
+                      { color: textColor },
+                      Platform.OS === 'web' &&
+                        ({
+                          outlineStyle: 'none',
+                          outlineWidth: 0,
+                          outlineColor: 'transparent',
+                          outline: 'none',
+                          boxShadow: 'none',
+                        } as any),
+                    ]}
+                    keyboardType="decimal-pad"
+                    value={customPercentages[id] ?? ''}
+                    placeholder="0"
+                    placeholderTextColor={mutedText}
+                    onChangeText={(txt) => {
+                      setCustomPercentages((prev) => ({ ...prev, [id]: txt }));
+                    }}
+                  />
+                  <Text style={[styles.exactCurrPrefix, { color: mutedText }]}>%</Text>
+                </View>
+
+                <View style={styles.marginChipsRow}>
+                  {[-10, -5, 5, 10].map((delta) => (
+                    <AnimatedPressable
+                      key={delta}
+                      scaleTo={0.92}
+                      onPress={() => handleShiftPercentage(id, delta)}
+                      contentStyle={[styles.marginChip, { backgroundColor: chipBg }]}
+                    >
+                      <Text style={[styles.marginChipText, { color: textColor }]}>
+                        {delta > 0 ? `+${delta}%` : `${delta}%`}
+                      </Text>
+                    </AnimatedPressable>
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
+
+          {splitType === 'shares' && (
+            <View style={styles.dynamicControlsWrap}>
+              <View style={styles.sharesRow}>
+                <View style={styles.sharesStepperWrap}>
+                  <AnimatedPressable
+                    scaleTo={0.9}
+                    onPress={() => handleShiftShare(id, -1)}
+                    contentStyle={[styles.shareStepBtn, { backgroundColor: chipBg }]}
+                  >
+                    <Text style={[styles.shareStepBtnText, { color: textColor }]}>−</Text>
+                  </AnimatedPressable>
+                  <View style={[styles.shareCountBox, { backgroundColor: cardBg }]}>
+                    <Text style={[styles.shareCountText, { color: textColor }]}>
+                      {customShares[id] ?? 1} {(customShares[id] ?? 1) === 1 ? 'share' : 'shares'}
+                    </Text>
+                  </View>
+                  <AnimatedPressable
+                    scaleTo={0.9}
+                    onPress={() => handleShiftShare(id, 1)}
+                    contentStyle={[styles.shareStepBtn, { backgroundColor: chipBg }]}
+                  >
+                    <Text style={[styles.shareStepBtnText, { color: textColor }]}>+</Text>
+                  </AnimatedPressable>
+                </View>
+
+                <Text style={[styles.computedShareText, { color: mutedText }]}>
+                  = {currSym}{assignedAmount.toFixed(2)}
+                </Text>
+              </View>
+            </View>
+          )}
+        </SmoothCollapsible>
+      </View>
+    );
+  };
 
   return (
     <Modal
       visible={visible}
-      transparent={!isIOS}
-      presentationStyle={isIOS ? 'pageSheet' : undefined}
+      transparent
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={[styles.modalOverlay, isIOS && { backgroundColor: bgSheet }]}>
+      <View style={styles.modalOverlay}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Dismiss modal backdrop"
+        />
         <View
           style={[
             styles.sheetContainer,
             { backgroundColor: bgSheet },
-            isIOS && {
-              flex: 1,
-              maxHeight: '100%',
-              borderTopLeftRadius: 0,
-              borderTopRightRadius: 0,
-              paddingTop: 18,
-            },
           ]}
         >
           <View style={styles.dragHandleWrap}>
@@ -323,7 +714,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             <View>
               <Text style={[styles.title, { color: textColor }]}>Add & Split Expense</Text>
               <Text style={[styles.subtitleText, { color: mutedText }]}>
-                Instant equal split across selected people
+                {splitType === 'equal'
+                  ? 'Instant equal split across selected people'
+                  : splitType === 'exact'
+                  ? 'Dynamic exact split with custom margin shifting'
+                  : splitType === 'percentage'
+                  ? 'Dynamic percentage split by custom ratio'
+                  : 'Dynamic share-based expense split'}
               </Text>
             </View>
             <AnimatedPressable
@@ -389,16 +786,42 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 <Text style={[styles.fieldLabel, { color: mutedText, marginBottom: 0 }]}>
                   CATEGORY
                 </Text>
-                <AnimatedPressable
-                  scaleTo={0.94}
-                  onPress={() => setShowAddCategory(true)}
-                  contentStyle={[styles.newCategoryMiniBtn, { backgroundColor: chipBg }]}
-                >
-                  <AddCircleIcon size={13} color={textColor} />
-                  <Text style={[styles.newCategoryMiniText, { color: textColor }]}>
-                    New Category
-                  </Text>
-                </AnimatedPressable>
+                <View style={styles.catActionsRow}>
+                  {category ? (
+                    <AnimatedPressable
+                      scaleTo={0.94}
+                      onPress={() => {
+                        const match = categories.find(
+                          (c) => c.name.toLowerCase() === category.toLowerCase()
+                        );
+                        if (match) {
+                          setCategoryToEdit(match);
+                          setShowAddCategory(true);
+                        }
+                      }}
+                      accessibilityLabel="Edit category"
+                      contentStyle={[styles.newCategoryMiniBtn, { backgroundColor: chipBg }]}
+                    >
+                      <Pen2Icon size={12} color={textColor} />
+                      <Text style={[styles.newCategoryMiniText, { color: textColor }]}>
+                        Edit
+                      </Text>
+                    </AnimatedPressable>
+                  ) : null}
+                  <AnimatedPressable
+                    scaleTo={0.94}
+                    onPress={() => {
+                      setCategoryToEdit(null);
+                      setShowAddCategory(true);
+                    }}
+                    contentStyle={[styles.newCategoryMiniBtn, { backgroundColor: chipBg }]}
+                  >
+                    <AddCircleIcon size={13} color={textColor} />
+                    <Text style={[styles.newCategoryMiniText, { color: textColor }]}>
+                      New Category
+                    </Text>
+                  </AnimatedPressable>
+                </View>
               </View>
               <JellyRadio
                 scrollable
@@ -667,13 +1090,103 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   </AnimatedPressable>
                   <View style={[styles.splitSummaryBadge, { backgroundColor: chipBg }]}>
                     <Text style={[styles.splitPerPersonNote, { color: textColor }]}>
-                      {parsedAmount > 0
-                        ? `${currSym}${perPersonShare.toFixed(2)} / person`
-                        : 'Equal Split'}
+                      {splitType === 'equal'
+                        ? parsedAmount > 0
+                          ? `${currSym}${perPersonShare.toFixed(2)} / person`
+                          : 'Equal Split'
+                        : splitType === 'exact'
+                        ? `${currSym}${splitCalculations.allocated.toFixed(2)} allocated`
+                        : splitType === 'percentage'
+                        ? `${splitCalculations.totalPct}% allocated`
+                        : `${splitCalculations.totalShares} total shares`}
                     </Text>
                   </View>
                 </View>
               </View>
+
+              {/* Split Method Segmented Radio */}
+              <View style={styles.splitMethodWrap}>
+                <Text style={[styles.fieldLabel, { color: mutedText, marginBottom: 8 }]}>
+                  SPLIT METHOD
+                </Text>
+                <JellyRadio
+                  items={splitTypeItems}
+                  value={splitType}
+                  onChange={handleSplitTypeChange}
+                  chipColor={chipBg}
+                  activeColor={activeBg}
+                  textColor={textColor}
+                  activeTextColor={activeText}
+                  size="sm"
+                  gap={6}
+                  radius={999}
+                />
+              </View>
+
+              {/* Dynamic Allocation & Balance Indicator */}
+              <SmoothCollapsible expanded={splitType !== 'equal'}>
+                <View style={[styles.balanceCard, { backgroundColor: inputBg }]}>
+                  <View style={styles.balanceHeaderRow}>
+                    <View style={styles.balanceHeaderLeft}>
+                      <Text style={[styles.balanceSmallLabel, { color: mutedText }]}>
+                        {splitType === 'exact'
+                          ? 'TOTAL ALLOCATED'
+                          : splitType === 'percentage'
+                          ? 'PERCENTAGE SPLIT'
+                          : 'TOTAL SHARES'}
+                      </Text>
+                      <Text style={[styles.balanceTotalText, { color: textColor }]}>
+                        {currSym}{splitCalculations.allocated.toFixed(2)} / {currSym}{parsedAmount.toFixed(2)}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.balanceStatusPill,
+                        {
+                          backgroundColor: splitCalculations.isBalanced
+                            ? 'rgba(16, 185, 129, 0.16)'
+                            : splitCalculations.remaining > 0
+                            ? 'rgba(245, 158, 11, 0.16)'
+                            : 'rgba(239, 68, 68, 0.16)',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.balanceStatusText,
+                          {
+                            color: splitCalculations.isBalanced
+                              ? '#10B981'
+                              : splitCalculations.remaining > 0
+                              ? '#F59E0B'
+                              : '#EF4444',
+                          },
+                        ]}
+                      >
+                        {splitCalculations.isBalanced
+                          ? '✓ Balanced'
+                          : splitCalculations.remaining > 0
+                          ? `${currSym}${splitCalculations.remaining.toFixed(2)} left`
+                          : `${currSym}${Math.abs(splitCalculations.remaining).toFixed(2)} over`}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {!splitCalculations.isBalanced && splitCalculations.remaining !== 0 && (
+                    <AnimatedPressable
+                      scaleTo={0.96}
+                      onPress={handleDistributeRemaining}
+                      contentStyle={[styles.distributeBtn, { backgroundColor: activeBg }]}
+                    >
+                      <Text style={[styles.distributeBtnText, { color: activeText }]}>
+                        {splitCalculations.remaining > 0
+                          ? `Distribute Remaining ${currSym}${splitCalculations.remaining.toFixed(2)} Evenly`
+                          : `Auto-Balance ${currSym}${Math.abs(splitCalculations.remaining).toFixed(2)} Difference`}
+                      </Text>
+                    </AnimatedPressable>
+                  )}
+                </View>
+              </SmoothCollapsible>
 
               {showFriendSearch && (
                 <Animated.View
@@ -737,58 +1250,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               )}
 
               <View style={styles.splitMembersList}>
-                {showUserFiltered && (
-                  <View style={[styles.springCheckRow, { backgroundColor: inputBg }]}>
-                    <SpringCheck
-                      label="You"
-                      checked={splitWithMembers.includes('user')}
-                      onChange={(checked) => handleMemberCheckedChange('user', checked)}
-                      color={textColor}
-                      fillColor={activeBg}
-                      checkColor={activeText}
-                      boxSize={22}
-                      boxRadius={999}
-                      fontSize={14}
-                      strike="none"
-                      doneOpacity={1}
-                      trailing={
-                        splitWithMembers.includes('user') && parsedAmount > 0 ? (
-                          <Text style={[styles.memberShareText, { color: mutedText }]}>
-                            {currSym}{perPersonShare.toFixed(2)}
-                          </Text>
-                        ) : null
-                      }
-                    />
-                  </View>
-                )}
+                {showUserFiltered && renderParticipantRow('user', 'You')}
 
-                {visibleScopedFriends.map((f) => {
-                  const inSplit = splitWithMembers.includes(f.id);
-                  return (
-                    <View key={f.id} style={[styles.springCheckRow, { backgroundColor: inputBg }]}>
-                      <SpringCheck
-                        label={f.name}
-                        checked={inSplit}
-                        onChange={(checked) => handleMemberCheckedChange(f.id, checked)}
-                        color={textColor}
-                        fillColor={activeBg}
-                        checkColor={activeText}
-                        boxSize={22}
-                        boxRadius={999}
-                        fontSize={14}
-                        strike="none"
-                        doneOpacity={1}
-                        trailing={
-                          inSplit && parsedAmount > 0 ? (
-                            <Text style={[styles.memberShareText, { color: mutedText }]}>
-                              {currSym}{perPersonShare.toFixed(2)}
-                            </Text>
-                          ) : null
-                        }
-                      />
-                    </View>
-                  );
-                })}
+                {visibleScopedFriends.map((f) => renderParticipantRow(f.id, f.name))}
 
                 {!showUserFiltered && visibleScopedFriends.length === 0 && (
                   <View style={[styles.springCheckRow, { backgroundColor: inputBg }]}>
@@ -827,9 +1291,16 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       />
 
       <AddCategoryModal
+        key={categoryToEdit ? `edit-${categoryToEdit.id}` : 'new-cat'}
         visible={showAddCategory}
-        onClose={() => setShowAddCategory(false)}
+        categoryToEdit={categoryToEdit}
+        onClose={() => {
+          setShowAddCategory(false);
+          setCategoryToEdit(null);
+        }}
         onCreated={(created) => setCategory(created.name)}
+        onUpdated={(updated) => setCategory(updated.name)}
+        onDeleted={() => setCategory(categories[0]?.name || 'Food & Drinks')}
       />
     </Modal>
   );
@@ -1090,6 +1561,150 @@ const styles = StyleSheet.create({
   },
   locationChipText: {
     fontSize: 11,
+    fontWeight: '500',
+  },
+  catActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  splitMethodWrap: {
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  balanceCard: {
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  balanceHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  balanceHeaderLeft: {
+    gap: 2,
+  },
+  balanceSmallLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: 0.8,
+  },
+  balanceTotalText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  balanceStatusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  balanceStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  distributeBtn: {
+    borderRadius: 999,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  distributeBtnText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  memberSplitCard: {
+    borderRadius: 16,
+    padding: 12,
+    gap: 6,
+    overflow: 'hidden',
+    ...(Platform.OS === 'web'
+      ? ({ transition: 'all 0.28s cubic-bezier(0.16, 1, 0.3, 1)' } as any)
+      : {}),
+  },
+  dynamicControlsWrap: {
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+    gap: 8,
+  },
+  exactInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  exactInputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 90,
+    height: 34,
+  },
+  exactCurrPrefix: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginRight: 4,
+  },
+  exactTextInput: {
+    fontSize: 14,
+    fontWeight: '500',
+    minWidth: 55,
+    paddingVertical: 0,
+  },
+  marginChipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  marginChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  marginChipText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  computedShareText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  sharesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  sharesStepperWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  shareStepBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shareStepBtnText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  shareCountBox: {
+    paddingHorizontal: 10,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shareCountText: {
+    fontSize: 12,
     fontWeight: '500',
   },
 });

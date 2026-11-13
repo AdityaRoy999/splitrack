@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -96,13 +97,10 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
       : '#F4F5F8';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
-  const isIOS = Platform.OS === 'ios';
-
   return (
     <Modal
       visible={visible}
-      transparent={!isIOS}
-      presentationStyle={isIOS ? 'pageSheet' : undefined}
+      transparent
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
@@ -110,25 +108,21 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
         style={[
           styles.backdrop,
           {
-            backgroundColor: isIOS
-              ? sheetBg
-              : isDark
-                ? 'rgba(0,0,0,0.72)'
-                : 'rgba(15,23,42,0.35)',
+            backgroundColor: isDark
+              ? 'rgba(0,0,0,0.72)'
+              : 'rgba(15,23,42,0.35)',
           },
         ]}
       >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Dismiss analytics modal backdrop"
+        />
         <View
           style={[
             styles.sheet,
             { backgroundColor: sheetBg },
-            isIOS && {
-              flex: 1,
-              maxHeight: '100%',
-              borderTopLeftRadius: 0,
-              borderTopRightRadius: 0,
-              paddingTop: 18,
-            },
           ]}
         >
           <View style={styles.dragHandleWrap}>
