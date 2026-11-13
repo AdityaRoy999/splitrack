@@ -96,17 +96,17 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
         <Aurora
           colorStops={
             isDark
-              ? ['#5227FF', '#00E5FF', '#7CFF67', '#5227FF']
+              ? ['#5227FF', '#00E5FF', '#10B981', '#5227FF']
               : ['#38BDF8', '#818CF8', '#34D399', '#38BDF8']
           }
-          amplitude={1.1}
-          blend={0.65}
-          height={0.88}
+          amplitude={0.88}
+          blend={0.52}
+          height={0.50}
           speed={0.85}
-          glow={0.72}
+          glow={0.50}
           layers={2}
           direction="bottom"
-          opacity={isDark ? 0.92 : 0.78}
+          opacity={isDark ? 0.9 : 0.75}
           lightMode={!isDark}
           style={{ borderRadius: 24 }}
         />

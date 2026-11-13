@@ -25,12 +25,12 @@ const EXPAND_GAP = 12;
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 const PROVIDER_AURORA_STOPS: Record<string, [string, string, string]> = {
-  slice: ['#5227FF', '#7cff67', '#5227FF'],
-  gpay: ['#0EA5E9', '#38BDF8', '#22C55E'],
+  slice: ['#6366F1', '#A855F7', '#EC4899'],
+  gpay: ['#0284C7', '#38BDF8', '#10B981'],
   phonepe: ['#7C3AED', '#EC4899', '#6366F1'],
   paytm: ['#06B6D4', '#3B82F6', '#0EA5E9'],
-  bank: ['#10B981', '#14B8A6', '#059669'],
-  cred: ['#F97316', '#F59E0B', '#EF4444'],
+  bank: ['#059669', '#10B981', '#14B8A6'],
+  cred: ['#E11D48', '#F43F5E', '#FB7185'],
 };
 
 const BANK_AURORA_STOPS: Record<string, [string, string, string]> = {
@@ -43,10 +43,10 @@ const BANK_AURORA_STOPS: Record<string, [string, string, string]> = {
 };
 
 const FALLBACK_AURORA_STOPS: [string, string, string][] = [
-  ['#5227FF', '#7cff67', '#5227FF'],
-  ['#0EA5E9', '#38BDF8', '#22C55E'],
+  ['#6366F1', '#A855F7', '#EC4899'],
+  ['#0284C7', '#38BDF8', '#10B981'],
   ['#7C3AED', '#EC4899', '#6366F1'],
-  ['#10B981', '#14B8A6', '#059669'],
+  ['#059669', '#10B981', '#14B8A6'],
 ];
 
 const getAuroraStops = (acc: UpiAccount, fallbackIndex: number): [string, string, string] => {
@@ -167,11 +167,11 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
       >
         <Aurora
           colorStops={auroraStops}
-          amplitude={1.08}
-          blend={0.58}
-          height={isCardProfile ? 0.85 : 0.74}
-          speed={0.9}
-          glow={0.68}
+          amplitude={0.88}
+          blend={0.5}
+          height={0.46}
+          speed={0.85}
+          glow={0.48}
           layers={2}
           direction="bottom"
           opacity={isCardProfile ? (isDark ? 0.88 : 0.72) : isDark ? 0.82 : 0.68}

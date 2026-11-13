@@ -187,6 +187,11 @@ void main() {
   glow = 1.0 - pow(1.0 - glow, vec3(max(strength, 1.0)));
   float dither = (hash(frag) - 0.5) / 255.0;
 
+  if (cover <= 0.002) {
+    outColor = vec4(0.0);
+    return;
+  }
+
   if (uLightMode > 0.5) {
     vec3 tint = cover > 0.0001 ? glow / cover : vec3(0.0);
     cover *= smootherstep(0.0, 0.25, cover);
@@ -261,21 +266,6 @@ const link = (gl: WebGL2RenderingContext): Program | null => {
     if (info) uniforms[info.name.replace('[0]', '')] = gl.getUniformLocation(program, info.name);
   }
   return { program, uniforms };
-};
-
-const hexWithAlpha = (hex: string, alpha: number): string => {
-  const clean = hex.replace('#', '');
-  const full =
-    clean.length === 3
-      ? clean
-          .split('')
-          .map((c) => c + c)
-          .join('')
-      : clean.padEnd(6, '0').slice(0, 6);
-  const r = parseInt(full.slice(0, 2), 16) || 0;
-  const g = parseInt(full.slice(2, 4), 16) || 0;
-  const b = parseInt(full.slice(4, 6), 16) || 0;
-  return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1).toFixed(3)})`;
 };
 
 export const Aurora = ({
@@ -548,19 +538,6 @@ export const Aurora = ({
     wakeRef.current?.();
   });
 
-  const isBottom = direction === 'bottom';
-  const c0 = stops[0] || '#5227FF';
-  const c1 = stops[1] || '#00E5FF';
-  const c2 = stops[2] || '#7CFF67';
-  const c3 = stops[3] || c0;
-
-  const aBase = lightMode ? 0.38 : 0.52 * brightness;
-  const backingGradient = isBottom
-    ? `linear-gradient(to bottom, transparent 0%, ${hexWithAlpha(c1, aBase * 0.35)} 35%, ${hexWithAlpha(c2, aBase * 0.65)} 70%, ${hexWithAlpha(c3, aBase * 0.85)} 100%)`
-    : `linear-gradient(to bottom, ${hexWithAlpha(c0, aBase * 0.85)} 0%, ${hexWithAlpha(c1, aBase * 0.65)} 30%, ${hexWithAlpha(c2, aBase * 0.35)} 65%, transparent 100%)`;
-
-  const baselineStrip = `linear-gradient(to right, ${hexWithAlpha(c0, aBase * 0.75)}, ${hexWithAlpha(c1, aBase)}, ${hexWithAlpha(c2, aBase * 0.95)}, ${hexWithAlpha(c3, aBase * 0.75)})`;
-
   const flattenedStyle = StyleSheet.flatten(style as any) as any;
   const containerStyle: React.CSSProperties = {
     position: 'absolute',
@@ -581,39 +558,6 @@ export const Aurora = ({
       className={['relative h-full w-full overflow-hidden', className].filter(Boolean).join(' ')}
       style={containerStyle}
     >
-      {/* Permanent full-height atmospheric horizon wash backing */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: backingGradient,
-          pointerEvents: 'none',
-        }}
-      />
-
-      {/* Permanent full-width grounding baseline wash with continuous vertical fade (NO hard line / seam) */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: baselineStrip,
-          pointerEvents: 'none',
-          opacity: 0.85,
-          maskImage: isBottom
-            ? 'linear-gradient(to bottom, transparent 0%, transparent 25%, rgba(0,0,0,0.35) 60%, black 100%)'
-            : 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.35) 40%, transparent 75%, transparent 100%)',
-          WebkitMaskImage: isBottom
-            ? 'linear-gradient(to bottom, transparent 0%, transparent 25%, rgba(0,0,0,0.35) 60%, black 100%)'
-            : 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.35) 40%, transparent 75%, transparent 100%)',
-        }}
-      />
-
       <canvas
         ref={canvasRef}
         style={{

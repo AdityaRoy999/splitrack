@@ -9,7 +9,6 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -137,21 +136,6 @@ const sampleOklchHexes = (
     result.push(oklchToHex(L, C, h));
   }
   return result;
-};
-
-const hexWithAlpha = (hex: string, alpha: number): string => {
-  const clean = hex.replace('#', '');
-  const full =
-    clean.length === 3
-      ? clean
-          .split('')
-          .map((c) => c + c)
-          .join('')
-      : clean.padEnd(6, '0').slice(0, 6);
-  const r = parseInt(full.slice(0, 2), 16) || 0;
-  const g = parseInt(full.slice(2, 4), 16) || 0;
-  const b = parseInt(full.slice(4, 6), 16) || 0;
-  return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1).toFixed(3)})`;
 };
 
 const GAUSSIAN_FALLOFF = [
@@ -313,78 +297,21 @@ export const Aurora: React.FC<AuroraProps> = React.memo(({
     outputRange: [1.1, 0.95, 1.1],
   });
 
-  // Foundational grounding colors across the horizon
-  const horizonColors = useMemo<[string, string, ...string[]]>(() => {
-    const [c0, c1, c2, c3] = fourStops;
-    const aBase = lightMode ? 0.38 : 0.52 * strength;
-    const aFade = 0;
-    if (isBottom) {
-      return [
-        hexWithAlpha(c0, aFade),
-        hexWithAlpha(c1, aBase * 0.4),
-        hexWithAlpha(c2, aBase * 0.8),
-        hexWithAlpha(c3, aBase),
-      ];
-    }
-    return [
-      hexWithAlpha(c0, aBase),
-      hexWithAlpha(c1, aBase * 0.8),
-      hexWithAlpha(c2, aBase * 0.4),
-      hexWithAlpha(c3, aFade),
-    ];
-  }, [fourStops, isBottom, lightMode, strength]);
-
-  // Dedicated permanent cross-horizon grounding wash (full card height, continuous diagonal ramp, NO hard edges)
-  const baselineWashColors = useMemo<[string, string, ...string[]]>(() => {
-    const [c0, c1, c2, c3] = fourStops;
-    const a = lightMode ? 0.36 : 0.55 * strength;
-    const aFade = 0;
-    if (isBottom) {
-      return [
-        hexWithAlpha(c3, aFade),
-        hexWithAlpha(c2, a * 0.35),
-        hexWithAlpha(c1, a * 0.75),
-        hexWithAlpha(c0, a),
-      ];
-    }
-    return [
-      hexWithAlpha(c0, a),
-      hexWithAlpha(c1, a * 0.75),
-      hexWithAlpha(c2, a * 0.35),
-      hexWithAlpha(c3, aFade),
-    ];
-  }, [fourStops, isBottom, lightMode, strength]);
-
   const svgWidth = boxSize.width * 1.34;
   const svgHeight = boxSize.height;
 
-  // Primary energy nodes anchor coordinates
-  const anchorY1 = isBottom ? boxSize.height * 0.94 : boxSize.height * 0.06;
-  const anchorY2 = isBottom ? boxSize.height * 0.82 : boxSize.height * 0.18;
+  // Primary energy nodes anchor coordinates: anchored directly at the bottom baseline
+  const anchorY1 = isBottom ? boxSize.height * 1.02 : -boxSize.height * 0.02;
+  const anchorY2 = isBottom ? boxSize.height * 0.94 : boxSize.height * 0.06;
 
-  const ry1 = boxSize.height * (0.75 + height * 0.42);
-  const ry2 = boxSize.height * (0.62 + height * 0.36);
+  // Crest radius: keeps lower half saturated while leaving the upper 50% clean default black
+  const ry1 = boxSize.height * (0.32 + height * 0.22);
+  const ry2 = boxSize.height * (0.26 + height * 0.18);
 
   return (
     <View onLayout={handleLayout} pointerEvents="none" style={[styles.container, style]}>
       <Animated.View style={[styles.fill, { opacity: revealAnim }]}>
-        {/* Layer 1: Ambient Horizon Linear Gradient Wash */}
-        <ExpoLinearGradient
-          colors={horizonColors}
-          start={{ x: 0.05, y: isBottom ? 0.1 : 0 }}
-          end={{ x: 0.95, y: isBottom ? 1 : 0.9 }}
-          style={[styles.fill, { opacity: clampedOpacity * 0.85 }]}
-        />
-
-        {/* Layer 2: Dedicated Permanent Grounding Horizon Wash (full card height, diagonal cross-wash, NO hard edges) */}
-        <ExpoLinearGradient
-          colors={baselineWashColors}
-          start={{ x: 0.95, y: isBottom ? 0.15 : 0 }}
-          end={{ x: 0.05, y: isBottom ? 1 : 0.85 }}
-          style={[styles.fill, { opacity: clampedOpacity * 0.85 }]}
-        />
-
-        {/* Layer 3: Dynamic Primary Aurora Curtain (drifting & breathing) */}
+        {/* Layer 1: Dynamic Primary Aurora Curtain (drifting & breathing) */}
         <Animated.View
           style={[
             styles.curtainLayer,
