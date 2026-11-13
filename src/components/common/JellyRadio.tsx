@@ -124,119 +124,81 @@ const JellyChip: React.FC<JellyChipProps> = ({
   useEffect(() => {
     if (selectionSeq === 0) return;
 
-    const distance = Math.abs(index - activeIndex);
-    const delay = distance * stagger;
-    const dampingRatio = Math.max(8, Math.round(22 * (1 - Math.min(0.7, bounce))));
-    const springStiffness = Math.max(180, stiffness);
-
-    const timer = setTimeout(() => {
+    if (index === activeIndex) {
       scaleX.stopAnimation();
       scaleY.stopAnimation();
       translateX.stopAnimation();
 
-      if (index === activeIndex) {
-        // Active chip swells with elastic horizontal/vertical jelly rebound
-        const xPeak = 1 + swell * 0.78 * jelly;
-        const yPeak = 1 - swell * 0.3 * jelly;
-        Animated.parallel([
-          Animated.sequence([
-            Animated.timing(scaleX, {
-              toValue: xPeak,
-              duration: 95,
-              useNativeDriver: USE_NATIVE_DRIVER,
-            }),
-            Animated.spring(scaleX, {
-              toValue: 1,
-              stiffness: springStiffness,
-              damping: dampingRatio,
-              mass: 0.85,
-              useNativeDriver: USE_NATIVE_DRIVER,
-            }),
-          ]),
-          Animated.sequence([
-            Animated.timing(scaleY, {
-              toValue: yPeak,
-              duration: 95,
-              useNativeDriver: USE_NATIVE_DRIVER,
-            }),
-            Animated.spring(scaleY, {
-              toValue: 1,
-              stiffness: springStiffness,
-              damping: dampingRatio,
-              mass: 0.85,
-              useNativeDriver: USE_NATIVE_DRIVER,
-            }),
-          ]),
-          Animated.spring(translateX, {
-            toValue: 0,
-            stiffness: springStiffness,
-            damping: dampingRatio + 3,
+      const xPeak = 1 + Math.min(0.08, swell * 0.4);
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(scaleX, {
+            toValue: xPeak,
+            duration: 60,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
-        ]).start();
-      } else {
-        // Neighbor chips barge outward from the active selection & spring back
+          Animated.spring(scaleX, {
+            toValue: 1,
+            stiffness: 450,
+            damping: 24,
+            mass: 0.75,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(scaleY, {
+            toValue: xPeak,
+            duration: 60,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+          Animated.spring(scaleY, {
+            toValue: 1,
+            stiffness: 450,
+            damping: 24,
+            mass: 0.75,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+        ]),
+      ]).start();
+      return;
+    }
+
+    if (barge > 0) {
+      const distance = Math.abs(index - activeIndex);
+      const delay = distance * stagger;
+      const timer = setTimeout(() => {
+        scaleX.stopAnimation();
+        scaleY.stopAnimation();
+        translateX.stopAnimation();
+
         const direction = index < activeIndex ? -1 : 1;
         const falloff = Math.max(0.32, 1 - (distance - 1) * 0.25);
         const shift = direction * barge * falloff;
-        const squash = 1 - shrink * falloff;
 
-        Animated.parallel([
-          Animated.sequence([
-            Animated.timing(translateX, {
-              toValue: shift,
-              duration: 90,
-              useNativeDriver: USE_NATIVE_DRIVER,
-            }),
-            Animated.spring(translateX, {
-              toValue: 0,
-              stiffness: springStiffness * 0.85,
-              damping: dampingRatio + 2,
-              useNativeDriver: USE_NATIVE_DRIVER,
-            }),
-          ]),
-          Animated.sequence([
-            Animated.timing(scaleX, {
-              toValue: squash,
-              duration: 90,
-              useNativeDriver: USE_NATIVE_DRIVER,
-            }),
-            Animated.spring(scaleX, {
-              toValue: 1,
-              stiffness: springStiffness * 0.85,
-              damping: dampingRatio + 2,
-              useNativeDriver: USE_NATIVE_DRIVER,
-            }),
-          ]),
-          Animated.sequence([
-            Animated.timing(scaleY, {
-              toValue: 1 + shrink * 0.45 * falloff * jelly,
-              duration: 90,
-              useNativeDriver: USE_NATIVE_DRIVER,
-            }),
-            Animated.spring(scaleY, {
-              toValue: 1,
-              stiffness: springStiffness * 0.85,
-              damping: dampingRatio + 2,
-              useNativeDriver: USE_NATIVE_DRIVER,
-            }),
-          ]),
+        Animated.sequence([
+          Animated.timing(translateX, {
+            toValue: shift,
+            duration: 70,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+          Animated.spring(translateX, {
+            toValue: 0,
+            stiffness: 350,
+            damping: 22,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
         ]).start();
-      }
-    }, delay);
+      }, delay);
 
-    return () => clearTimeout(timer);
+      return () => clearTimeout(timer);
+    }
   }, [
     selectionSeq,
     activeIndex,
     index,
     stagger,
-    bounce,
-    stiffness,
     swell,
-    jelly,
     barge,
-    shrink,
     scaleX,
     scaleY,
     translateX,
@@ -347,12 +309,12 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   radius = 999,
   columns,
   noWrap = false,
-  swell = 0.26,
-  barge = 7,
-  shrink = 0.06,
-  jelly = 1.2,
-  bounce = 0.28,
-  stagger = 24,
+  swell = 0.2,
+  barge = 0,
+  shrink = 0.04,
+  jelly = 1.0,
+  bounce = 0.2,
+  stagger = 0,
   stiffness = 500,
   disabled = false,
   scrollable = false,
@@ -379,7 +341,7 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
     normalizedItems.findIndex((i) => i.value === currentValue)
   );
 
-  if (Platform.OS === 'ios' && isLiquidGlassEnabled && normalizedItems.length > 0) {
+  if (Platform.OS === 'ios' && isLiquidGlassEnabled && !scrollable && normalizedItems.length > 0) {
     return (
       <AppleRadioControl
         items={normalizedItems.map((entry) => ({

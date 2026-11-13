@@ -66,6 +66,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
   const [searchExpandAnim] = useState(() => new Animated.Value(0));
 
+  const [showPaidBySearch, setShowPaidBySearch] = useState(false);
+  const [paidBySearchQuery, setPaidBySearchQuery] = useState('');
+  const [paidBySearchExpandAnim] = useState(() => new Animated.Value(0));
+
   const toggleFriendSearch = () => {
     if (showFriendSearch) {
       Animated.timing(searchExpandAnim, {
@@ -83,6 +87,31 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setShowFriendSearch(true);
       searchExpandAnim.setValue(0);
       Animated.timing(searchExpandAnim, {
+        toValue: 1,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+    }
+  };
+
+  const togglePaidBySearch = () => {
+    if (showPaidBySearch) {
+      Animated.timing(paidBySearchExpandAnim, {
+        toValue: 0,
+        duration: 190,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished) {
+          setShowPaidBySearch(false);
+          setPaidBySearchQuery('');
+        }
+      });
+    } else {
+      setShowPaidBySearch(true);
+      paidBySearchExpandAnim.setValue(0);
+      Animated.timing(paidBySearchExpandAnim, {
         toValue: 1,
         duration: 240,
         easing: Easing.out(Easing.cubic),
@@ -118,6 +147,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     const nextTripId = val === 'none' ? undefined : val;
     setTripId(nextTripId);
     setFriendSearchQuery('');
+    setPaidBySearchQuery('');
     if (!nextTripId) {
       setSplitWithMembers(['user', ...friends.slice(0, 2).map((f) => f.id)]);
       return;
@@ -194,16 +224,31 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const perPersonShare = splitWithMembers.length > 0 ? parsedAmount / splitWithMembers.length : 0;
   const currSym = currencies[currency]?.symbol || '₹';
 
-  const categoryItems = categories.map((cat) => ({
-    value: cat.name,
-    label: cat.name,
-    icon: renderSolarIcon(cat.iconKey, 14, category === cat.name ? activeText : mutedText),
-  }));
+  const categoryItems = useMemo(
+    () =>
+      categories.map((cat) => ({
+        value: cat.name,
+        label: cat.name,
+        icon: renderSolarIcon(cat.iconKey, 14, category === cat.name ? activeText : mutedText),
+      })),
+    [categories, category, activeText, mutedText]
+  );
 
-  const paidByItems = [
-    ...(showUserInScope ? [{ value: 'user', label: 'You' }] : []),
-    ...tripScopedFriends.map((f) => ({ value: f.id, label: f.name })),
-  ];
+  const paidByItems = useMemo(
+    () => [
+      ...(showUserInScope ? [{ value: 'user', label: 'You' }] : []),
+      ...tripScopedFriends.map((f) => ({ value: f.id, label: f.name })),
+    ],
+    [showUserInScope, tripScopedFriends]
+  );
+
+  const normalizedPaidByQuery = paidBySearchQuery.trim().toLowerCase();
+  const visiblePaidByItems = useMemo(() => {
+    if (!normalizedPaidByQuery) return paidByItems;
+    return paidByItems.filter((item) =>
+      item.label.toLowerCase().includes(normalizedPaidByQuery)
+    );
+  }, [paidByItems, normalizedPaidByQuery]);
 
   const normalizedQuery = friendSearchQuery.trim().toLowerCase();
   const visibleScopedFriends = useMemo(() => {
@@ -484,21 +529,101 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 radius={999}
               />
 
-              <Text style={[styles.fieldLabel, { color: mutedText, marginTop: 14 }]}>PAID BY</Text>
-              <JellyRadio
-                scrollable
-                fadeColor={cardBg}
-                items={paidByItems}
-                value={paidBy}
-                onChange={(val) => setPaidBy(val)}
-                chipColor={chipBg}
-                activeColor={activeBg}
-                textColor={textColor}
-                activeTextColor={activeText}
-                size="sm"
-                gap={8}
-                radius={999}
-              />
+              <View style={styles.paidByHeaderRow}>
+                <Text style={[styles.fieldLabel, { color: mutedText, marginBottom: 0 }]}>PAID BY</Text>
+                <AnimatedPressable
+                  scaleTo={0.9}
+                  onPress={togglePaidBySearch}
+                  accessibilityLabel="Search payer"
+                  contentStyle={[
+                    styles.searchIconBtn,
+                    { backgroundColor: showPaidBySearch ? activeBg : chipBg },
+                  ]}
+                >
+                  <MagnifierIcon
+                    size={14}
+                    color={showPaidBySearch ? activeText : textColor}
+                  />
+                </AnimatedPressable>
+              </View>
+
+              {showPaidBySearch && (
+                <Animated.View
+                  style={{
+                    overflow: 'hidden',
+                    maxHeight: paidBySearchExpandAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 52],
+                    }),
+                    marginBottom: paidBySearchExpandAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 10],
+                    }),
+                    opacity: paidBySearchExpandAnim,
+                    transform: [
+                      {
+                        translateY: paidBySearchExpandAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-8, 0],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <View style={[styles.friendSearchBox, { backgroundColor: inputBg, marginTop: 8 }]}>
+                    <MagnifierIcon size={14} color={mutedText} />
+                    <TextInput
+                      style={[
+                        styles.friendSearchInput,
+                        { color: textColor },
+                        Platform.OS === 'web' &&
+                          ({
+                            outlineStyle: 'none',
+                            outlineWidth: 0,
+                            outlineColor: 'transparent',
+                            outline: 'none',
+                            boxShadow: 'none',
+                          } as any),
+                      ]}
+                      placeholder="Search payer by name..."
+                      placeholderTextColor={mutedText}
+                      value={paidBySearchQuery}
+                      onChangeText={setPaidBySearchQuery}
+                      autoFocus
+                    />
+                    {paidBySearchQuery.length > 0 && (
+                      <AnimatedPressable
+                        scaleTo={0.9}
+                        onPress={() => setPaidBySearchQuery('')}
+                        contentStyle={styles.clearLocationBtn}
+                      >
+                        <CloseCircleIcon size={14} color={mutedText} />
+                      </AnimatedPressable>
+                    )}
+                  </View>
+                </Animated.View>
+              )}
+
+              {visiblePaidByItems.length > 0 ? (
+                <JellyRadio
+                  scrollable
+                  fadeColor={cardBg}
+                  items={visiblePaidByItems}
+                  value={paidBy}
+                  onChange={(val) => setPaidBy(val)}
+                  chipColor={chipBg}
+                  activeColor={activeBg}
+                  textColor={textColor}
+                  activeTextColor={activeText}
+                  size="sm"
+                  gap={8}
+                  radius={999}
+                />
+              ) : (
+                <Text style={[styles.noPayerText, { color: mutedText }]}>
+                  {`No payer matching "${paidBySearchQuery}"`}
+                </Text>
+              )}
 
               <Text style={[styles.fieldLabel, { color: mutedText, marginTop: 14 }]}>
                 LINK TO TRIP / GROUP
@@ -806,6 +931,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 14,
     marginBottom: 8,
+  },
+  paidByHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  noPayerText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    paddingVertical: 8,
   },
   newCategoryMiniBtn: {
     flexDirection: 'row',

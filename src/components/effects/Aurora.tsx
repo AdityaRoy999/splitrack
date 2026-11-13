@@ -9,6 +9,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -136,6 +137,21 @@ const sampleOklchHexes = (
     result.push(oklchToHex(L, C, h));
   }
   return result;
+};
+
+const hexWithAlpha = (hex: string, alpha: number): string => {
+  const clean = hex.replace('#', '');
+  const full =
+    clean.length === 3
+      ? clean
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : clean.padEnd(6, '0').slice(0, 6);
+  const r = parseInt(full.slice(0, 2), 16) || 0;
+  const g = parseInt(full.slice(2, 4), 16) || 0;
+  const b = parseInt(full.slice(4, 6), 16) || 0;
+  return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1).toFixed(3)})`;
 };
 
 const GAUSSIAN_FALLOFF = [
@@ -274,52 +290,82 @@ export const Aurora: React.FC<AuroraProps> = React.memo(({
 
   const isBottom = direction === 'bottom';
 
+  // Native hardware-accelerated full-width grounding gradient (CAGradientLayer on iOS)
+  // Guarantees flush bottom corners without floating box artifacts
+  const nativeGroundedColors = useMemo<[string, string, string, string, string]>(() => {
+    const [, c1, c2, c3] = fourStops;
+    const a = lightMode ? 0.72 : 0.92 * strength;
+    return [
+      'rgba(0, 0, 0, 0)',
+      'rgba(0, 0, 0, 0)',
+      hexWithAlpha(c1, a * 0.42),
+      hexWithAlpha(c2, a * 0.85),
+      hexWithAlpha(c3, a),
+    ];
+  }, [fourStops, lightMode, strength]);
+
+  const nativeCounterColors = useMemo<[string, string, string, string]>(() => {
+    const [c0, c1] = fourStops;
+    const a = lightMode ? 0.48 : 0.68 * strength;
+    return [
+      'rgba(0, 0, 0, 0)',
+      'rgba(0, 0, 0, 0)',
+      hexWithAlpha(c0, a * 0.55),
+      hexWithAlpha(c1, a * 0.92),
+    ];
+  }, [fourStops, lightMode, strength]);
+
   // Layer 1 Horizontal Drift: spans overscan width
   const txDrift1 = driftAnim1.interpolate({
     inputRange: [0, 1],
-    outputRange: [-boxSize.width * 0.18, boxSize.width * 0.08],
+    outputRange: [-boxSize.width * 0.22, boxSize.width * 0.08],
   });
 
   // Layer 2 Horizontal Drift: counter-directional motion
   const txDrift2 = driftAnim2.interpolate({
     inputRange: [0, 1],
-    outputRange: [boxSize.width * 0.06, -boxSize.width * 0.16],
+    outputRange: [boxSize.width * 0.08, -boxSize.width * 0.22],
   });
 
-  // Breathing vertical expansion
-  const syBreathe1 = breatheAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.94, 1.12, 0.94],
-  });
-
-  const syBreathe2 = breatheAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [1.1, 0.95, 1.1],
-  });
-
-  const svgWidth = boxSize.width * 1.34;
+  const svgWidth = boxSize.width * 1.5;
   const svgHeight = boxSize.height;
 
   // Primary energy nodes anchor coordinates: anchored directly at the bottom baseline
-  const anchorY1 = isBottom ? boxSize.height * 1.02 : -boxSize.height * 0.02;
-  const anchorY2 = isBottom ? boxSize.height * 0.94 : boxSize.height * 0.06;
+  const anchorY1 = isBottom ? boxSize.height * 1.05 : -boxSize.height * 0.05;
+  const anchorY2 = isBottom ? boxSize.height * 0.95 : boxSize.height * 0.05;
 
   // Crest radius: keeps lower half saturated while leaving the upper 50% clean default black
-  const ry1 = boxSize.height * (0.32 + height * 0.22);
-  const ry2 = boxSize.height * (0.26 + height * 0.18);
+  const ry1 = boxSize.height * (0.36 + height * 0.22);
+  const ry2 = boxSize.height * (0.28 + height * 0.18);
 
   return (
     <View onLayout={handleLayout} pointerEvents="none" style={[styles.container, style]}>
       <Animated.View style={[styles.fill, { opacity: revealAnim }]}>
-        {/* Layer 1: Dynamic Primary Aurora Curtain (drifting & breathing) */}
+        {/* Layer 1: Native Hardware Grounding Gradient (100% full-width, zero floating box, fills corners flush) */}
+        <ExpoLinearGradient
+          colors={nativeGroundedColors}
+          locations={[0.0, 0.44, 0.72, 0.90, 1.0]}
+          start={{ x: 0.08, y: isBottom ? 0.35 : 0.0 }}
+          end={{ x: 0.96, y: isBottom ? 1.0 : 0.65 }}
+          style={[styles.fill, { opacity: clampedOpacity }]}
+        />
+        <ExpoLinearGradient
+          colors={nativeCounterColors}
+          locations={[0.0, 0.48, 0.80, 1.0]}
+          start={{ x: 0.96, y: isBottom ? 0.4 : 0.0 }}
+          end={{ x: 0.04, y: isBottom ? 1.0 : 0.6 }}
+          style={[styles.fill, { opacity: clampedOpacity * 0.78 }]}
+        />
+
+        {/* Layer 2: Dynamic Primary Aurora Curtain (drifting waves) */}
         <Animated.View
           style={[
             styles.curtainLayer,
             {
               width: svgWidth,
               height: svgHeight,
-              opacity: clampedOpacity,
-              transform: [{ translateX: txDrift1 }, { scaleY: syBreathe1 }],
+              opacity: clampedOpacity * 0.9,
+              transform: [{ translateX: txDrift1 }],
             },
             Platform.OS === 'web' ? ({ filter: 'blur(20px)' } as unknown as ViewStyle) : undefined,
           ]}
@@ -367,7 +413,7 @@ export const Aurora: React.FC<AuroraProps> = React.memo(({
           </Svg>
         </Animated.View>
 
-        {/* Layer 4: Dynamic Secondary Aurora Shimmer (counter-motion for depth) */}
+        {/* Layer 3: Dynamic Secondary Aurora Shimmer (counter-motion for depth) */}
         <Animated.View
           style={[
             styles.curtainLayer,
@@ -375,7 +421,7 @@ export const Aurora: React.FC<AuroraProps> = React.memo(({
               width: svgWidth,
               height: svgHeight,
               opacity: clampedOpacity * 0.82,
-              transform: [{ translateX: txDrift2 }, { scaleY: syBreathe2 }],
+              transform: [{ translateX: txDrift2 }],
             },
             Platform.OS === 'web' ? ({ filter: 'blur(28px)' } as unknown as ViewStyle) : undefined,
           ]}
