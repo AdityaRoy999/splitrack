@@ -11,12 +11,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.15",
-      "versionDate": "2026-11-13T08:36:10Z",
-      "versionDescription": "fix: remove prefilled background washes and lime-yellow stops to preserve clean default black upper card",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-15/Splittrack-unsigned.ipa",
-      "size": 12415854,
+      "version": "1.0.16",
+      "versionDate": "2026-11-13T09:13:11Z",
+      "versionDescription": "fix: ground native iOS gradient to eliminate floating box, resolve category twitching, and add search to Paid By",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-16/Splittrack-unsigned.ipa",
+      "size": 12417980,
       "versions": [
+        {
+          "version": "1.0.16",
+          "buildVersion": "16",
+          "date": "2026-11-13T09:13:11Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-16/Splittrack-unsigned.ipa",
+          "size": 12417980,
+          "localizedDescription": "fix: ground native iOS gradient to eliminate floating box, resolve category twitching, and add search to Paid By"
+        },
         {
           "version": "1.0.15",
           "buildVersion": "15",
