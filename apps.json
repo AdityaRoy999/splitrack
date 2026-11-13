@@ -11,12 +11,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.19",
-      "versionDate": "2026-11-13T16:37:13Z",
-      "versionDescription": "feat: add multi-app transaction import (JSON/XLSX), dynamic split margin shifters, smooth menu transitions, erase all data fresh start, and fix iOS gradient box",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-19/Splittrack-unsigned.ipa",
-      "size": 13026291,
+      "version": "1.0.20",
+      "versionDate": "2026-11-13T19:32:44Z",
+      "versionDescription": "feat: green star badge cutout, inset dividers, smooth QR modal & card stack expand, dark erase dialog, Slice CSV bank parser, and build iOS IPA",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-20/Splittrack-unsigned.ipa",
+      "size": 13715345,
       "versions": [
+        {
+          "version": "1.0.20",
+          "buildVersion": "20",
+          "date": "2026-11-13T19:32:44Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-20/Splittrack-unsigned.ipa",
+          "size": 13715345,
+          "localizedDescription": "feat: green star badge cutout, inset dividers, smooth QR modal & card stack expand, dark erase dialog, Slice CSV bank parser, and build iOS IPA"
+        },
         {
           "version": "1.0.19",
           "buildVersion": "19",
