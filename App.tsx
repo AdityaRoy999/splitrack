@@ -55,7 +55,7 @@ import { AddTripModal } from './src/components/trips/AddTripModal';
 import { AddMemberModal } from './src/components/trips/AddMemberModal';
 import { AddCategoryModal } from './src/components/categories/AddCategoryModal';
 import { SettleModal } from './src/components/trips/SettleModal';
-import { SettingsModal } from './src/components/settings/SettingsModal';
+import { SettingsPage } from './src/components/settings/SettingsPage';
 import { CalendarDatePickerModal, formatDisplayDate } from './src/components/common/CalendarDatePickerModal';
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 import { PreloaderSplash } from './src/components/common/PreloaderSplash';
@@ -362,6 +362,7 @@ function MainAppContent({
                 <JellyRadio
                   scrollable
                   fadeColor={rootBg}
+                  blurWidth={2}
                   items={['All', 'Expenses', 'Splits', 'Income']}
                   value={expenseFilter}
                   onChange={(val) => setExpenseFilter(val as ExpenseFilter)}
@@ -376,26 +377,28 @@ function MainAppContent({
               </View>
 
               <AnimatedPressable
-                scaleTo={0.94}
+                scaleTo={0.92}
                 onPress={() => setShowCalendarModal(true)}
                 accessibilityLabel="Open calendar date filter"
                 contentStyle={[
-                  styles.calendarTriggerBtn,
+                  selectedExpenseDate ? styles.calendarTriggerBtn : styles.iconOnlyCircleBtn,
                   { backgroundColor: selectedExpenseDate ? activeBg : chipBg },
                 ]}
               >
                 <CalendarDateIcon
-                  size={15}
+                  size={16}
                   color={selectedExpenseDate ? activeText : textColor}
                 />
-                <Text
-                  style={[
-                    styles.calendarTriggerText,
-                    { color: selectedExpenseDate ? activeText : textColor },
-                  ]}
-                >
-                  {selectedExpenseDate ? formatDisplayDate(selectedExpenseDate) : 'Date'}
-                </Text>
+                {selectedExpenseDate ? (
+                  <Text
+                    style={[
+                      styles.calendarTriggerText,
+                      { color: selectedExpenseDate ? activeText : textColor },
+                    ]}
+                  >
+                    {formatDisplayDate(selectedExpenseDate)}
+                  </Text>
+                ) : null}
               </AnimatedPressable>
             </View>
 
@@ -405,6 +408,7 @@ function MainAppContent({
                 <JellyRadio
                   scrollable
                   fadeColor={rootBg}
+                  blurWidth={2}
                   items={categoryFilterItems}
                   value={selectedCategoryFilter}
                   onChange={(val) => setSelectedCategoryFilter(val)}
@@ -421,7 +425,7 @@ function MainAppContent({
               <View style={styles.catActionsRow}>
                 {selectedCategoryFilter !== 'All' && (
                   <AnimatedPressable
-                    scaleTo={0.94}
+                    scaleTo={0.92}
                     onPress={() => {
                       const match = categories.find(
                         (c) => c.name.toLowerCase() === selectedCategoryFilter.toLowerCase()
@@ -432,23 +436,21 @@ function MainAppContent({
                       }
                     }}
                     accessibilityLabel="Edit category"
-                    contentStyle={[styles.newCategoryBtn, { backgroundColor: chipBg }]}
+                    contentStyle={[styles.iconOnlyCircleBtn, { backgroundColor: chipBg }]}
                   >
-                    <Pen2Icon size={14} color={textColor} />
-                    <Text style={[styles.newCategoryText, { color: textColor }]}>Edit</Text>
+                    <Pen2Icon size={15} color={textColor} />
                   </AnimatedPressable>
                 )}
                 <AnimatedPressable
-                  scaleTo={0.94}
+                  scaleTo={0.92}
                   onPress={() => {
                     setCategoryToEdit(null);
                     setShowAddCategory(true);
                   }}
                   accessibilityLabel="Create custom category"
-                  contentStyle={[styles.newCategoryBtn, { backgroundColor: chipBg }]}
+                  contentStyle={[styles.iconOnlyCircleBtn, { backgroundColor: chipBg }]}
                 >
-                  <AddCircleIcon size={15} color={textColor} />
-                  <Text style={[styles.newCategoryText, { color: textColor }]}>New</Text>
+                  <AddCircleIcon size={17} color={textColor} />
                 </AnimatedPressable>
               </View>
             </View>
@@ -962,10 +964,23 @@ function MainAppContent({
       )}
 
       <View style={styles.mainViewport}>
-        {currentTab === 'home' && renderHomeTab()}
-        {currentTab === 'expenses' && renderExpensesTab()}
-        {currentTab === 'trips' && renderTripsTab()}
-        {currentTab === 'analytics' && renderAnalyticsTab()}
+        {showSettings ? (
+          <FadeInSlide key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
+            <SettingsPage
+              onBack={() => setShowSettings(false)}
+              onSignOut={onSignOut}
+              userName="Jfiqw Alex"
+              userHandle="@alex"
+            />
+          </FadeInSlide>
+        ) : (
+          <>
+            {currentTab === 'home' && renderHomeTab()}
+            {currentTab === 'expenses' && renderExpensesTab()}
+            {currentTab === 'trips' && renderTripsTab()}
+            {currentTab === 'analytics' && renderAnalyticsTab()}
+          </>
+        )}
 
         <GradualBlur
           position="top"
@@ -1004,12 +1019,14 @@ function MainAppContent({
       <GlassDock
         currentTab={currentTab}
         onTabChange={(tab) => {
+          setShowSettings(false);
           setCurrentTab(tab);
           setSelectedTripId(null);
           setHomeView('overview');
           setSelectedMemberId(null);
         }}
         onQuickAdd={() => {
+          setShowSettings(false);
           setExpenseDefaultTripId(undefined);
           setExpenseDefaultFriendIds(undefined);
           setShowAddExpense(true);
@@ -1063,12 +1080,6 @@ function MainAppContent({
           setSelectedFriendForSettle(null);
         }}
         targetFriendId={selectedFriendForSettle?.id}
-      />
-
-      <SettingsModal
-        visible={showSettings}
-        onClose={() => setShowSettings(false)}
-        onSignOut={onSignOut}
       />
 
       <AnalyticsInfoModal
@@ -1316,6 +1327,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  iconOnlyCircleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+    borderWidth: 0,
   },
   newCategoryBtn: {
     flexDirection: 'row',

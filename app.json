@@ -39,6 +39,12 @@
         {
           "photosPermission": "Allow Splittrack to choose a photo for a member profile."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Splittrack to access your location to automatically tag expenses."
+        }
       ]
     ]
   }

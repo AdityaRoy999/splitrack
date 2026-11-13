@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Modal,
   Platform,
   Pressable,
@@ -41,6 +43,32 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
   const textColor = isDark ? '#FFFFFF' : '#000000';
   const mutedText = isDark ? '#71717A' : '#6B7280';
 
+  const [animVal] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    if (visible) {
+      Animated.spring(animVal, {
+        toValue: 1,
+        tension: 68,
+        friction: 9,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      animVal.setValue(0);
+    }
+  }, [visible, animVal]);
+
+  const handleSmoothClose = () => {
+    Animated.timing(animVal, {
+      toValue: 0,
+      duration: 170,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      onClose();
+    });
+  };
+
   const handleCopy = () => {
     triggerNotification(NotificationType.Success);
     if (
@@ -66,8 +94,8 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
   const brandMeta = getUpiBrandMeta(account.provider, account.bankBrand);
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
+    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleSmoothClose}>
+      <Animated.View style={[styles.modalOverlay, { opacity: animVal }]}>
         {Platform.OS === 'web' ? (
           <View
             pointerEvents="none"
@@ -75,15 +103,15 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
               styles.backdropFill,
               {
                 backgroundColor: isDark ? 'rgba(6, 7, 11, 0.56)' : 'rgba(15, 23, 42, 0.34)',
-                backdropFilter: 'blur(18px) saturate(140%)',
-                WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+                backdropFilter: 'blur(20px) saturate(150%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(150%)',
               } as unknown as ViewStyle,
             ]}
           />
         ) : (
           <View pointerEvents="none" style={styles.backdropFill}>
             <BlurView
-              intensity={isDark ? 36 : 32}
+              intensity={isDark ? 42 : 36}
               tint={isDark ? 'dark' : 'light'}
               style={styles.backdropFill}
             />
@@ -98,12 +126,33 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
 
         <Pressable
           accessibilityLabel="Close QR modal backdrop"
-          onPress={onClose}
+          onPress={handleSmoothClose}
           style={styles.backdropFill}
         />
 
-        <View style={[styles.contentCard, { backgroundColor: cardBg }]}>
-          <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: pillBg }]}>
+        <Animated.View
+          style={[
+            styles.contentCard,
+            {
+              backgroundColor: cardBg,
+              transform: [
+                {
+                  scale: animVal.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.88, 1],
+                  }),
+                },
+                {
+                  translateY: animVal.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [24, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <TouchableOpacity onPress={handleSmoothClose} style={[styles.closeBtn, { backgroundColor: pillBg }]}>
             <CloseCircleIcon size={20} color={textColor} />
           </TouchableOpacity>
 
@@ -148,8 +197,8 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
               style={styles.pillAction}
             />
           </View>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 };

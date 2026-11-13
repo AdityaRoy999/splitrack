@@ -1,7 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
-  Animated,
-  Easing,
   LayoutAnimation,
   Platform,
   StyleProp,
@@ -17,10 +15,11 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 /**
- * Triggers a springy, smooth native layout animation for surrounding views.
- * Call this right before updating state that expands or contracts content.
+ * Triggers a silky smooth native layout animation for surrounding views.
+ * Uses easeInEaseOut to prevent bouncy spring twitching on iOS.
  */
-export const triggerSmoothLayout = (duration = 280) => {
+export const triggerSmoothLayout = (duration = 240) => {
+  if (Platform.OS === 'web') return;
   if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
@@ -31,8 +30,7 @@ export const triggerSmoothLayout = (duration = 280) => {
       property: LayoutAnimation.Properties.opacity,
     },
     update: {
-      type: LayoutAnimation.Types.spring,
-      springDamping: 0.84,
+      type: LayoutAnimation.Types.easeInEaseOut,
     },
     delete: {
       type: LayoutAnimation.Types.easeInEaseOut,
@@ -49,17 +47,16 @@ interface SmoothCollapsibleProps {
 }
 
 /**
- * A smooth, hardware-accelerated accordion/collapsible container.
- * Seamlessly interpolates height, opacity, and subtle translation on both Native & Web.
+ * A smooth accordion/collapsible container:
+ * - Web: Hardware-accelerated CSS cubic-bezier maxHeight & opacity transitions.
+ * - iOS/Android: Native UIKit/Android layout animation with easeInEaseOut, zero frame jumping.
  */
 export const SmoothCollapsible: React.FC<SmoothCollapsibleProps> = ({
   expanded,
   children,
   style,
-  duration = 260,
+  duration = 240,
 }) => {
-  const [contentHeight, setContentHeight] = useState<number>(0);
-  const [animProgress] = useState(() => new Animated.Value(expanded ? 1 : 0));
   const isFirstRender = useRef(true);
 
   useEffect(() => {
@@ -67,16 +64,10 @@ export const SmoothCollapsible: React.FC<SmoothCollapsibleProps> = ({
       isFirstRender.current = false;
       return;
     }
-
-    Animated.timing(animProgress, {
-      toValue: expanded ? 1 : 0,
-      duration,
-      easing: expanded
-        ? Easing.out(Easing.cubic)
-        : Easing.in(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [expanded, duration, animProgress]);
+    if (Platform.OS !== 'web') {
+      triggerSmoothLayout(duration);
+    }
+  }, [expanded, duration]);
 
   if (Platform.OS === 'web') {
     return (
@@ -84,9 +75,9 @@ export const SmoothCollapsible: React.FC<SmoothCollapsibleProps> = ({
         style={[
           styles.webContainer,
           {
-            maxHeight: expanded ? 280 : 0,
+            maxHeight: expanded ? 360 : 0,
             opacity: expanded ? 1 : 0,
-            transform: expanded ? 'translateY(0)' : 'translateY(-6px)',
+            transform: expanded ? 'translateY(0)' : 'translateY(-4px)',
             transition:
               'max-height 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
             overflow: 'hidden',
@@ -100,46 +91,14 @@ export const SmoothCollapsible: React.FC<SmoothCollapsibleProps> = ({
     );
   }
 
-  const maxHeight = animProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, Math.max(contentHeight, 280)],
-  });
-
-  const opacity = animProgress.interpolate({
-    inputRange: [0, 0.25, 1],
-    outputRange: [0, 0.45, 1],
-  });
-
-  const translateY = animProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-6, 0],
-  });
+  if (!expanded) {
+    return null;
+  }
 
   return (
-    <Animated.View
-      style={[
-        styles.nativeContainer,
-        {
-          maxHeight,
-          opacity,
-          transform: [{ translateY }],
-          overflow: 'hidden',
-        },
-        style,
-      ]}
-      pointerEvents={expanded ? 'auto' : 'none'}
-    >
-      <View
-        onLayout={(e) => {
-          const h = e.nativeEvent.layout.height;
-          if (h > 0 && Math.abs(h - contentHeight) > 2) {
-            setContentHeight(h);
-          }
-        }}
-      >
-        {children}
-      </View>
-    </Animated.View>
+    <View style={[styles.nativeContainer, style]}>
+      {children}
+    </View>
   );
 };
 
@@ -153,3 +112,5 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 });
+
+export default SmoothCollapsible;

@@ -50,6 +50,7 @@ export interface JellyRadioProps {
   disabled?: boolean;
   scrollable?: boolean;
   fadeColor?: string;
+  blurWidth?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -329,6 +330,7 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   disabled = false,
   scrollable = false,
   fadeColor,
+  blurWidth = 2,
   style,
 }) => {
   const { themeMode } = useLiquidGlass();
@@ -412,8 +414,12 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
         >
           {rowContent}
         </ScrollView>
-        <GradualBlur position="left" width={16} strength={1.1} layers={5} tint={resolvedFade} />
-        <GradualBlur position="right" width={18} strength={1.1} layers={5} tint={resolvedFade} />
+        {blurWidth > 0 && (
+          <>
+            <GradualBlur position="left" width={blurWidth} strength={0.8} layers={3} tint={resolvedFade} />
+            <GradualBlur position="right" width={blurWidth} strength={0.8} layers={3} tint={resolvedFade} />
+          </>
+        )}
       </View>
     );
   }

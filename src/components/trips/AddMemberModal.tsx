@@ -21,7 +21,6 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { Friend } from '../../types';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassPill } from '../glass/GlassPill';
-import { GradualBlur } from '../effects/GradualBlur';
 
 interface AddMemberModalProps {
   visible: boolean;
@@ -298,9 +297,6 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                 />
               </View>
             </ScrollView>
-
-            <GradualBlur position="top" height={18} strength={1.1} layers={5} tint={bgSheet} />
-            <GradualBlur position="bottom" height={22} strength={1.2} layers={6} tint={bgSheet} />
           </View>
 
           <GlassPill

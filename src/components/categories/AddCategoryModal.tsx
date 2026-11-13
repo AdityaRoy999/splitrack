@@ -30,7 +30,6 @@ import {
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { GlassPill } from '../glass/GlassPill';
-import { GradualBlur } from '../effects/GradualBlur';
 
 interface AddCategoryModalProps {
   visible: boolean;
@@ -343,8 +342,6 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
               </View>
             </View>
             </ScrollView>
-            <GradualBlur position="top" height={22} strength={1.3} layers={6} tint={sheetBg} />
-            <GradualBlur position="bottom" height={26} strength={1.4} layers={6} tint={sheetBg} />
           </View>
 
           <GlassPill

@@ -41,28 +41,7 @@ const DockTabButton: React.FC<{
   item: NavItemConfig;
   isActive: boolean;
   isDark: boolean;
-  onPress: () => void;
-}> = ({ item, isActive, isDark, onPress }) => {
-  const [pressScale] = useState(() => new Animated.Value(1));
-
-  const handlePressIn = () => {
-    Animated.spring(pressScale, {
-      toValue: 0.92,
-      stiffness: 520,
-      damping: 24,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(pressScale, {
-      toValue: 1,
-      stiffness: 420,
-      damping: 20,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-  };
-
+}> = ({ item, isActive, isDark }) => {
   const contentColor = item.isAction
     ? isDark
       ? '#FFFFFF'
@@ -76,21 +55,13 @@ const DockTabButton: React.FC<{
         : '#64748B';
 
   return (
-    <TouchableOpacity
-      activeOpacity={1}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
+    <View
       accessibilityRole="tab"
       accessibilityState={{ selected: isActive }}
       style={styles.tabBtn}
+      pointerEvents="none"
     >
-      <Animated.View
-        style={[
-          styles.tabInner,
-          { transform: [{ scale: pressScale }] },
-        ]}
-      >
+      <View style={styles.tabInner}>
         {item.icon(contentColor)}
         <Text
           numberOfLines={1}
@@ -98,14 +69,14 @@ const DockTabButton: React.FC<{
             styles.tabLabel,
             {
               color: contentColor,
-              fontWeight: isActive ? '500' : '400',
+              fontWeight: isActive ? '600' : '400',
             },
           ]}
         >
           {item.label}
         </Text>
-      </Animated.View>
-    </TouchableOpacity>
+      </View>
+    </View>
   );
 };
 
@@ -202,13 +173,25 @@ export const GlassDock: React.FC<GlassDockProps> = ({
     }
   };
 
-  const handlePress = (item: NavItemConfig) => {
-    triggerImpact(ImpactStyle.Light);
-    if (item.isAction) {
-      onQuickAdd();
-    } else {
-      onTabChange(item.key);
+  const handleTouch = (touchX: number) => {
+    if (rowWidth <= 0 || mainNavItems.length === 0) return;
+    const slot = Math.min(
+      Math.max(Math.floor((touchX / rowWidth) * mainNavItems.length), 0),
+      mainNavItems.length - 1
+    );
+    if (slot !== activeIndex) {
+      triggerImpact(ImpactStyle.Light);
+      const item = mainNavItems[slot];
+      if (item) {
+        if (item.isAction) onQuickAdd();
+        else onTabChange(item.key);
+      }
     }
+  };
+
+  const handleSplitAction = () => {
+    triggerImpact(ImpactStyle.Light);
+    onQuickAdd();
   };
 
   const bottomOffset = Math.max(16, insets.bottom - 8);
@@ -232,7 +215,15 @@ export const GlassDock: React.FC<GlassDockProps> = ({
           matteColor={isDark ? '#141418' : '#FFFFFF'}
           style={[styles.navbarCapsule, { width: capsuleWidth }]}
         >
-          <View style={styles.navRow} onLayout={handleRowLayout}>
+          <View
+            style={styles.navRow}
+            onLayout={handleRowLayout}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={(e) => handleTouch(e.nativeEvent.locationX)}
+            onResponderMove={(e) => handleTouch(e.nativeEvent.locationX)}
+            onResponderRelease={(e) => handleTouch(e.nativeEvent.locationX)}
+          >
             {/* Sliding active section pill indicator */}
             <Animated.View
               pointerEvents="none"
@@ -252,7 +243,6 @@ export const GlassDock: React.FC<GlassDockProps> = ({
                 item={item}
                 isActive={currentTab === item.key}
                 isDark={isDark}
-                onPress={() => handlePress(item)}
               />
             ))}
           </View>
@@ -269,7 +259,7 @@ export const GlassDock: React.FC<GlassDockProps> = ({
             style={styles.splitOrb}
           >
             <TouchableOpacity
-              onPress={() => handlePress(splitActionItem)}
+              onPress={handleSplitAction}
               activeOpacity={0.8}
               accessibilityLabel="Add split expense"
               style={styles.splitOrbTouch}

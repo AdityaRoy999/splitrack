@@ -23,7 +23,6 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassPill } from '../glass/GlassPill';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { UpiQrModal } from '../upi/UpiQrModal';
-import { GradualBlur } from '../effects/GradualBlur';
 
 interface SettleModalProps {
   visible: boolean;
@@ -344,8 +343,6 @@ export const SettleModal: React.FC<SettleModalProps> = ({
               </>
             )}
             </ScrollView>
-            <GradualBlur position="top" height={14} strength={1} layers={4} tint={bgSheet} />
-            <GradualBlur position="bottom" height={22} strength={1.2} layers={5} tint={bgSheet} />
           </View>
         </View>
 

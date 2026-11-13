@@ -18,7 +18,6 @@ import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
 import { GlassPill } from '../glass/GlassPill';
-import { GradualBlur } from '../effects/GradualBlur';
 
 interface AddUpiProfileModalProps {
   visible: boolean;
@@ -355,8 +354,6 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
               </View>
             </View>
             </ScrollView>
-            <GradualBlur position="top" height={22} strength={1.3} layers={6} tint={bgSheet} />
-            <GradualBlur position="bottom" height={26} strength={1.4} layers={6} tint={bgSheet} />
           </View>
 
           <GlassPill

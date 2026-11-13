@@ -16,7 +16,6 @@ import { CursorIcon } from '@solar-icons/react-native/bold/cursor';
 import { HandIcon } from '@solar-icons/react-native/bold/hand';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
-import { GradualBlur } from '../effects/GradualBlur';
 
 interface AnalyticsInfoModalProps {
   visible: boolean;
@@ -180,9 +179,6 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
                 </View>
               ))}
             </ScrollView>
-
-            <GradualBlur position="top" height={18} strength={1.1} layers={5} tint={sheetBg} />
-            <GradualBlur position="bottom" height={22} strength={1.2} layers={6} tint={sheetBg} />
           </View>
 
           <AnimatedPressable

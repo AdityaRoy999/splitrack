@@ -77,7 +77,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
         ? 'rgba(255, 255, 255, 0.36)'
         : 'rgba(255, 255, 255, 0.68)');
 
-  const resolvedIntensity = intensity ?? (glassStyle === 'clear' ? 32 : isDark ? 55 : 72);
+  const resolvedIntensity = intensity ?? (glassStyle === 'clear' ? 38 : isDark ? 68 : 80);
 
   return (
     <View
@@ -94,8 +94,8 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
         },
         Platform.OS === 'web'
           ? ({
-              backdropFilter: `blur(${glassStyle === 'clear' ? 14 : 22}px) saturate(175%)`,
-              WebkitBackdropFilter: `blur(${glassStyle === 'clear' ? 14 : 22}px) saturate(175%)`,
+              backdropFilter: `blur(${glassStyle === 'clear' ? 16 : 28}px) saturate(175%)`,
+              WebkitBackdropFilter: `blur(${glassStyle === 'clear' ? 16 : 28}px) saturate(175%)`,
             } as unknown as ViewStyle)
           : undefined,
         style,

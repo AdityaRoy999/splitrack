@@ -23,7 +23,6 @@ import { GlassPill } from '../glass/GlassPill';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
-import { GradualBlur } from '../effects/GradualBlur';
 import { AddCategoryModal } from '../categories/AddCategoryModal';
 
 interface AddTripModalProps {
@@ -342,8 +341,6 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
                   );
                 })}
                   </ScrollView>
-                  <GradualBlur position="left" width={16} strength={1.1} layers={5} tint={bgSheet} />
-                  <GradualBlur position="right" width={18} strength={1.1} layers={5} tint={bgSheet} />
                 </View>
               </View>
 
@@ -390,9 +387,6 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
                 </View>
               </View>
             </ScrollView>
-
-            <GradualBlur position="top" height={24} strength={1.3} layers={6} tint={bgSheet} />
-            <GradualBlur position="bottom" height={28} strength={1.4} layers={6} tint={bgSheet} />
           </View>
 
           <GlassPill

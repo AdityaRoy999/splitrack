@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Easing,
   Modal,
@@ -11,6 +12,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as Location from 'expo-location';
+import { LocateFixed } from 'lucide-react-native';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
@@ -34,7 +37,6 @@ import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
 import { SmoothCollapsible, triggerSmoothLayout } from '../common/SmoothCollapsible';
 import { AddCategoryModal } from '../categories/AddCategoryModal';
-import { GradualBlur } from '../effects/GradualBlur';
 import {
   CalendarDatePickerModal,
   formatDisplayDate,
@@ -77,6 +79,98 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [showPaidBySearch, setShowPaidBySearch] = useState(false);
   const [paidBySearchQuery, setPaidBySearchQuery] = useState('');
   const [paidBySearchExpandAnim] = useState(() => new Animated.Value(0));
+  const [isLocating, setIsLocating] = useState(false);
+
+  const handleAutoLocate = async () => {
+    try {
+      setIsLocating(true);
+      triggerImpact(ImpactStyle.Light);
+
+      // Web fallback
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            try {
+              const res = await Location.reverseGeocodeAsync({ latitude, longitude });
+              if (res && res.length > 0) {
+                const item = res[0];
+                const parts = [item.name, item.street, item.subregion || item.district, item.city || item.region].filter(Boolean);
+                const placeName = parts.slice(0, 2).join(', ') || item.city || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+                setLocation(placeName);
+                triggerNotification(NotificationType.Success);
+              } else {
+                setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+              }
+            } catch {
+              try {
+                const r = await fetch(
+                  `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+                );
+                const data = await r.json();
+                const name =
+                  data.address?.amenity ||
+                  data.address?.road ||
+                  data.address?.neighbourhood ||
+                  data.address?.suburb ||
+                  data.address?.city ||
+                  data.display_name?.split(',')[0];
+                const city = data.address?.city || data.address?.town || data.address?.state;
+                setLocation(
+                  name
+                    ? city && !name.toLowerCase().includes(city.toLowerCase())
+                      ? `${name}, ${city}`
+                      : name
+                    : `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+                );
+                triggerNotification(NotificationType.Success);
+              } catch {
+                setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+              }
+            } finally {
+              setIsLocating(false);
+            }
+          },
+          () => {
+            setIsLocating(false);
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+        return;
+      }
+
+      // Native iOS & Android via expo-location
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setIsLocating(false);
+        return;
+      }
+
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const { latitude, longitude } = pos.coords;
+      const places = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (places && places.length > 0) {
+        const p = places[0];
+        const primary = p.name || p.street || p.subregion;
+        const city = p.city || p.region;
+        const formatted = primary
+          ? city && !primary.toLowerCase().includes(city.toLowerCase())
+            ? `${primary}, ${city}`
+            : primary
+          : (city || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        setLocation(formatted);
+        triggerNotification(NotificationType.Success);
+      } else {
+        setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      }
+    } catch (err) {
+      console.warn('Auto locate error:', err);
+    } finally {
+      setIsLocating(false);
+    }
+  };
 
   const toggleFriendSearch = () => {
     triggerSmoothLayout(240);
@@ -888,10 +982,28 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                     scaleTo={0.9}
                     onPress={() => setLocation('')}
                     contentStyle={styles.clearLocationBtn}
+                    accessibilityLabel="Clear location"
                   >
                     <CloseCircleIcon size={14} color={mutedText} />
                   </AnimatedPressable>
                 )}
+                <AnimatedPressable
+                  scaleTo={0.88}
+                  onPress={handleAutoLocate}
+                  disabled={isLocating}
+                  contentStyle={styles.locateBtn}
+                  accessibilityLabel="Auto-detect current location"
+                >
+                  {isLocating ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={isDark ? '#60A5FA' : '#2563EB'}
+                      style={{ transform: [{ scale: 0.75 }] }}
+                    />
+                  ) : (
+                    <LocateFixed size={16} color={isDark ? '#60A5FA' : '#2563EB'} />
+                  )}
+                </AnimatedPressable>
               </View>
               {locationSuggestions.length > 0 && (
                 <ScrollView
@@ -1264,8 +1376,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               </View>
             </View>
             </ScrollView>
-            <GradualBlur position="top" height={24} strength={1.3} layers={6} tint={bgSheet} />
-            <GradualBlur position="bottom" height={28} strength={1.4} layers={6} tint={bgSheet} />
           </View>
 
           <GlassPill
@@ -1546,6 +1656,12 @@ const styles = StyleSheet.create({
   },
   clearLocationBtn: {
     padding: 2,
+  },
+  locateBtn: {
+    padding: 4,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   locationChipsScroll: {
     marginTop: 8,

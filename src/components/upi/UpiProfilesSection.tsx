@@ -126,19 +126,19 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
     Animated.parallel([
       Animated.spring(topAnim, {
         toValue: targetTop,
-        tension: 60,
-        friction: 9,
+        tension: 48,
+        friction: 10,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
       Animated.spring(scaleAnim, {
         toValue: targetScale,
-        tension: 60,
-        friction: 9,
+        tension: 48,
+        friction: 10,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
       Animated.timing(footerOpacityAnim, {
         toValue: targetFooterOpacity,
-        duration: 180,
+        duration: 200,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
@@ -162,6 +162,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
       <GlassSurface
         borderRadius={24}
         glassStyle="regular"
+        intensity={isDark ? 82 : 92}
         matteColor={cardBaseBg}
         style={styles.upiCardGradient}
       >
@@ -379,8 +380,8 @@ export const UpiProfilesSection: React.FC = () => {
   useEffect(() => {
     Animated.spring(deckHeightAnim, {
       toValue: targetDeckHeight,
-      tension: 62,
-      friction: 9,
+      tension: 48,
+      friction: 10,
       useNativeDriver: false,
     }).start();
   }, [targetDeckHeight, deckHeightAnim]);
