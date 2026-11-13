@@ -129,16 +129,6 @@ vec3 toSrgb(vec3 c) {
   return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
 }
 
-vec3 ramp(float t, int stopCount, Float32Array stops, float lightMode) {
-  float x = clamp(t, 0.0, 1.0) * float(stopCount - 1);
-  int i = int(min(floor(x), float(stopCount - 2)));
-  float f = x - float(i);
-  f = f * f * (3.0 - 2.0 * f);
-  vec3 lch = mix(stops[i], stops[i + 1], f);
-  lch.x = mix(lch.x, min(lch.x, 0.7), lightMode);
-  return toSrgb(oklabToLinear(vec3(lch.x, lch.y * cos(lch.z), lch.y * sin(lch.z))));
-}
-
 float hash(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
   p += dot(p, p + 45.32);
@@ -241,6 +231,8 @@ const compile = (gl: WebGL2RenderingContext, type: number, source: string) => {
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
   if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return shader;
+  const log = gl.getShaderInfoLog(shader);
+  console.warn('Aurora WebGL compile error:', log);
   gl.deleteShader(shader);
   return null;
 };
@@ -257,6 +249,8 @@ const link = (gl: WebGL2RenderingContext): Program | null => {
   gl.deleteShader(vertex);
   gl.deleteShader(fragment);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    const log = gl.getProgramInfoLog(program);
+    console.warn('Aurora WebGL link error:', log);
     gl.deleteProgram(program);
     return null;
   }
@@ -267,6 +261,21 @@ const link = (gl: WebGL2RenderingContext): Program | null => {
     if (info) uniforms[info.name.replace('[0]', '')] = gl.getUniformLocation(program, info.name);
   }
   return { program, uniforms };
+};
+
+const hexWithAlpha = (hex: string, alpha: number): string => {
+  const clean = hex.replace('#', '');
+  const full =
+    clean.length === 3
+      ? clean
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : clean.padEnd(6, '0').slice(0, 6);
+  const r = parseInt(full.slice(0, 2), 16) || 0;
+  const g = parseInt(full.slice(2, 4), 16) || 0;
+  const b = parseInt(full.slice(4, 6), 16) || 0;
+  return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1).toFixed(3)})`;
 };
 
 export const Aurora = ({
@@ -539,6 +548,19 @@ export const Aurora = ({
     wakeRef.current?.();
   });
 
+  const isBottom = direction === 'bottom';
+  const c0 = stops[0] || '#5227FF';
+  const c1 = stops[1] || '#00E5FF';
+  const c2 = stops[2] || '#7CFF67';
+  const c3 = stops[3] || c0;
+
+  const aBase = lightMode ? 0.38 : 0.52 * brightness;
+  const backingGradient = isBottom
+    ? `linear-gradient(to bottom, transparent 0%, ${hexWithAlpha(c1, aBase * 0.35)} 35%, ${hexWithAlpha(c2, aBase * 0.65)} 70%, ${hexWithAlpha(c3, aBase * 0.85)} 100%)`
+    : `linear-gradient(to bottom, ${hexWithAlpha(c0, aBase * 0.85)} 0%, ${hexWithAlpha(c1, aBase * 0.65)} 30%, ${hexWithAlpha(c2, aBase * 0.35)} 65%, transparent 100%)`;
+
+  const baselineStrip = `linear-gradient(to right, ${hexWithAlpha(c0, aBase * 0.75)}, ${hexWithAlpha(c1, aBase)}, ${hexWithAlpha(c2, aBase * 0.95)}, ${hexWithAlpha(c3, aBase * 0.75)})`;
+
   const flattenedStyle = StyleSheet.flatten(style as any) as any;
   const containerStyle: React.CSSProperties = {
     position: 'absolute',
@@ -559,6 +581,33 @@ export const Aurora = ({
       className={['relative h-full w-full overflow-hidden', className].filter(Boolean).join(' ')}
       style={containerStyle}
     >
+      {/* Permanent atmospheric horizon wash backing */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: backingGradient,
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Permanent full-width grounding baseline strip */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          ...(isBottom ? { bottom: 0 } : { top: 0 }),
+          height: '45%',
+          background: baselineStrip,
+          pointerEvents: 'none',
+          opacity: 0.85,
+        }}
+      />
+
       <canvas
         ref={canvasRef}
         style={{
