@@ -124,7 +124,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      animationType="fade"
       onRequestClose={onClose}
     >
       <View

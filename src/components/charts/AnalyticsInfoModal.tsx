@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -100,7 +99,7 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      animationType="fade"
       onRequestClose={onClose}
     >
       <View

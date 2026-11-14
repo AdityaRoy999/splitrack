@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CopyIcon } from '@solar-icons/react-native/bold/copy';
 import { QrCodeIcon } from '@solar-icons/react-native/bold/qr-code';
+import { Pen2Icon } from '@solar-icons/react-native/bold/pen-2';
+import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { UpiAccount } from '../../types';
@@ -90,6 +92,8 @@ interface ProfileDeckCardProps {
   onMakeDefault: (acc: UpiAccount) => void;
   onCopy: (acc: UpiAccount) => void;
   onOpenQr: (acc: UpiAccount) => void;
+  onEdit: (acc: UpiAccount) => void;
+  onDelete: (acc: UpiAccount) => void;
 }
 
 const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
@@ -113,6 +117,8 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
   onMakeDefault,
   onCopy,
   onOpenQr,
+  onEdit,
+  onDelete,
 }) => {
   const targetTop = isExpanded ? rank * (CARD_HEIGHT + EXPAND_GAP) : rank * STACK_PEEK;
   const targetScale = isExpanded ? 1 : Math.max(0.82, 1 - rank * 0.035);
@@ -220,11 +226,11 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
             )}
           </View>
 
-          {!isDefault && (
-            <Animated.View
-              style={{ opacity: footerOpacityAnim }}
-              pointerEvents={!isExpanded && rank > 0 ? 'none' : 'auto'}
-            >
+          <Animated.View
+            style={[styles.topActionsRow, { opacity: footerOpacityAnim }]}
+            pointerEvents={!isExpanded && rank > 0 ? 'none' : 'auto'}
+          >
+            {!isDefault && (
               <AnimatedPressable
                 scaleTo={0.93}
                 onPress={() => onMakeDefault(acc)}
@@ -235,8 +241,30 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
                   Make Default
                 </Text>
               </AnimatedPressable>
-            </Animated.View>
-          )}
+            )}
+
+            {isExpanded && (
+              <View style={styles.cardEditDeleteRow}>
+                <AnimatedPressable
+                  scaleTo={0.9}
+                  onPress={() => onEdit(acc)}
+                  accessibilityLabel={`Edit ${acc.title}`}
+                  contentStyle={[styles.cardActionIconBtn, { backgroundColor: actionGlassBg }]}
+                >
+                  <Pen2Icon size={13} color={textColor} />
+                </AnimatedPressable>
+
+                <AnimatedPressable
+                  scaleTo={0.9}
+                  onPress={() => onDelete(acc)}
+                  accessibilityLabel={`Delete ${acc.title}`}
+                  contentStyle={[styles.cardActionIconBtn, { backgroundColor: actionGlassBg }]}
+                >
+                  <TrashBinTrashIcon size={13} color="#EF4444" />
+                </AnimatedPressable>
+              </View>
+            )}
+          </Animated.View>
         </View>
 
         {/* Middle Row for Real Debit / Credit Bank Cards */}
@@ -347,12 +375,14 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
 };
 
 export const UpiProfilesSection: React.FC = () => {
-  const { accounts, selectedAccountId, setSelectedAccountId, transactions } = useSplitTrack();
+  const { accounts, selectedAccountId, setSelectedAccountId, transactions, deleteUpiAccount } = useSplitTrack();
   const { formatAmount, themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [showAddProfile, setShowAddProfile] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<UpiAccount | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<UpiAccount | null>(null);
   const [qrAccount, setQrAccount] = useState<UpiAccount | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -483,6 +513,13 @@ export const UpiProfilesSection: React.FC = () => {
               onMakeDefault={handleMakeDefault}
               onCopy={handleCopy}
               onOpenQr={setQrAccount}
+              onEdit={(targetAcc) => {
+                setEditingAccount(targetAcc);
+                setShowAddProfile(true);
+              }}
+              onDelete={(targetAcc) => {
+                setAccountToDelete(targetAcc);
+              }}
             />
           );
         })}
@@ -490,8 +527,60 @@ export const UpiProfilesSection: React.FC = () => {
 
       <AddUpiProfileModal
         visible={showAddProfile}
-        onClose={() => setShowAddProfile(false)}
+        editingAccount={editingAccount}
+        onClose={() => {
+          setShowAddProfile(false);
+          setEditingAccount(null);
+        }}
       />
+
+      {/* Delete Account Confirmation Dialog */}
+      {accountToDelete && (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setAccountToDelete(null)}
+        >
+          <View style={styles.deleteModalOverlay}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setAccountToDelete(null)}
+              accessibilityLabel="Dismiss confirmation"
+            />
+            <View style={[styles.deleteDialogCard, { backgroundColor: isDark ? '#141418' : '#FFFFFF' }]}>
+              <Text style={[styles.deleteDialogTitle, { color: textColor }]}>
+                Remove Card &amp; Profile
+              </Text>
+              <Text style={[styles.deleteDialogBody, { color: mutedText }]}>
+                Are you sure you want to remove &quot;{accountToDelete.title}&quot;? Past recorded transactions will not be deleted.
+              </Text>
+              <View style={styles.deleteDialogActions}>
+                <TouchableOpacity
+                  onPress={() => setAccountToDelete(null)}
+                  style={[styles.deleteCancelBtn, { backgroundColor: pillSurface }]}
+                >
+                  <Text style={[styles.deleteCancelText, { color: textColor }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    const deleted = deleteUpiAccount(accountToDelete.id);
+                    if (deleted) {
+                      triggerNotification(NotificationType.Success);
+                    } else {
+                      triggerNotification(NotificationType.Warning);
+                    }
+                    setAccountToDelete(null);
+                  }}
+                  style={styles.deleteConfirmBtn}
+                >
+                  <Text style={styles.deleteConfirmText}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {qrAccount && (
         <UpiQrModal
@@ -682,6 +771,75 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     letterSpacing: 0.5,
+  },
+  topActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardEditDeleteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardActionIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
+  },
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  deleteDialogCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 24,
+    padding: 20,
+    gap: 12,
+    borderWidth: 0,
+  },
+  deleteDialogTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  deleteDialogBody: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  deleteDialogActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+  },
+  deleteCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
+  },
+  deleteCancelText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  deleteConfirmBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: '#EF4444',
+  },
+  deleteConfirmText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 

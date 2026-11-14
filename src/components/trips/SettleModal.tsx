@@ -235,7 +235,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      animationType="fade"
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>

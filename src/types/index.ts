@@ -11,9 +11,22 @@ export type ThemeMode = 'dark' | 'light';
 
 export type UpiProvider = 'slice' | 'gpay' | 'phonepe' | 'paytm' | 'bank' | 'cred';
 
-export type PaymentProfileKind = 'upi' | 'debit' | 'credit';
+export type PaymentProfileKind =
+  | 'upi'
+  | 'debit'
+  | 'credit'
+  | 'wallet'
+  | 'forex'
+  | 'netbanking';
 
-export type BankBrand = 'hdfc' | 'icici' | 'sbi' | 'axis' | 'kotak' | 'amex';
+export type BankBrand =
+  | 'hdfc'
+  | 'icici'
+  | 'sbi'
+  | 'axis'
+  | 'kotak'
+  | 'amex'
+  | string;
 
 export interface UpiAccount {
   id: string;

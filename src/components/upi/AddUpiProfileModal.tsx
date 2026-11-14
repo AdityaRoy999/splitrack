@@ -7,59 +7,91 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
+import { MagnifierIcon } from '@solar-icons/react-native/bold/magnifier';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
-import { BankBrand, PaymentProfileKind, UpiProvider } from '../../types';
+import { BankBrand, PaymentProfileKind, UpiAccount, UpiProvider } from '../../types';
 import { NotificationType, triggerNotification } from '../../utils/haptics';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
 import { GlassPill } from '../glass/GlassPill';
+import { BankIssuerPickerModal } from './BankIssuerPickerModal';
+import { UpiAppPickerModal } from './UpiAppPickerModal';
+import { BankItem, BANKS_CATALOG } from '../../constants/banksCatalog';
+import { UpiAppItem, UPI_APPS_CATALOG } from '../../constants/upiAppsCatalog';
 
 interface AddUpiProfileModalProps {
   visible: boolean;
   onClose: () => void;
+  editingAccount?: UpiAccount | null;
 }
 
-const PROVIDER_OPTIONS: { value: UpiProvider; label: string; accent: string; secondary: string }[] = [
-  { value: 'gpay', label: 'Google Pay', accent: '#1A428A', secondary: '#0E2248' },
-  { value: 'phonepe', label: 'PhonePe', accent: '#4D88FF', secondary: '#1E50BA' },
-  { value: 'slice', label: 'Slice', accent: '#12141A', secondary: '#2A2E3D' },
-  { value: 'paytm', label: 'Paytm', accent: '#0EA5E9', secondary: '#0369A1' },
-  { value: 'bank', label: 'Bank UPI', accent: '#10B981', secondary: '#047857' },
-];
-
-const BANK_OPTIONS: { value: BankBrand; label: string; bankName: string; accent: string; secondary: string }[] = [
-  { value: 'hdfc', label: 'HDFC Bank', bankName: 'HDFC Bank', accent: '#1D4ED8', secondary: '#C81E32' },
-  { value: 'icici', label: 'ICICI Bank', bankName: 'ICICI Bank', accent: '#EA580C', secondary: '#9A3412' },
-  { value: 'sbi', label: 'SBI', bankName: 'State Bank', accent: '#0284C7', secondary: '#1E3A8A' },
-  { value: 'axis', label: 'Axis Bank', bankName: 'Axis Bank', accent: '#9D174D', secondary: '#701A75' },
-  { value: 'kotak', label: 'Kotak', bankName: 'Kotak Bank', accent: '#DC2626', secondary: '#1E293B' },
-  { value: 'amex', label: 'Amex', bankName: 'American Express', accent: '#334155', secondary: '#0284C7' },
+const QUICK_PROVIDERS: { value: UpiProvider; label: string }[] = [
+  { value: 'gpay', label: 'Google Pay' },
+  { value: 'phonepe', label: 'PhonePe' },
+  { value: 'paytm', label: 'Paytm' },
+  { value: 'slice', label: 'Slice' },
+  { value: 'cred', label: 'CRED' },
+  { value: 'bank', label: 'Bank UPI' },
 ];
 
 const CARD_NETWORKS: ('VISA' | 'Mastercard' | 'RuPay')[] = ['VISA', 'Mastercard', 'RuPay'];
 
-export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
-  visible,
-  onClose,
-}) => {
-  const { addUpiAccount, setSelectedAccountId } = useSplitTrack();
+interface FormContentProps {
+  editingAccount?: UpiAccount | null;
+  onClose: () => void;
+}
+
+const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClose }) => {
+  const { addUpiAccount, updateUpiAccount, setSelectedAccountId } = useSplitTrack();
   const { themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
-  const [kind, setKind] = useState<PaymentProfileKind>('upi');
-  const [label, setLabel] = useState('');
-  const [upiId, setUpiId] = useState('');
-  const [provider, setProvider] = useState<UpiProvider>('gpay');
-  const [bankBrand, setBankBrand] = useState<BankBrand>('hdfc');
-  const [last4, setLast4] = useState('');
-  const [expiry, setExpiry] = useState('08/30');
-  const [cardType, setCardType] = useState<'VISA' | 'Mastercard' | 'RuPay'>('VISA');
-  const [makeActive, setMakeActive] = useState(true);
+  const [kind, setKind] = useState<PaymentProfileKind>(
+    () => (editingAccount?.kind as PaymentProfileKind) || 'upi'
+  );
+  const [label, setLabel] = useState(() => editingAccount?.title || '');
+  const [upiId, setUpiId] = useState(() => editingAccount?.upiId || '');
+  const [provider, setProvider] = useState<UpiProvider>(
+    () => (editingAccount?.provider as UpiProvider) || 'gpay'
+  );
+  const [selectedUpiApp, setSelectedUpiApp] = useState<UpiAppItem>(() => {
+    if (editingAccount?.provider) {
+      const match = UPI_APPS_CATALOG.find((a) => a.id === editingAccount.provider);
+      if (match) return match;
+    }
+    return UPI_APPS_CATALOG[0];
+  });
+  const [bankBrand, setBankBrand] = useState<BankBrand>(
+    () => (editingAccount?.bankBrand as BankBrand) || 'hdfc'
+  );
+  const [selectedBank, setSelectedBank] = useState<BankItem>(() => {
+    if (editingAccount?.bankBrand) {
+      const match = BANKS_CATALOG.find((b) => b.id === editingAccount.bankBrand);
+      if (match) return match;
+    }
+    return BANKS_CATALOG[1];
+  });
+  const [last4, setLast4] = useState(() =>
+    (editingAccount?.cardNumber || '').replace(/\D/g, '').slice(-4)
+  );
+  const [expiry, setExpiry] = useState(() => editingAccount?.expiry || '08/30');
+  const [cardType, setCardType] = useState<'VISA' | 'Mastercard' | 'RuPay'>(
+    () => (editingAccount?.cardType as any) || 'VISA'
+  );
+  const [makeActive, setMakeActive] = useState(() =>
+    editingAccount ? Boolean(editingAccount.isDefault) : true
+  );
+
+  const [showBankPicker, setShowBankPicker] = useState(false);
+  const [showAppPicker, setShowAppPicker] = useState(false);
+
+  const isEditing = Boolean(editingAccount);
 
   const bgSheet = isDark ? '#09090B' : '#F4F4F8';
   const cardBg = isDark ? '#121216' : '#FFFFFF';
@@ -70,77 +102,123 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
 
-  const resetForm = () => {
-    setKind('upi');
-    setLabel('');
-    setUpiId('');
-    setProvider('gpay');
-    setBankBrand('hdfc');
-    setLast4('');
-    setExpiry('08/30');
-    setCardType('VISA');
-    setMakeActive(true);
+  const handleSelectBank = (bank: BankItem) => {
+    setSelectedBank(bank);
+    setBankBrand(bank.id);
+  };
+
+  const handleSelectUpiApp = (app: UpiAppItem) => {
+    setSelectedUpiApp(app);
+    setProvider((app.id as UpiProvider) || 'bank');
+    if (!upiId || upiId.includes('@')) {
+      const prefix = upiId.includes('@') ? upiId.split('@')[0] : 'alex';
+      setUpiId(`${prefix}${app.defaultHandle}`);
+    }
   };
 
   const handleSave = () => {
     if (kind === 'upi') {
       const cleanUpi = upiId.trim();
-      if (!cleanUpi || !cleanUpi.includes('@')) return;
+      if (!cleanUpi || !cleanUpi.includes('@')) {
+        triggerNotification(NotificationType.Error);
+        return;
+      }
 
-      const providerMeta =
-        PROVIDER_OPTIONS.find((p) => p.value === provider) || PROVIDER_OPTIONS[0];
-      const cleanLabel = label.trim() || `${providerMeta.label} Splits`;
+      const cleanLabel = label.trim() || `${selectedUpiApp.name} Splits`;
 
-      const created = addUpiAccount({
-        title: cleanLabel,
-        kind: 'upi',
-        provider,
-        upiId: cleanUpi,
-        cardHolder: 'Alex',
-        cardNumber: '',
-        expiry: '',
-        cardType: 'RuPay',
-        accentColor: providerMeta.accent,
-        secondaryColor: providerMeta.secondary,
-        balance: 0,
-        isDefault: makeActive,
-      });
+      if (isEditing && editingAccount) {
+        updateUpiAccount(editingAccount.id, {
+          title: cleanLabel,
+          kind: 'upi',
+          provider: (provider as UpiProvider) || 'bank',
+          upiId: cleanUpi,
+          accentColor: selectedUpiApp.accentColor,
+          secondaryColor: selectedUpiApp.secondaryColor,
+          isDefault: makeActive,
+        });
+        if (makeActive) {
+          setSelectedAccountId(editingAccount.id);
+        }
+      } else {
+        const created = addUpiAccount({
+          title: cleanLabel,
+          kind: 'upi',
+          provider: (provider as UpiProvider) || 'bank',
+          upiId: cleanUpi,
+          cardHolder: 'Alex',
+          cardNumber: '',
+          expiry: '',
+          cardType: 'RuPay',
+          accentColor: selectedUpiApp.accentColor,
+          secondaryColor: selectedUpiApp.secondaryColor,
+          balance: 0,
+          isDefault: makeActive,
+        });
 
-      if (makeActive && created?.id) {
-        setSelectedAccountId(created.id);
+        if (makeActive && created?.id) {
+          setSelectedAccountId(created.id);
+        }
       }
     } else {
       const cleanLast4 = last4.replace(/\D/g, '').slice(-4);
-      if (cleanLast4.length < 4) return;
+      if (cleanLast4.length < 4 && kind !== 'netbanking' && kind !== 'wallet') {
+        triggerNotification(NotificationType.Error);
+        return;
+      }
 
-      const bankMeta = BANK_OPTIONS.find((b) => b.value === bankBrand) || BANK_OPTIONS[0];
-      const kindSuffix = kind === 'credit' ? 'Credit' : 'Debit';
-      const cleanLabel = label.trim() || `${bankMeta.label} ${kindSuffix}`;
+      const kindSuffix =
+        kind === 'credit'
+          ? 'Credit'
+          : kind === 'debit'
+          ? 'Debit'
+          : kind === 'wallet'
+          ? 'Wallet'
+          : kind === 'forex'
+          ? 'Forex'
+          : 'NetBanking';
+      const cleanLabel = label.trim() || `${selectedBank.shortName} ${kindSuffix}`;
 
-      const created = addUpiAccount({
-        title: cleanLabel,
-        kind,
-        bankName: bankMeta.bankName,
-        bankBrand,
-        provider: 'bank',
-        upiId: '',
-        cardHolder: 'Alex',
-        cardNumber: `•••• •••• •••• ${cleanLast4}`,
-        expiry: expiry.trim() || '08/30',
-        cardType,
-        accentColor: bankMeta.accent,
-        secondaryColor: bankMeta.secondary,
-        balance: 0,
-        isDefault: makeActive,
-      });
+      if (isEditing && editingAccount) {
+        updateUpiAccount(editingAccount.id, {
+          title: cleanLabel,
+          kind,
+          bankName: selectedBank.name,
+          bankBrand,
+          cardNumber: cleanLast4 ? `•••• •••• •••• ${cleanLast4}` : editingAccount.cardNumber,
+          expiry: expiry.trim() || '08/30',
+          cardType,
+          accentColor: selectedBank.accentColor,
+          secondaryColor: selectedBank.secondaryColor,
+          isDefault: makeActive,
+        });
+        if (makeActive) {
+          setSelectedAccountId(editingAccount.id);
+        }
+      } else {
+        const created = addUpiAccount({
+          title: cleanLabel,
+          kind,
+          bankName: selectedBank.name,
+          bankBrand,
+          provider: 'bank',
+          upiId: '',
+          cardHolder: 'Alex',
+          cardNumber: cleanLast4 ? `•••• •••• •••• ${cleanLast4}` : '•••• •••• •••• 1001',
+          expiry: expiry.trim() || '08/30',
+          cardType,
+          accentColor: selectedBank.accentColor,
+          secondaryColor: selectedBank.secondaryColor,
+          balance: 0,
+          isDefault: makeActive,
+        });
 
-      if (makeActive && created?.id) {
-        setSelectedAccountId(created.id);
+        if (makeActive && created?.id) {
+          setSelectedAccountId(created.id);
+        }
       }
     }
 
     triggerNotification(NotificationType.Success);
-    resetForm();
     onClose();
   };
 
@@ -156,54 +234,50 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
       : undefined;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityLabel="Dismiss modal backdrop"
-        />
-        <View
-          style={[
-            styles.sheetContainer,
-            { backgroundColor: bgSheet },
-          ]}
-        >
-          <View style={styles.dragHandleWrap}>
-            <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
-          </View>
+    <>
+      <View style={[styles.sheetContainer, { backgroundColor: bgSheet }]}>
+        <View style={styles.dragHandleWrap}>
+          <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
+        </View>
 
-          <View style={styles.headerRow}>
-            <View>
-              <Text style={[styles.title, { color: textColor }]}>New UPI or Card Profile</Text>
-              <Text style={[styles.subtitle, { color: mutedText }]}>
-                Add a UPI handle, debit card, or credit card
-              </Text>
-            </View>
-            <AnimatedPressable
-              onPress={onClose}
-              scaleTo={0.9}
-              accessibilityLabel="Close new profile modal"
-              contentStyle={[styles.closeBtn, { backgroundColor: cardBg }]}
-            >
-              <CloseCircleIcon size={20} color={textColor} />
-            </AnimatedPressable>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={[styles.title, { color: textColor }]}>
+              {isEditing ? 'Edit Profile & Account' : 'New UPI or Card Profile'}
+            </Text>
+            <Text style={[styles.subtitleText, { color: mutedText }]}>
+              {isEditing
+                ? 'Update your account credentials & details'
+                : 'Add a UPI handle, card, wallet, or netbanking profile'}
+            </Text>
           </View>
+          <AnimatedPressable
+            onPress={onClose}
+            scaleTo={0.9}
+            accessibilityLabel="Close profile modal"
+            contentStyle={[styles.closeBtn, { backgroundColor: cardBg }]}
+          >
+            <CloseCircleIcon size={20} color={textColor} />
+          </AnimatedPressable>
+        </View>
 
-          <View style={styles.scrollAreaWrap}>
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.scrollAreaWrap}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
               <Text style={[styles.fieldLabel, { color: mutedText }]}>PROFILE TYPE</Text>
               <JellyRadio
+                scrollable
+                blurWidth={0}
                 items={[
                   { value: 'upi', label: 'UPI ID' },
                   { value: 'debit', label: 'Debit Card' },
                   { value: 'credit', label: 'Credit Card' },
+                  { value: 'wallet', label: 'Prepaid Wallet' },
+                  { value: 'forex', label: 'Forex Card' },
+                  { value: 'netbanking', label: 'Net Banking' },
                 ]}
                 value={kind}
                 onChange={(val) => setKind(val as PaymentProfileKind)}
@@ -217,10 +291,14 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
               />
 
               <Text style={[styles.fieldLabel, { color: mutedText, marginTop: 14 }]}>
-                {kind === 'upi' ? 'PROFILE LABEL' : 'CARD NAME / VARIANT'}
+                {kind === 'upi' ? 'PROFILE LABEL' : 'CARD / ACCOUNT LABEL'}
               </Text>
               <TextInput
-                style={[styles.textInput, { backgroundColor: inputBg, color: textColor }, webOutlineNone]}
+                style={[
+                  styles.textInput,
+                  { backgroundColor: inputBg, color: textColor },
+                  webOutlineNone,
+                ]}
                 placeholder={kind === 'upi' ? 'e.g. Roommates Split UPI' : 'e.g. Regalia Gold'}
                 placeholderTextColor={mutedText}
                 value={label}
@@ -233,8 +311,12 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
                     UPI ID HANDLE
                   </Text>
                   <TextInput
-                    style={[styles.textInput, { backgroundColor: inputBg, color: textColor }, webOutlineNone]}
-                    placeholder="e.g. alex@okicici"
+                    style={[
+                      styles.textInput,
+                      { backgroundColor: inputBg, color: textColor },
+                      webOutlineNone,
+                    ]}
+                    placeholder="e.g. alex@slice or 9137657510@okaxis"
                     placeholderTextColor={mutedText}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -242,41 +324,81 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
                     onChangeText={setUpiId}
                   />
 
-                  <Text style={[styles.fieldLabel, { color: mutedText, marginTop: 14 }]}>
-                    UPI APP / PROVIDER
-                  </Text>
-                  <JellyRadio
-                    scrollable
-                    items={PROVIDER_OPTIONS.map((p) => ({ value: p.value, label: p.label }))}
-                    value={provider}
-                    onChange={(val) => setProvider(val as UpiProvider)}
-                    chipColor={chipBg}
-                    activeColor={activeBg}
-                    textColor={textColor}
-                    activeTextColor={activeText}
-                    size="sm"
-                    gap={8}
-                    radius={999}
-                  />
+                  {/* UPI App Picker Header with clean search icon button */}
+                  <View style={styles.pickerSectionHeader}>
+                    <Text style={[styles.fieldLabel, { color: mutedText, marginBottom: 0 }]}>
+                      UPI APP / PROVIDER
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowAppPicker(true)}
+                      style={[styles.searchIconButton, { backgroundColor: inputBg }]}
+                      accessibilityLabel="Search all UPI apps"
+                    >
+                      <MagnifierIcon size={14} color={textColor} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Quick Horizontal Options */}
+                  <View style={{ marginTop: 4 }}>
+                    <JellyRadio
+                      scrollable
+                      blurWidth={0}
+                      items={QUICK_PROVIDERS.map((p) => ({ value: p.value, label: p.label }))}
+                      value={provider}
+                      onChange={(val) => {
+                        setProvider(val as UpiProvider);
+                        const matched = UPI_APPS_CATALOG.find((a) => a.id === val);
+                        if (matched) handleSelectUpiApp(matched);
+                      }}
+                      chipColor={chipBg}
+                      activeColor={activeBg}
+                      textColor={textColor}
+                      activeTextColor={activeText}
+                      size="sm"
+                      gap={6}
+                      radius={999}
+                    />
+                  </View>
                 </>
               ) : (
                 <>
-                  <Text style={[styles.fieldLabel, { color: mutedText, marginTop: 14 }]}>
-                    BANK ISSUER
-                  </Text>
-                  <JellyRadio
-                    scrollable
-                    items={BANK_OPTIONS.map((b) => ({ value: b.value, label: b.label }))}
-                    value={bankBrand}
-                    onChange={(val) => setBankBrand(val as BankBrand)}
-                    chipColor={chipBg}
-                    activeColor={activeBg}
-                    textColor={textColor}
-                    activeTextColor={activeText}
-                    size="sm"
-                    gap={8}
-                    radius={999}
-                  />
+                  {/* Bank Issuer Header with clean search icon button */}
+                  <View style={styles.pickerSectionHeader}>
+                    <Text style={[styles.fieldLabel, { color: mutedText, marginBottom: 0 }]}>
+                      BANK ISSUER
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowBankPicker(true)}
+                      style={[styles.searchIconButton, { backgroundColor: inputBg }]}
+                      accessibilityLabel="Search all banks"
+                    >
+                      <MagnifierIcon size={14} color={textColor} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Quick Popular Banks Chips */}
+                  <View style={{ marginTop: 4 }}>
+                    <JellyRadio
+                      scrollable
+                      blurWidth={0}
+                      items={BANKS_CATALOG.slice(0, 6).map((b) => ({
+                        value: b.id,
+                        label: b.shortName,
+                      }))}
+                      value={selectedBank.id}
+                      onChange={(val) => {
+                        const match = BANKS_CATALOG.find((b) => b.id === val);
+                        if (match) handleSelectBank(match);
+                      }}
+                      chipColor={chipBg}
+                      activeColor={activeBg}
+                      textColor={textColor}
+                      activeTextColor={activeText}
+                      size="sm"
+                      gap={6}
+                      radius={999}
+                    />
+                  </View>
 
                   <View style={styles.splitRow}>
                     <View style={styles.splitColLeft}>
@@ -310,7 +432,6 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
                         ]}
                         placeholder="08/30"
                         placeholderTextColor={mutedText}
-                        maxLength={5}
                         value={expiry}
                         onChangeText={setExpiry}
                       />
@@ -321,7 +442,8 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
                     CARD NETWORK
                   </Text>
                   <JellyRadio
-                    items={CARD_NETWORKS.map((net) => ({ value: net, label: net }))}
+                    blurWidth={0}
+                    items={CARD_NETWORKS.map((n) => ({ value: n, label: n }))}
                     value={cardType}
                     onChange={(val) => setCardType(val as 'VISA' | 'Mastercard' | 'RuPay')}
                     chipColor={chipBg}
@@ -336,34 +458,84 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
               )}
             </View>
 
+            {/* Make Active Toggle */}
             <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
-              <View style={[styles.checkRow, { backgroundColor: inputBg }]}>
-                <SpringCheck
-                  label="Make this the default profile"
-                  checked={makeActive}
-                  onChange={(checked) => setMakeActive(checked)}
-                  color={textColor}
-                  fillColor={activeBg}
-                  checkColor={activeText}
-                  boxSize={22}
-                  boxRadius={999}
-                  fontSize={14}
-                  strike="none"
-                  doneOpacity={1}
-                />
-              </View>
+              <SpringCheck
+                label="Make this the default profile"
+                checked={makeActive}
+                onChange={setMakeActive}
+                color={textColor}
+                fillColor={activeBg}
+                checkColor={activeText}
+                boxSize={22}
+                boxRadius={999}
+                fontSize={14}
+                strike="none"
+                doneOpacity={1}
+              />
             </View>
-            </ScrollView>
-          </View>
 
-          <GlassPill
-            label={kind === 'upi' ? 'Save UPI Profile' : 'Save Card Profile'}
-            variant="accent"
-            size="lg"
-            onPress={handleSave}
-            style={styles.saveBtn}
-          />
+            <GlassPill
+              label={
+                isEditing
+                  ? 'Save Changes'
+                  : kind === 'upi'
+                  ? 'Save UPI Profile'
+                  : 'Save Card Profile'
+              }
+              variant="light"
+              size="lg"
+              onPress={handleSave}
+              style={styles.saveBtn}
+            />
+          </ScrollView>
         </View>
+      </View>
+
+      {/* Dedicated Bank Issuer Picker (Full Page with Authentic Logos) */}
+      <BankIssuerPickerModal
+        visible={showBankPicker}
+        selectedBankId={selectedBank.id}
+        onClose={() => setShowBankPicker(false)}
+        onSelectBank={handleSelectBank}
+      />
+
+      {/* Dedicated UPI App Picker (Full Page with Authentic Logos) */}
+      <UpiAppPickerModal
+        visible={showAppPicker}
+        selectedAppId={selectedUpiApp.id}
+        onClose={() => setShowAppPicker(false)}
+        onSelectApp={handleSelectUpiApp}
+      />
+    </>
+  );
+};
+
+export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
+  visible,
+  onClose,
+  editingAccount,
+}) => {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Dismiss modal backdrop"
+        />
+        {visible ? (
+          <ProfileFormContent
+            key={editingAccount ? editingAccount.id : 'new-profile-form'}
+            editingAccount={editingAccount}
+            onClose={onClose}
+          />
+        ) : null}
       </View>
     </Modal>
   );
@@ -384,8 +556,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingHorizontal: 16,
     paddingBottom: 28,
-    maxHeight: '88%',
-    borderWidth: 0,
+    maxHeight: '90%',
   },
   dragHandleWrap: {
     alignItems: 'center',
@@ -408,7 +579,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: -0.3,
   },
-  subtitle: {
+  subtitleText: {
     fontSize: 12,
     fontWeight: '400',
     marginTop: 2,
@@ -419,7 +590,6 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 0,
   },
   scrollAreaWrap: {
     position: 'relative',
@@ -432,21 +602,35 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   sectionCard: {
-    borderRadius: 22,
+    borderRadius: 20,
     padding: 16,
     borderWidth: 0,
-    width: '100%',
   },
   fieldLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
-    letterSpacing: 0.7,
+    letterSpacing: 0.9,
     marginBottom: 8,
   },
+  pickerSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  searchIconButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
+  },
   textInput: {
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     fontSize: 15,
     fontWeight: '400',
     borderWidth: 0,
@@ -461,16 +645,7 @@ const styles = StyleSheet.create({
   splitColRight: {
     flex: 1,
   },
-  checkRow: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    borderWidth: 0,
-  },
   saveBtn: {
-    width: '100%',
-    marginTop: 6,
+    marginTop: 4,
   },
 });
-
-export default AddUpiProfileModal;

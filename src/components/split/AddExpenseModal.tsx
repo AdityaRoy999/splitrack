@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -10,11 +11,13 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { LocateFixed } from 'lucide-react-native';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
+import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
@@ -556,17 +559,24 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   const paidByItems = useMemo(
     () => [
-      ...(showUserInScope ? [{ value: 'user', label: 'You' }] : []),
-      ...tripScopedFriends.map((f) => ({ value: f.id, label: f.name })),
+      ...(showUserInScope ? [{ value: 'user', label: 'You', handle: '@you', avatar: '' }] : []),
+      ...tripScopedFriends.map((f) => ({
+        value: f.id,
+        label: f.name,
+        handle: f.handle,
+        avatar: f.avatar,
+      })),
     ],
     [showUserInScope, tripScopedFriends]
   );
 
-  const normalizedPaidByQuery = paidBySearchQuery.trim().toLowerCase();
+  const normalizedPaidByQuery = paidBySearchQuery.trim().toLowerCase().replace(/^@/, '');
   const visiblePaidByItems = useMemo(() => {
     if (!normalizedPaidByQuery) return paidByItems;
-    return paidByItems.filter((item) =>
-      item.label.toLowerCase().includes(normalizedPaidByQuery)
+    return paidByItems.filter(
+      (item) =>
+        item.label.toLowerCase().includes(normalizedPaidByQuery) ||
+        (item.handle && item.handle.toLowerCase().includes(normalizedPaidByQuery))
     );
   }, [paidByItems, normalizedPaidByQuery]);
 
@@ -614,6 +624,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const renderParticipantRow = (id: string, name: string) => {
     const inSplit = splitWithMembers.includes(id);
     const assignedAmount = splitCalculations.memberAmounts[id] ?? 0;
+    const friendMeta = id === 'user' ? null : friends.find((f) => f.id === id);
+    const handleText =
+      id === 'user'
+        ? '@you'
+        : friendMeta?.handle || `@${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
 
     return (
       <View
@@ -624,7 +639,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         ]}
       >
         <SpringCheck
-          label={name}
+          label={
+            <View style={{ gap: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '500', color: textColor }}>{name}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '400', color: mutedText }}>{handleText}</Text>
+            </View>
+          }
           checked={inSplit}
           onChange={(checked) => handleMemberCheckedChange(id, checked)}
           color={textColor}
@@ -785,7 +805,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      animationType="fade"
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
@@ -1120,7 +1140,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                             boxShadow: 'none',
                           } as any),
                       ]}
-                      placeholder="Search payer by name..."
+                      placeholder="Search payer by name or @username..."
                       placeholderTextColor={mutedText}
                       value={paidBySearchQuery}
                       onChangeText={setPaidBySearchQuery}
@@ -1139,10 +1159,62 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 </Animated.View>
               )}
 
-              {visiblePaidByItems.length > 0 ? (
+              {showPaidBySearch ? (
+                <View style={[styles.payerSearchDropdown, { backgroundColor: inputBg }]}>
+                  {visiblePaidByItems.length > 0 ? (
+                    visiblePaidByItems.map((item) => {
+                      const isSelected = paidBy === item.value;
+                      return (
+                        <TouchableOpacity
+                          key={item.value}
+                          onPress={() => {
+                            triggerImpact(ImpactStyle.Light);
+                            setPaidBy(item.value);
+                            togglePaidBySearch();
+                          }}
+                          activeOpacity={0.7}
+                          style={[
+                            styles.payerSearchItem,
+                            {
+                              backgroundColor: isSelected ? (isDark ? '#272732' : '#E4E4EC') : 'transparent',
+                              borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+                            },
+                          ]}
+                        >
+                          {item.avatar ? (
+                            <Image source={{ uri: item.avatar }} style={styles.payerAvatar} />
+                          ) : (
+                            <View style={[styles.payerAvatarFallback, { backgroundColor: chipBg }]}>
+                              <Text style={[styles.payerAvatarText, { color: textColor }]}>
+                                {item.label.slice(0, 2).toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                          <View style={styles.payerTextCol}>
+                            <Text style={[styles.payerNameText, { color: textColor }]}>{item.label}</Text>
+                            <Text style={[styles.payerHandleText, { color: '#10B981' }]}>
+                              {item.handle || `@${item.label.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`}
+                            </Text>
+                          </View>
+                          {isSelected && (
+                            <View style={styles.payerCheckSlot}>
+                              <CheckCircleIcon size={16} color="#10B981" />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })
+                  ) : (
+                    <Text style={[styles.noPayerText, { color: mutedText }]}>
+                      {`No payer matching "${paidBySearchQuery}"`}
+                    </Text>
+                  )}
+                </View>
+              ) : visiblePaidByItems.length > 0 ? (
                 <JellyRadio
                   scrollable
                   fadeColor={cardBg}
+                  blurWidth={0}
                   items={visiblePaidByItems}
                   value={paidBy}
                   onChange={(val) => setPaidBy(val)}
@@ -1341,7 +1413,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                       placeholder={
                         selectedTrip
                           ? `Search in ${selectedTrip.name}...`
-                          : 'Search friends by name...'
+                          : 'Search friends by name or @username...'
                       }
                       placeholderTextColor={mutedText}
                       value={friendSearchQuery}
@@ -1584,6 +1656,50 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     paddingVertical: 0,
+  },
+  payerSearchDropdown: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  payerSearchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    gap: 10,
+    borderBottomWidth: 1,
+  },
+  payerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  payerAvatarFallback: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payerAvatarText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  payerTextCol: {
+    flex: 1,
+    gap: 1,
+  },
+  payerNameText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  payerHandleText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  payerCheckSlot: {
+    paddingRight: 2,
   },
   splitSummaryBadge: {
     paddingVertical: 4,

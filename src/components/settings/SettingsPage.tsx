@@ -17,6 +17,11 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
+import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
+import { CardSendIcon } from '@solar-icons/react-native/bold/card-send';
+import { UsersGroupTwoRoundedIcon } from '@solar-icons/react-native/bold/users-group-two-rounded';
+import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
+import { PieChart2Icon } from '@solar-icons/react-native/bold/pie-chart-2';
 import { MoonIcon } from '@solar-icons/react-native/bold/moon';
 import { Sun2Icon } from '@solar-icons/react-native/bold/sun-2';
 import { RefreshCircleIcon } from '@solar-icons/react-native/bold/refresh-circle';
@@ -28,7 +33,6 @@ import { FileTextIcon } from '@solar-icons/react-native/bold/file-text';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { DangerCircleIcon } from '@solar-icons/react-native/bold/danger-circle';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
-import { VerifiedCheckIcon } from '@solar-icons/react-native/bold/verified-check';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { JellyRadio } from '../common/JellyRadio';
@@ -50,6 +54,11 @@ interface SettingsPageProps {
   onSignOut?: () => void;
   userName?: string;
   userHandle?: string;
+  onNavigateTab?: (tab: 'home' | 'expenses' | 'trips' | 'analytics') => void;
+  onOpenAddExpense?: () => void;
+  onOpenAddTrip?: () => void;
+  onOpenAddMember?: () => void;
+  onManageCards?: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
@@ -57,6 +66,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onSignOut,
   userName = 'Jfiqw Alex',
   userHandle = '@alex',
+  onNavigateTab,
+  onOpenAddExpense,
+  onOpenAddTrip,
+  onOpenAddMember,
+  onManageCards,
 }) => {
   const insets = useSafeAreaInsets();
   const {
@@ -70,7 +84,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setCurrency,
   } = useLiquidGlass();
 
-  const { resetDemoData, eraseAllData, accounts, selectedAccountId, importTransactions } = useSplitTrack();
+  const {
+    resetDemoData,
+    eraseAllData,
+    accounts,
+    selectedAccountId,
+    importTransactions,
+    trips,
+    friends,
+  } = useSplitTrack();
 
   const [targetAccountId, setTargetAccountId] = useState<string>(
     selectedAccountId || accounts[0]?.id || 'acc-1'
@@ -296,16 +318,138 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               style={[styles.profileAvatar, { backgroundColor: isDark ? '#000000' : '#FFFFFF' }]}
               resizeMode="cover"
             />
-            {/* Cutout Verified Star Badge */}
+            {/* Cutout Verified Badge */}
             <View style={styles.verifiedBadgeWrap}>
-              <VerifiedCheckIcon size={25} color={cardBg} style={styles.verifiedCutoutStar} />
-              <View style={styles.verifiedWhiteCore} />
-              <VerifiedCheckIcon size={20} color="#10B981" />
+              <View style={[styles.verifiedCutoutDisk, { backgroundColor: cardBg }]} />
+              <CheckCircleIcon size={22} color="#10B981" />
             </View>
           </TouchableOpacity>
 
           <Text style={[styles.profileName, { color: textColor }]}>{userName}</Text>
           <Text style={[styles.profileHandle, { color: mutedText }]}>{userHandle}</Text>
+        </View>
+
+        {/* Quick Management & Navigation Stack Card */}
+        <View style={[styles.joinedCard, { backgroundColor: cardBg }]}>
+          <View style={styles.joinedSection}>
+            <Text style={[styles.sectionHeader, { color: mutedText }]}>QUICK NAVIGATION</Text>
+          </View>
+
+          {/* Row 1: Manage Cards & UPI Profiles */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              triggerImpact(ImpactStyle.Light);
+              if (onManageCards) onManageCards();
+              else if (onNavigateTab) onNavigateTab('expenses');
+            }}
+            style={styles.navRowItem}
+          >
+            <View style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)' }]}>
+              <CardSendIcon size={18} color="#10B981" />
+            </View>
+            <View style={styles.navTextCol}>
+              <Text style={[styles.navRowTitle, { color: textColor }]}>Manage Cards &amp; UPI Profiles</Text>
+              <Text style={[styles.navRowSubtitle, { color: mutedText }]}>
+                {accounts.length} active cards &amp; UPI accounts
+              </Text>
+            </View>
+            <AltArrowRightIcon size={14} color={mutedText} />
+          </TouchableOpacity>
+
+          <View style={[styles.sectionDivider, { backgroundColor: dividerColor }]} />
+
+          {/* Row 2: Trips & Shared Groups */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              triggerImpact(ImpactStyle.Light);
+              if (onNavigateTab) onNavigateTab('trips');
+            }}
+            style={styles.navRowItem}
+          >
+            <View style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)' }]}>
+              <UsersGroupTwoRoundedIcon size={18} color="#3B82F6" />
+            </View>
+            <View style={styles.navTextCol}>
+              <Text style={[styles.navRowTitle, { color: textColor }]}>Trips &amp; Shared Groups</Text>
+              <Text style={[styles.navRowSubtitle, { color: mutedText }]}>
+                {trips.length} active trips &amp; group ledgers
+              </Text>
+            </View>
+            <AltArrowRightIcon size={14} color={mutedText} />
+          </TouchableOpacity>
+
+          <View style={[styles.sectionDivider, { backgroundColor: dividerColor }]} />
+
+          {/* Row 3: People & Members */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              triggerImpact(ImpactStyle.Light);
+              if (onOpenAddMember) onOpenAddMember();
+              else if (onNavigateTab) onNavigateTab('trips');
+            }}
+            style={styles.navRowItem}
+          >
+            <View style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(168, 85, 247, 0.15)' : 'rgba(168, 85, 247, 0.1)' }]}>
+              <UsersGroupTwoRoundedIcon size={18} color="#A855F7" />
+            </View>
+            <View style={styles.navTextCol}>
+              <Text style={[styles.navRowTitle, { color: textColor }]}>People &amp; Members</Text>
+              <Text style={[styles.navRowSubtitle, { color: mutedText }]}>
+                {friends.length} split members &amp; friends
+              </Text>
+            </View>
+            <AltArrowRightIcon size={14} color={mutedText} />
+          </TouchableOpacity>
+
+          <View style={[styles.sectionDivider, { backgroundColor: dividerColor }]} />
+
+          {/* Row 4: Split & Record Expense */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              triggerImpact(ImpactStyle.Light);
+              if (onOpenAddExpense) onOpenAddExpense();
+              else if (onNavigateTab) onNavigateTab('expenses');
+            }}
+            style={styles.navRowItem}
+          >
+            <View style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.1)' }]}>
+              <AddCircleIcon size={18} color="#F59E0B" />
+            </View>
+            <View style={styles.navTextCol}>
+              <Text style={[styles.navRowTitle, { color: textColor }]}>Split &amp; Record Expense</Text>
+              <Text style={[styles.navRowSubtitle, { color: mutedText }]}>
+                Record a shared bill or log payment
+              </Text>
+            </View>
+            <AltArrowRightIcon size={14} color={mutedText} />
+          </TouchableOpacity>
+
+          <View style={[styles.sectionDivider, { backgroundColor: dividerColor }]} />
+
+          {/* Row 5: Expense Ledger & Analytics */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              triggerImpact(ImpactStyle.Light);
+              if (onNavigateTab) onNavigateTab('analytics');
+            }}
+            style={styles.navRowItem}
+          >
+            <View style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(6, 182, 212, 0.15)' : 'rgba(6, 182, 212, 0.1)' }]}>
+              <PieChart2Icon size={18} color="#06B6D4" />
+            </View>
+            <View style={styles.navTextCol}>
+              <Text style={[styles.navRowTitle, { color: textColor }]}>Expense Ledger &amp; Analytics</Text>
+              <Text style={[styles.navRowSubtitle, { color: mutedText }]}>
+                Spending breakdown, charts &amp; categories
+              </Text>
+            </View>
+            <AltArrowRightIcon size={14} color={mutedText} />
+          </TouchableOpacity>
         </View>
 
         {/* Joined Settings Card (Theme, Surface Style, Currency, Preferences) */}
@@ -821,22 +965,18 @@ const styles = StyleSheet.create({
   },
   verifiedBadgeWrap: {
     position: 'absolute',
-    bottom: -3,
-    right: -3,
-    width: 25,
-    height: 25,
+    bottom: -1,
+    right: -1,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  verifiedCutoutStar: {
+  verifiedCutoutDisk: {
     position: 'absolute',
-  },
-  verifiedWhiteCore: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FFFFFF',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   profileName: {
     fontSize: 20,
@@ -854,6 +994,33 @@ const styles = StyleSheet.create({
   joinedSection: {
     paddingHorizontal: 16,
     paddingVertical: 14,
+  },
+  navRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    gap: 14,
+  },
+  navIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  navRowTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  navRowSubtitle: {
+    fontSize: 12,
+    fontWeight: '400',
   },
   sectionDivider: {
     height: 1,

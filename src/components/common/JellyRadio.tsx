@@ -330,7 +330,7 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   disabled = false,
   scrollable = false,
   fadeColor,
-  blurWidth = 2,
+  blurWidth = 0,
   style,
 }) => {
   const { themeMode } = useLiquidGlass();

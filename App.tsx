@@ -60,6 +60,7 @@ import { CalendarDatePickerModal, formatDisplayDate } from './src/components/com
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 import { PreloaderSplash } from './src/components/common/PreloaderSplash';
 import { OnboardingAuthScreen, type AuthLogoRect } from './src/components/auth/OnboardingAuthScreen';
+import { OnboardingUsernameScreen } from './src/components/auth/OnboardingUsernameScreen';
 import { AnimatedPressable, FadeInSlide } from './src/components/common/MotionPrimitives';
 import { JellyRadio } from './src/components/common/JellyRadio';
 import { ExpenseCategory, Friend, Transaction } from './src/types';
@@ -362,7 +363,7 @@ function MainAppContent({
                 <JellyRadio
                   scrollable
                   fadeColor={rootBg}
-                  blurWidth={2}
+                  blurWidth={0}
                   items={['All', 'Expenses', 'Splits', 'Income']}
                   value={expenseFilter}
                   onChange={(val) => setExpenseFilter(val as ExpenseFilter)}
@@ -408,7 +409,7 @@ function MainAppContent({
                 <JellyRadio
                   scrollable
                   fadeColor={rootBg}
-                  blurWidth={2}
+                  blurWidth={0}
                   items={categoryFilterItems}
                   value={selectedCategoryFilter}
                   onChange={(val) => setSelectedCategoryFilter(val)}
@@ -914,54 +915,12 @@ function MainAppContent({
     </ScrollView>
   );
 
-  const rootBg = isLiquidGlassEnabled
-    ? isDark
-      ? '#05050A'
-      : '#E8EDF6'
-    : palette.background;
+  // In both Liquid Glass and Matte modes, app background is strictly solid black (OLED) in dark mode
+  const rootBg = palette.background;
 
   return (
     <View style={[styles.container, { backgroundColor: rootBg, paddingTop: insets.top }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-
-      {isLiquidGlassEnabled && (
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          <Aurora
-            colorStops={
-              isDark
-                ? ['#3B28CC', '#0EA5E9', '#10B981']
-                : ['#8B5CF6', '#38BDF8', '#34D399']
-            }
-            amplitude={0.85}
-            blend={0.65}
-            height={0.48}
-            speed={0.5}
-            glow={0.85}
-            layers={2}
-            direction="top"
-            intro={false}
-            opacity={isDark ? 0.28 : 0.32}
-            lightMode={!isDark}
-          />
-          <Aurora
-            colorStops={
-              isDark
-                ? ['#6366F1', '#06B6D4', '#4F46E5']
-                : ['#60A5FA', '#A78BFA', '#6EE7B7']
-            }
-            amplitude={0.8}
-            blend={0.65}
-            height={0.38}
-            speed={0.4}
-            glow={0.8}
-            layers={1}
-            direction="bottom"
-            intro={false}
-            opacity={isDark ? 0.22 : 0.24}
-            lightMode={!isDark}
-          />
-        </View>
-      )}
 
       <View style={styles.mainViewport}>
         {showSettings ? (
@@ -971,6 +930,26 @@ function MainAppContent({
               onSignOut={onSignOut}
               userName="Jfiqw Alex"
               userHandle="@alex"
+              onNavigateTab={(tab) => {
+                setShowSettings(false);
+                setCurrentTab(tab);
+              }}
+              onOpenAddExpense={() => {
+                setShowSettings(false);
+                setShowAddExpense(true);
+              }}
+              onOpenAddTrip={() => {
+                setShowSettings(false);
+                setShowAddTrip(true);
+              }}
+              onOpenAddMember={() => {
+                setShowSettings(false);
+                setShowAddMember(true);
+              }}
+              onManageCards={() => {
+                setShowSettings(false);
+                setCurrentTab('expenses');
+              }}
             />
           </FadeInSlide>
         ) : (
@@ -1112,6 +1091,13 @@ export default function App() {
   const [hideOnboardingLogo, setHideOnboardingLogo] = useState(true);
   const [onboardingLogoRect, setOnboardingLogoRect] = useState<AuthLogoRect | null>(null);
   const onboardingLogoNodeRef = useRef<ViewRefNode | null>(null);
+  const [onboardingStage, setOnboardingStage] = useState<'auth' | 'username'>('auth');
+  const [pendingAuthData, setPendingAuthData] = useState<{
+    provider: 'email' | 'google' | 'guest';
+    mode: 'signin' | 'signup';
+    name?: string;
+    email?: string;
+  } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -1142,20 +1128,29 @@ export default function App() {
     name?: string;
     email?: string;
   }) => {
-    const resolvedName =
-      payload.name?.trim() ||
-      (payload.email ? payload.email.split('@')[0] : 'Jfiqw Alex');
-    setUserDisplayName(resolvedName);
+    setPendingAuthData(payload);
+    setOnboardingStage('username');
+  };
+
+  const handleUsernameSetupComplete = async (data: {
+    displayName: string;
+    username: string;
+    avatar?: string;
+  }) => {
+    setUserDisplayName(data.displayName);
     setIsAuthenticated(true);
+    setOnboardingStage('auth');
     setHideHeaderLogo(false);
     try {
       await AsyncStorage.setItem(
         AUTH_STORAGE_KEY,
         JSON.stringify({
           isAuthenticated: true,
-          userDisplayName: resolvedName,
-          provider: payload.provider,
-          email: payload.email,
+          userDisplayName: data.displayName,
+          username: data.username,
+          avatar: data.avatar,
+          provider: pendingAuthData?.provider || 'email',
+          email: pendingAuthData?.email,
         })
       );
     } catch {
@@ -1165,6 +1160,8 @@ export default function App() {
 
   const handleSignOut = async () => {
     setIsAuthenticated(false);
+    setOnboardingStage('auth');
+    setPendingAuthData(null);
     setHideOnboardingLogo(false);
     try {
       await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
@@ -1191,6 +1188,12 @@ export default function App() {
                   onHeaderLogoNode={(node) => {
                     headerLogoNodeRef.current = node;
                   }}
+                />
+              ) : onboardingStage === 'username' ? (
+                <OnboardingUsernameScreen
+                  initialDisplayName={pendingAuthData?.name}
+                  initialEmail={pendingAuthData?.email}
+                  onComplete={handleUsernameSetupComplete}
                 />
               ) : (
                 <OnboardingAuthScreen

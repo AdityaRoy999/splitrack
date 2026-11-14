@@ -177,7 +177,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
     <Modal
       visible={visible}
       transparent
-      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      animationType="fade"
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
@@ -350,7 +350,16 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
                 <View style={styles.membersList}>
                   <View style={[styles.memberRow, { backgroundColor: inputBg }]}>
                     <SpringCheck
-                      label="You (Organizer)"
+                      label={
+                        <View style={{ gap: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '500', color: textColor }}>
+                            You (Organizer)
+                          </Text>
+                          <Text style={{ fontSize: 11, fontWeight: '400', color: mutedText }}>
+                            @you
+                          </Text>
+                        </View>
+                      }
                       checked={true}
                       disabled
                       color={textColor}
@@ -369,7 +378,16 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
                     return (
                       <View key={friend.id} style={[styles.memberRow, { backgroundColor: inputBg }]}>
                         <SpringCheck
-                          label={friend.name}
+                          label={
+                            <View style={{ gap: 1 }}>
+                              <Text style={{ fontSize: 14, fontWeight: '500', color: textColor }}>
+                                {friend.name}
+                              </Text>
+                              <Text style={{ fontSize: 11, fontWeight: '400', color: mutedText }}>
+                                {friend.handle}
+                              </Text>
+                            </View>
+                          }
                           checked={isChecked}
                           onChange={(checked) => handleMemberChange(friend.id, checked)}
                           color={textColor}

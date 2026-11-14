@@ -427,6 +427,8 @@ interface SplitTrackContextType {
   ) => Friend | null;
   addTrip: (trip: Omit<Trip, 'id' | 'totalSpend'>) => void;
   addUpiAccount: (acc: Omit<UpiAccount, 'id' | 'totalSpent'>) => UpiAccount;
+  updateUpiAccount: (id: string, updates: Partial<Omit<UpiAccount, 'id'>>) => void;
+  deleteUpiAccount: (id: string) => boolean;
   addCategory: (name: string, iconKey: string, color?: string) => ExpenseCategory;
   updateCategory: (id: string, name: string, iconKey: string, color?: string) => ExpenseCategory | null;
   deleteCategory: (id: string) => boolean;
@@ -724,6 +726,28 @@ export const SplitTrackProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return newAccount;
   };
 
+  // Update Existing UPI or Card Profile
+  const updateUpiAccount = (id: string, updates: Partial<Omit<UpiAccount, 'id'>>) => {
+    const nextAccounts = accounts.map((acc) => (acc.id === id ? { ...acc, ...updates } : acc));
+    setAccounts(nextAccounts);
+    saveState(nextAccounts, friends, trips, transactions, categories);
+  };
+
+  // Delete Existing UPI or Card Profile
+  const deleteUpiAccount = (id: string): boolean => {
+    if (accounts.length <= 1) {
+      // Keep at least one account in system
+      return false;
+    }
+    const nextAccounts = accounts.filter((acc) => acc.id !== id);
+    setAccounts(nextAccounts);
+    if (selectedAccountId === id && nextAccounts[0]) {
+      setSelectedAccountId(nextAccounts[0].id);
+    }
+    saveState(nextAccounts, friends, trips, transactions, categories);
+    return true;
+  };
+
   // Add Custom Category
   const addCategory = (name: string, iconKey: string, color: string = '#6366F1'): ExpenseCategory => {
     const trimmed = name.trim();
@@ -938,6 +962,8 @@ export const SplitTrackProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         addMemberToTrip,
         addTrip,
         addUpiAccount,
+        updateUpiAccount,
+        deleteUpiAccount,
         addCategory,
         updateCategory,
         deleteCategory,
