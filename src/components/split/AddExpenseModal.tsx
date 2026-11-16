@@ -286,7 +286,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   ];
 
   const handleSplitTypeChange = (val: string) => {
-    triggerSmoothLayout(280);
     const next = val as SplitType;
     setSplitType(next);
     triggerImpact(ImpactStyle.Light);
@@ -640,7 +639,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       <View
         key={id}
         style={[
-          splitType === 'equal' ? styles.springCheckRow : styles.memberSplitCard,
+          styles.memberSplitCard,
           { backgroundColor: inputBg },
         ]}
       >
@@ -1853,7 +1852,7 @@ const styles = StyleSheet.create({
     gap: 6,
     overflow: 'hidden',
     ...(Platform.OS === 'web'
-      ? ({ transition: 'all 0.28s cubic-bezier(0.16, 1, 0.3, 1)' } as any)
+      ? ({ transition: 'background-color 0.2s ease, opacity 0.2s ease' } as any)
       : {}),
   },
   dynamicControlsWrap: {

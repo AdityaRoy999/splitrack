@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Animated,
+  Platform,
   StyleProp,
   StyleSheet,
   ViewStyle,
@@ -12,6 +14,8 @@ interface GlassModalSheetProps {
   children: React.ReactNode;
 }
 
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
 export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
   style,
   children,
@@ -22,25 +26,51 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
   const bgMatte = isDark ? '#09090B' : '#F4F4F8';
   const tintGlass = isDark ? 'rgba(18, 18, 24, 0.82)' : 'rgba(255, 255, 255, 0.88)';
 
+  const [slideAnim] = useState(() => new Animated.Value(360));
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: 0,
+      stiffness: 340,
+      damping: 28,
+      mass: 0.8,
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [slideAnim]);
+
   return (
-    <GlassSurface
-      borderTopLeftRadius={32}
-      borderTopRightRadius={32}
-      borderBottomLeftRadius={0}
-      borderBottomRightRadius={0}
-      borderRadius={0}
-      glassStyle="regular"
-      intensity={isDark ? 85 : 95}
-      tintColor={tintGlass}
-      matteColor={bgMatte}
-      style={[styles.sheetBase, style]}
+    <Animated.View
+      style={[
+        styles.animWrap,
+        {
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
     >
-      {children}
-    </GlassSurface>
+      <GlassSurface
+        borderTopLeftRadius={32}
+        borderTopRightRadius={32}
+        borderBottomLeftRadius={0}
+        borderBottomRightRadius={0}
+        borderRadius={0}
+        glassStyle="regular"
+        intensity={isDark ? 85 : 95}
+        tintColor={tintGlass}
+        matteColor={bgMatte}
+        style={[styles.sheetBase, style]}
+      >
+        {children}
+      </GlassSurface>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
+  animWrap: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+  },
   sheetBase: {
     width: '100%',
     maxWidth: 480,

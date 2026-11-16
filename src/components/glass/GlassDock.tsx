@@ -213,6 +213,10 @@ export const GlassDock: React.FC<GlassDockProps> = ({
     lastTouchXRef.current = touchX;
     const initialSlot = getSlotFromX(touchX);
     setHoverSlot(initialSlot);
+    const initialItem = mainNavItems[initialSlot];
+    if (initialItem && !initialItem.isAction) {
+      onTabChange(initialItem.key);
+    }
 
     // Holding navbar breathing expansion (authentic iOS liquid glass)
     Animated.spring(capsuleScale, {
@@ -290,6 +294,10 @@ export const GlassDock: React.FC<GlassDockProps> = ({
     if (newSlot !== hoverSlot) {
       setHoverSlot(newSlot);
       triggerImpact(ImpactStyle.Light);
+      const targetItem = mainNavItems[newSlot];
+      if (targetItem && !targetItem.isAction) {
+        onTabChange(targetItem.key);
+      }
     }
   };
 

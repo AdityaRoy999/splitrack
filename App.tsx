@@ -146,6 +146,17 @@ function MainAppContent({
   const activeText = isDark ? '#18181B' : '#FFFFFF';
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
 
+  const dynamicScrollContent = useMemo(
+    () => [
+      styles.scrollContent,
+      {
+        paddingTop: insets.top + 10,
+        paddingBottom: 114,
+      },
+    ],
+    [insets.top]
+  );
+
   const categoryFilterItems = useMemo(
     () => [
       { value: 'All', label: 'All Categories' },
@@ -173,9 +184,9 @@ function MainAppContent({
           key={`member-detail-scroll-${activeMember.id}`}
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: 108 }]}
+          contentContainerStyle={dynamicScrollContent}
         >
-          <FadeInSlide key={`member-detail-${activeMember.id}`} style={styles.contentConstrainer}>
+          <View key={`member-detail-${activeMember.id}`} style={styles.contentConstrainer}>
             <HeaderBar
               onOpenSettings={() => setShowSettings(true)}
               userName={activeMember.name}
@@ -198,7 +209,7 @@ function MainAppContent({
                 setCurrentTab('trips');
               }}
             />
-          </FadeInSlide>
+          </View>
         </ScrollView>
       );
     }
@@ -209,9 +220,9 @@ function MainAppContent({
           key="members-page-scroll"
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: 108 }]}
+          contentContainerStyle={dynamicScrollContent}
         >
-          <FadeInSlide key="members-page" style={styles.contentConstrainer}>
+          <View key="members-page" style={styles.contentConstrainer}>
             <HeaderBar
               onOpenSettings={() => setShowSettings(true)}
               userName="Manage Members"
@@ -234,7 +245,7 @@ function MainAppContent({
                 setShowAddMember(true);
               }}
             />
-          </FadeInSlide>
+          </View>
         </ScrollView>
       );
     }
@@ -244,9 +255,9 @@ function MainAppContent({
         key="home-tab-scroll"
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 108 }]}
+        contentContainerStyle={dynamicScrollContent}
       >
-        <FadeInSlide key="home-tab" style={styles.contentConstrainer}>
+        <View key="home-tab" style={styles.contentConstrainer}>
           <HeaderBar
             onOpenSettings={() => setShowSettings(true)}
             userName={userDisplayName}
@@ -301,7 +312,7 @@ function MainAppContent({
             onSelectTransaction={() => setShowSettle(true)}
             onViewAll={() => setCurrentTab('expenses')}
           />
-        </FadeInSlide>
+        </View>
       </ScrollView>
     );
   };
@@ -326,9 +337,9 @@ function MainAppContent({
         key="expenses-tab-scroll"
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 108 }]}
+        contentContainerStyle={dynamicScrollContent}
       >
-        <FadeInSlide key="expenses-tab" style={styles.contentConstrainer}>
+        <View key="expenses-tab" style={styles.contentConstrainer}>
           <HeaderBar
             onOpenSettings={() => setShowSettings(true)}
             userName="Expenses & Ledger"
@@ -573,7 +584,7 @@ function MainAppContent({
             {/* UPI Profiles — each profile rendered as a clean borderless card */}
             <UpiProfilesSection />
           </View>
-        </FadeInSlide>
+        </View>
       </ScrollView>
     );
   };
@@ -586,9 +597,9 @@ function MainAppContent({
           key={`trip-detail-scroll-${activeTrip.id}`}
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: 108 }]}
+          contentContainerStyle={dynamicScrollContent}
         >
-          <FadeInSlide key={`trip-detail-${activeTrip.id}`} style={styles.contentConstrainer}>
+          <View key={`trip-detail-${activeTrip.id}`} style={styles.contentConstrainer}>
             <HeaderBar
               onOpenSettings={() => setShowSettings(true)}
               userName="Trip Details"
@@ -613,7 +624,7 @@ function MainAppContent({
                 setShowSettle(true);
               }}
             />
-          </FadeInSlide>
+          </View>
         </ScrollView>
       );
     }
@@ -629,9 +640,9 @@ function MainAppContent({
         key="trips-hub-scroll"
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 108 }]}
+        contentContainerStyle={dynamicScrollContent}
       >
-        <FadeInSlide key="trips-tab" style={styles.contentConstrainer}>
+        <View key="trips-tab" style={styles.contentConstrainer}>
           <HeaderBar
             onOpenSettings={() => setShowSettings(true)}
             userName="Trips & Group Hub"
@@ -867,7 +878,7 @@ function MainAppContent({
               </View>
             )}
           </View>
-        </FadeInSlide>
+        </View>
       </ScrollView>
     );
   };
@@ -877,9 +888,9 @@ function MainAppContent({
       key="analytics-tab-scroll"
       style={styles.scrollView}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={[styles.scrollContent, { paddingBottom: 108 }]}
+      contentContainerStyle={dynamicScrollContent}
     >
-      <FadeInSlide key="analytics-tab" style={styles.contentConstrainer}>
+      <View key="analytics-tab" style={styles.contentConstrainer}>
         <HeaderBar
           onOpenSettings={() => setShowSettings(true)}
           userName="Visual Analytics"
@@ -913,7 +924,7 @@ function MainAppContent({
 
           <SplineChart />
         </View>
-      </FadeInSlide>
+      </View>
     </ScrollView>
   );
 
@@ -921,12 +932,12 @@ function MainAppContent({
   const rootBg = palette.background;
 
   return (
-    <View style={[styles.container, { backgroundColor: rootBg, paddingTop: showSettings ? 0 : insets.top }]}>
+    <View style={[styles.container, { backgroundColor: rootBg, paddingTop: 0 }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <View style={styles.mainViewport}>
         {showSettings ? (
-          <FadeInSlide key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
+          <View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
             <SettingsPage
               onBack={() => setShowSettings(false)}
               onSignOut={onSignOut}
@@ -953,45 +964,49 @@ function MainAppContent({
                 setCurrentTab('expenses');
               }}
             />
-          </FadeInSlide>
+          </View>
         ) : (
-          <>
+          <View style={styles.tabPagesContainer}>
             {currentTab === 'home' && renderHomeTab()}
             {currentTab === 'expenses' && renderExpensesTab()}
             {currentTab === 'trips' && renderTripsTab()}
             {currentTab === 'analytics' && renderAnalyticsTab()}
-          </>
+          </View>
         )}
 
-        <GradualBlur
-          position="top"
-          height={30}
-          strength={1.4}
-          layers={7}
-          tint={
-            isLiquidGlassEnabled
-              ? isDark
-                ? 'rgba(5, 5, 10, 0.5)'
-                : 'rgba(232, 237, 246, 0.5)'
-              : isDark
-                ? 'rgba(9, 9, 11, 0.78)'
-                : 'rgba(242, 242, 247, 0.78)'
-          }
-          zIndex={45}
-        />
+        {!showSettings && (
+          <GradualBlur
+            position="top"
+            height={Math.max(38, insets.top + 24)}
+            strength={1.6}
+            layers={8}
+            curve="bezier"
+            tint={
+              isLiquidGlassEnabled
+                ? isDark
+                  ? 'rgba(5, 5, 10, 0.7)'
+                  : 'rgba(232, 237, 246, 0.7)'
+                : isDark
+                  ? 'rgba(9, 9, 11, 0.88)'
+                  : 'rgba(242, 242, 247, 0.88)'
+            }
+            zIndex={45}
+          />
+        )}
         <GradualBlur
           position="bottom"
-          height={52}
+          height={56}
           strength={1.5}
           layers={8}
+          curve="bezier"
           tint={
             isLiquidGlassEnabled
               ? isDark
-                ? 'rgba(5, 5, 10, 0.6)'
-                : 'rgba(232, 237, 246, 0.6)'
+                ? 'rgba(5, 5, 10, 0.65)'
+                : 'rgba(232, 237, 246, 0.65)'
               : isDark
-                ? 'rgba(9, 9, 11, 0.84)'
-                : 'rgba(242, 242, 247, 0.84)'
+                ? 'rgba(9, 9, 11, 0.88)'
+                : 'rgba(242, 242, 247, 0.88)'
           }
           zIndex={45}
         />
@@ -1001,10 +1016,12 @@ function MainAppContent({
         currentTab={currentTab}
         onTabChange={(tab) => {
           setShowSettings(false);
-          setCurrentTab(tab);
-          setSelectedTripId(null);
-          setHomeView('overview');
-          setSelectedMemberId(null);
+          if (tab !== currentTab) {
+            setCurrentTab(tab);
+            setSelectedTripId(null);
+            setHomeView('overview');
+            setSelectedMemberId(null);
+          }
         }}
         onQuickAdd={() => {
           setShowSettings(false);
@@ -1257,6 +1274,16 @@ const styles = StyleSheet.create({
     width: '100%',
     position: 'relative',
     overflow: 'hidden',
+  },
+  tabPagesContainer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  tabPage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
   scrollView: {
     flex: 1,

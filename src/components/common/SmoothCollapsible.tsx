@@ -14,15 +14,25 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+let isLayoutScheduled = false;
+
 /**
  * Triggers a silky smooth native layout animation for surrounding views.
- * Uses easeInEaseOut to prevent bouncy spring twitching on iOS.
+ * Throttled to 1 call per frame to prevent conflicting UIKit layout glitching.
  */
 export const triggerSmoothLayout = (duration = 240) => {
   if (Platform.OS === 'web') return;
+  if (isLayoutScheduled) return;
+
+  isLayoutScheduled = true;
+  requestAnimationFrame(() => {
+    isLayoutScheduled = false;
+  });
+
   if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
+
   LayoutAnimation.configureNext({
     duration,
     create: {
