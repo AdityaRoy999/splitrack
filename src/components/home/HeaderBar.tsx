@@ -1,5 +1,7 @@
-import React, { useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { UserAvatar } from '../common/UserAvatar';
 import { measureNodeInWindow, type ViewRefNode, type WindowRect } from '../../utils/measureWindow';
 import { Sun2Icon } from '@solar-icons/react-native/bold/sun-2';
 import { MoonIcon } from '@solar-icons/react-native/bold/moon';
@@ -32,6 +34,15 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   const { themeMode, toggleTheme } = useLiquidGlass();
   const isDark = themeMode === 'dark';
   const logoAnchorRef = useRef<ViewRefNode>(null);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('splittrack_user_avatar_uri')
+      .then((saved) => {
+        if (saved) setAvatarUri(saved);
+      })
+      .catch(() => {});
+  }, []);
 
   const setLogoRef = useCallback(
     (node: ViewRefNode | null) => {
@@ -72,21 +83,14 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             onLayout={reportLogoLayout}
             style={styles.avatarSlot}
           >
-            <Image
-              source={
-                isDark
-                  ? require('../../../assets/icon-dark.png')
-                  : require('../../../assets/icon-light.png')
-              }
-              resizeMode="cover"
-              style={[
-                styles.avatar,
-                {
-                  backgroundColor: isDark ? '#000000' : '#FFFFFF',
-                  opacity: hideLogo ? 0 : 1,
-                },
-              ]}
-            />
+            <View style={{ opacity: hideLogo ? 0 : 1 }}>
+              <UserAvatar
+                avatarUri={avatarUri}
+                size={40}
+                borderRadius={14}
+                isDark={isDark}
+              />
+            </View>
           </View>
         </AnimatedPressable>
         <View style={styles.greetingCol}>

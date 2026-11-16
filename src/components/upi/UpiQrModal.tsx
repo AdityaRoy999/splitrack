@@ -21,6 +21,7 @@ import { ImpactStyle, NotificationType, triggerImpact, triggerNotification } fro
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { UpiAccount } from '../../types';
 import { GlassPill } from '../glass/GlassPill';
+import { GlassSurface } from '../glass/GlassSurface';
 import { StyledUpiQr } from './StyledUpiQr';
 import { getUpiBrandMeta } from './upiBrandLogo';
 
@@ -36,10 +37,11 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
   account,
 }) => {
   const [copied, setCopied] = useState(false);
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
-  const cardBg = isDark ? '#111114' : '#FFFFFF';
-  const pillBg = isDark ? '#18181D' : '#F3F4F6';
+  const pillBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
+    : (isDark ? '#18181D' : '#F3F4F6');
   const textColor = isDark ? '#FFFFFF' : '#000000';
   const mutedText = isDark ? '#71717A' : '#6B7280';
 
@@ -132,9 +134,8 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
 
         <Animated.View
           style={[
-            styles.contentCard,
+            styles.contentCardWrap,
             {
-              backgroundColor: cardBg,
               transform: [
                 {
                   scale: animVal.interpolate({
@@ -152,51 +153,60 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
             },
           ]}
         >
-          <TouchableOpacity onPress={handleSmoothClose} style={[styles.closeBtn, { backgroundColor: pillBg }]}>
-            <CloseCircleIcon size={20} color={textColor} />
-          </TouchableOpacity>
+          <GlassSurface
+            borderRadius={28}
+            glassStyle="regular"
+            intensity={isDark ? 85 : 95}
+            tintColor={isDark ? 'rgba(20, 20, 26, 0.88)' : 'rgba(255, 255, 255, 0.92)'}
+            matteColor={isDark ? '#111114' : '#FFFFFF'}
+            style={styles.contentCard}
+          >
+            <TouchableOpacity onPress={handleSmoothClose} style={[styles.closeBtn, { backgroundColor: pillBg }]}>
+              <CloseCircleIcon size={20} color={textColor} />
+            </TouchableOpacity>
 
-          <View style={styles.header}>
-            <View style={[styles.appBadgePill, { backgroundColor: pillBg }]}>
-              <View style={[styles.appDot, { backgroundColor: brandMeta.primary }]} />
-              <Text style={[styles.appBadgeText, { color: textColor }]}>{brandMeta.label}</Text>
+            <View style={styles.header}>
+              <View style={[styles.appBadgePill, { backgroundColor: pillBg }]}>
+                <View style={[styles.appDot, { backgroundColor: brandMeta.primary }]} />
+                <Text style={[styles.appBadgeText, { color: textColor }]}>{brandMeta.label}</Text>
+              </View>
+              <Text style={[styles.title, { color: textColor }]}>Scan to Pay via UPI</Text>
+              <Text style={[styles.subtitle, { color: mutedText }]}>{account.title}</Text>
             </View>
-            <Text style={[styles.title, { color: textColor }]}>Scan to Pay via UPI</Text>
-            <Text style={[styles.subtitle, { color: mutedText }]}>{account.title}</Text>
-          </View>
 
-          {/* Stylish Scannable QR Code with UPI App Image in Center */}
-          <View style={styles.qrBox}>
-            <StyledUpiQr account={account} size={216} />
-          </View>
+            {/* Stylish Scannable QR Code with UPI App Image in Center */}
+            <View style={styles.qrBox}>
+              <StyledUpiQr account={account} size={216} />
+            </View>
 
-          {/* UPI ID Pill */}
-          <TouchableOpacity onPress={handleCopy} activeOpacity={0.8} style={[styles.upiPill, { backgroundColor: pillBg }]}>
-            <Text style={[styles.upiText, { color: textColor }]}>{account.upiId}</Text>
-            {copied ? (
-              <CheckCircleIcon size={16} color="#10B981" />
-            ) : (
-              <CopyIcon size={16} color={mutedText} />
-            )}
-          </TouchableOpacity>
+            {/* UPI ID Pill */}
+            <TouchableOpacity onPress={handleCopy} activeOpacity={0.8} style={[styles.upiPill, { backgroundColor: pillBg }]}>
+              <Text style={[styles.upiText, { color: textColor }]}>{account.upiId}</Text>
+              {copied ? (
+                <CheckCircleIcon size={16} color="#10B981" />
+              ) : (
+                <CopyIcon size={16} color={mutedText} />
+              )}
+            </TouchableOpacity>
 
-          {/* Action buttons */}
-          <View style={styles.actionsRow}>
-            <GlassPill
-              label={copied ? 'Copied!' : 'Copy UPI'}
-              icon={<CopyIcon size={15} color="#000000" />}
-              variant="light"
-              onPress={handleCopy}
-              style={styles.pillAction}
-            />
-            <GlassPill
-              label="Share"
-              icon={<ShareCircleIcon size={15} color="#FFFFFF" />}
-              variant="dark"
-              onPress={handleShare}
-              style={styles.pillAction}
-            />
-          </View>
+            {/* Action buttons */}
+            <View style={styles.actionsRow}>
+              <GlassPill
+                label={copied ? 'Copied!' : 'Copy UPI'}
+                icon={<CopyIcon size={15} color="#000000" />}
+                variant="light"
+                onPress={handleCopy}
+                style={styles.pillAction}
+              />
+              <GlassPill
+                label="Share"
+                icon={<ShareCircleIcon size={15} color="#FFFFFF" />}
+                variant="dark"
+                onPress={handleShare}
+                style={styles.pillAction}
+              />
+            </View>
+          </GlassSurface>
         </Animated.View>
       </Animated.View>
     </Modal>
@@ -217,10 +227,14 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  contentCard: {
+  contentCardWrap: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: '#FFFFFF',
+    zIndex: 2,
+    alignItems: 'center',
+  },
+  contentCard: {
+    width: '100%',
     borderRadius: 28,
     padding: 24,
     alignItems: 'center',
@@ -228,7 +242,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
     borderWidth: 0,
-    zIndex: 2,
   },
   closeBtn: {
     position: 'absolute',

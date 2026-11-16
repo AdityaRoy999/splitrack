@@ -21,6 +21,10 @@ const canUseNativeLiquidGlass = (() => {
 
 interface GlassSurfaceProps {
   borderRadius?: number;
+  borderTopLeftRadius?: number;
+  borderTopRightRadius?: number;
+  borderBottomLeftRadius?: number;
+  borderBottomRightRadius?: number;
   glassStyle?: 'regular' | 'clear';
   interactive?: boolean;
   intensity?: number;
@@ -40,6 +44,10 @@ interface GlassSurfaceProps {
  */
 export const GlassSurface: React.FC<GlassSurfaceProps> = ({
   borderRadius = 24,
+  borderTopLeftRadius,
+  borderTopRightRadius,
+  borderBottomLeftRadius,
+  borderBottomRightRadius,
   glassStyle = 'regular',
   interactive = false,
   intensity,
@@ -53,12 +61,21 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
 
   const resolvedMatte = matteColor || (isDark ? '#111114' : '#FFFFFF');
 
+  const cornerRadii: ViewStyle = {
+    borderRadius,
+    ...(borderTopLeftRadius !== undefined ? { borderTopLeftRadius } : {}),
+    ...(borderTopRightRadius !== undefined ? { borderTopRightRadius } : {}),
+    ...(borderBottomLeftRadius !== undefined ? { borderBottomLeftRadius } : {}),
+    ...(borderBottomRightRadius !== undefined ? { borderBottomRightRadius } : {}),
+  };
+
   if (!isLiquidGlassEnabled) {
     return (
       <View
         style={[
           styles.surfaceContainer,
-          { backgroundColor: resolvedMatte, borderRadius },
+          cornerRadii,
+          { backgroundColor: resolvedMatte },
           style,
         ]}
       >
@@ -72,19 +89,19 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
     (isDark
       ? glassStyle === 'clear'
         ? 'rgba(255, 255, 255, 0.14)'
-        : 'rgba(22, 22, 28, 0.58)'
+        : 'rgba(22, 22, 28, 0.62)'
       : glassStyle === 'clear'
         ? 'rgba(255, 255, 255, 0.36)'
-        : 'rgba(255, 255, 255, 0.68)');
+        : 'rgba(255, 255, 255, 0.74)');
 
-  const resolvedIntensity = intensity ?? (glassStyle === 'clear' ? 38 : isDark ? 68 : 80);
+  const resolvedIntensity = intensity ?? (glassStyle === 'clear' ? 38 : isDark ? 75 : 85);
 
   return (
     <View
       style={[
         styles.surfaceContainer,
+        cornerRadii,
         {
-          borderRadius,
           backgroundColor:
             canUseNativeLiquidGlass
               ? 'transparent'
@@ -108,7 +125,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
           isInteractive={interactive}
           colorScheme={isDark ? 'dark' : 'light'}
           tintColor={resolvedTint}
-          style={[StyleSheet.absoluteFill, { borderRadius }]}
+          style={[StyleSheet.absoluteFill, cornerRadii]}
         />
       ) : Platform.OS !== 'web' ? (
         <>
@@ -116,13 +133,14 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
             pointerEvents="none"
             intensity={resolvedIntensity}
             tint={isDark ? 'dark' : 'light'}
-            style={[StyleSheet.absoluteFill, { borderRadius }]}
+            style={[StyleSheet.absoluteFill, cornerRadii]}
           />
           <View
             pointerEvents="none"
             style={[
               StyleSheet.absoluteFill,
-              { backgroundColor: resolvedTint, borderRadius },
+              cornerRadii,
+              { backgroundColor: resolvedTint },
             ]}
           />
         </>
@@ -138,7 +156,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
         }
         start={{ x: 0.2, y: 0 }}
         end={{ x: 0.8, y: 1 }}
-        style={[StyleSheet.absoluteFill, { borderRadius }]}
+        style={[StyleSheet.absoluteFill, cornerRadii]}
       />
 
       {children}

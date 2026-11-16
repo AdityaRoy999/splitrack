@@ -21,6 +21,7 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { Friend } from '../../types';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassPill } from '../glass/GlassPill';
+import { GlassModalSheet } from '../common/GlassModalSheet';
 
 interface AddMemberModalProps {
   visible: boolean;
@@ -135,7 +136,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   editingFriend,
 }) => {
   const { friends, addFriend, updateFriend, addMemberToTrip } = useSplitTrack();
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
   const isEditing = Boolean(editingFriend);
 
@@ -147,10 +148,15 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   const [picking, setPicking] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const bgSheet = isDark ? '#09090B' : '#F4F4F8';
-  const cardBg = isDark ? '#121216' : '#FFFFFF';
-  const inputBg = isDark ? '#1B1B20' : '#F2F3F7';
-  const chipBg = isDark ? '#23232C' : '#E5E7EB';
+  const cardBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
+    : (isDark ? '#121216' : '#FFFFFF');
+  const inputBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
+    : (isDark ? '#1B1B20' : '#F2F3F7');
+  const chipBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.04)')
+    : (isDark ? '#23232C' : '#E5E7EB');
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
 
@@ -304,7 +310,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
           onPress={onClose}
           accessibilityLabel="Dismiss modal backdrop"
         />
-        <View style={[styles.sheetContainer, { backgroundColor: bgSheet }]}>
+        <GlassModalSheet style={styles.sheetContainer}>
           <View style={styles.dragHandleWrap}>
             <View
               style={[
@@ -503,7 +509,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
             onPress={handleSave}
             style={styles.saveBtn}
           />
-        </View>
+        </GlassModalSheet>
       </View>
     </Modal>
   );

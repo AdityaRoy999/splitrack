@@ -81,12 +81,14 @@ function getLedgerIcon(
 
 function MainAppContent({
   userDisplayName = 'Jfiqw Alex',
+  userHandle = '@alex',
   onSignOut,
   hideHeaderLogo = false,
   onHeaderLogoLayout,
   onHeaderLogoNode,
 }: {
   userDisplayName?: string;
+  userHandle?: string;
   onSignOut?: () => void;
   hideHeaderLogo?: boolean;
   onHeaderLogoLayout?: (rect: HeaderLogoRect) => void;
@@ -919,7 +921,7 @@ function MainAppContent({
   const rootBg = palette.background;
 
   return (
-    <View style={[styles.container, { backgroundColor: rootBg, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: rootBg, paddingTop: showSettings ? 0 : insets.top }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <View style={styles.mainViewport}>
@@ -928,8 +930,8 @@ function MainAppContent({
             <SettingsPage
               onBack={() => setShowSettings(false)}
               onSignOut={onSignOut}
-              userName="Jfiqw Alex"
-              userHandle="@alex"
+              userName={userDisplayName}
+              userHandle={userHandle}
               onNavigateTab={(tab) => {
                 setShowSettings(false);
                 setCurrentTab(tab);
@@ -1085,6 +1087,7 @@ export default function App() {
   const [showPreloader, setShowPreloader] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userDisplayName, setUserDisplayName] = useState('Jfiqw Alex');
+  const [userHandle, setUserHandle] = useState('@alex');
   const [hideHeaderLogo, setHideHeaderLogo] = useState(true);
   const [headerLogoRect, setHeaderLogoRect] = useState<HeaderLogoRect | null>(null);
   const headerLogoNodeRef = useRef<ViewRefNode | null>(null);
@@ -1110,6 +1113,9 @@ export default function App() {
             setIsAuthenticated(true);
             if (parsed.userDisplayName) {
               setUserDisplayName(parsed.userDisplayName);
+            }
+            if (parsed.username) {
+              setUserHandle(parsed.username.startsWith('@') ? parsed.username : `@${parsed.username}`);
             }
           }
         }
@@ -1138,10 +1144,14 @@ export default function App() {
     avatar?: string;
   }) => {
     setUserDisplayName(data.displayName);
+    setUserHandle(data.username.startsWith('@') ? data.username : `@${data.username}`);
     setIsAuthenticated(true);
     setOnboardingStage('auth');
     setHideHeaderLogo(false);
     try {
+      if (data.avatar) {
+        await AsyncStorage.setItem('splittrack_user_avatar_uri', data.avatar).catch(() => {});
+      }
       await AsyncStorage.setItem(
         AUTH_STORAGE_KEY,
         JSON.stringify({
@@ -1182,6 +1192,7 @@ export default function App() {
               {isAuthenticated ? (
                 <MainAppContent
                   userDisplayName={userDisplayName}
+                  userHandle={userHandle}
                   onSignOut={handleSignOut}
                   hideHeaderLogo={hideHeaderLogo}
                   onHeaderLogoLayout={setHeaderLogoRect}

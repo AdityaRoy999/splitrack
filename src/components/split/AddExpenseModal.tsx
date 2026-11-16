@@ -35,6 +35,7 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { currencies } from '../../theme/colors';
 import { renderSolarIcon } from '../../constants/solarIconsCatalog';
 import { GlassPill } from '../glass/GlassPill';
+import { GlassModalSheet } from '../common/GlassModalSheet';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
@@ -62,7 +63,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 }) => {
   const { accounts, friends, trips, transactions, categories, addTransaction, selectedAccountId } =
     useSplitTrack();
-  const { currency, themeMode } = useLiquidGlass();
+  const { currency, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const [title, setTitle] = useState('');
@@ -537,10 +538,15 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     onClose();
   };
 
-  const bgSheet = isDark ? '#09090B' : '#F4F4F8';
-  const cardBg = isDark ? '#121216' : '#FFFFFF';
-  const inputBg = isDark ? '#1B1B20' : '#F2F3F7';
-  const chipBg = isDark ? '#1C1C22' : '#EFEFF4';
+  const cardBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
+    : (isDark ? '#121216' : '#FFFFFF');
+  const inputBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
+    : (isDark ? '#1B1B20' : '#F2F3F7');
+  const chipBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.04)')
+    : (isDark ? '#1C1C22' : '#EFEFF4');
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
@@ -814,12 +820,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           onPress={onClose}
           accessibilityLabel="Dismiss modal backdrop"
         />
-        <View
-          style={[
-            styles.sheetContainer,
-            { backgroundColor: bgSheet },
-          ]}
-        >
+        <GlassModalSheet style={styles.sheetContainer}>
           <View style={styles.dragHandleWrap}>
             <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
           </View>
@@ -1457,7 +1458,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             onPress={handleSave}
             style={styles.saveBtn}
           />
-        </View>
+        </GlassModalSheet>
       </View>
 
       <CalendarDatePickerModal

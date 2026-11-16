@@ -22,14 +22,6 @@ export interface GradualBlurProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const CURVES: Record<GradualBlurCurve, (t: number) => number> = {
-  linear: (t) => t,
-  bezier: (t) => t * t * (3 - 2 * t),
-  'ease-in': (t) => t * t,
-  'ease-out': (t) => 1 - (1 - t) * (1 - t),
-  'ease-in-out': (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
-};
-
 const CSS_DIRECTIONS: Record<GradualBlurPosition, string> = {
   top: 'to top',
   bottom: 'to bottom',
@@ -79,17 +71,15 @@ function toRgbaWithAlpha(color: string, alphaFactor: number): string {
 }
 
 /**
- * React-Bits inspired GradualBlur ported cleanly to React Native & React Native Web.
- * Renders stacked progressive CSS backdrop-filter masks on Web and layered BlurView + LinearGradient on iOS/Android.
+ * Continuous Gaussian Blur:
+ * Renders a true continuous Gaussian blur with smooth alpha masking.
+ * No stepped slices or multi-layer banding artifacts.
  */
 export const GradualBlur: React.FC<GradualBlurProps> = React.memo(({
   position = 'bottom',
-  height = 32,
+  height = 36,
   width,
   strength = 1.6,
-  layers = 6,
-  curve = 'bezier',
-  exponential = true,
   opacity = 1,
   saturation = 1,
   tint = 'transparent',
@@ -99,91 +89,10 @@ export const GradualBlur: React.FC<GradualBlurProps> = React.memo(({
   const { themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
   const vertical = position === 'top' || position === 'bottom';
-  const depth = vertical ? height : (width ?? 22);
+  const depth = vertical ? height : (width ?? 28);
 
-  const webStack = useMemo(() => {
-    if (Platform.OS !== 'web') return null;
-
-    const count = Math.min(Math.max(Math.round(layers) || 1, 1), 12);
-    const shape = CURVES[curve] || CURVES.bezier;
-    const maxBlur = Math.max(strength, 0) * 10;
-    const level = (u: number) => {
-      const t = shape(clamp01(u));
-      return maxBlur * (exponential ? (Math.pow(2, 4 * t) - 1) / 15 : t);
-    };
-    const boost = Math.pow(Math.max(saturation, 0), 1 / count);
-    const direction = CSS_DIRECTIONS[position];
-
-    const steps = Array.from({ length: count }, (_, i) => {
-      const from = level(i / count);
-      const to = level((i + 1) / count);
-      const radius = Math.sqrt(Math.max(to * to - from * from, 0));
-      const filterParts = [`blur(${radius.toFixed(2)}px)`];
-      if (Math.abs(boost - 1) > 0.001) {
-        filterParts.push(`saturate(${boost.toFixed(3)})`);
-      }
-      const filter = filterParts.join(' ');
-      const mask = `linear-gradient(${direction}, transparent ${((i / count) * 100).toFixed(1)}%, #000 ${(((i + 1) / count) * 100).toFixed(1)}%)`;
-
-      return {
-        position: 'absolute' as const,
-        inset: 0,
-        backdropFilter: filter,
-        WebkitBackdropFilter: filter,
-        maskImage: mask,
-        WebkitMaskImage: mask,
-        opacity,
-      };
-    });
-
-    const stops = Array.from({ length: 7 }, (_, k) => {
-      const u = k / 6;
-      const t = shape(u);
-      const alpha = t * t * t * (t * (t * 6 - 15) + 10);
-      return `rgba(0, 0, 0, ${alpha.toFixed(3)}) ${(u * 100).toFixed(1)}%`;
-    }).join(', ');
-
-    const wash =
-      tint && tint !== 'transparent'
-        ? {
-            position: 'absolute' as const,
-            inset: 0,
-            background: tint,
-            maskImage: `linear-gradient(${direction}, ${stops})`,
-            WebkitMaskImage: `linear-gradient(${direction}, ${stops})`,
-          }
-        : null;
-
-    return { steps, wash };
-  }, [curve, exponential, layers, opacity, position, saturation, strength, tint]);
-
-  const nativeSlices = useMemo(() => {
-    if (Platform.OS === 'web') return [];
-    const bandCount = 4;
-    const shape = CURVES[curve] || CURVES.bezier;
-    const maxIntensity = Math.min(48, Math.max(8, strength * 14));
-    return Array.from({ length: bandCount }, (_, idx) => {
-      const fraction = 1 - idx / bandCount; // 1.0 -> 0.75 -> 0.5 -> 0.25
-      const t = shape((idx + 1) / bandCount);
-      return {
-        key: idx,
-        coveragePct: `${Math.round(fraction * 100)}%` as `${number}%`,
-        intensity: Math.max(4, Math.round((maxIntensity / bandCount) * (0.65 + t * 0.65))),
-      };
-    });
-  }, [curve, strength]);
-
-  const nativeGradient = useMemo(() => {
-    if (Platform.OS === 'web' || !tint || tint === 'transparent') return null;
-    const shape = CURVES[curve] || CURVES.bezier;
-    const stops = [0, 0.25, 0.55, 0.8, 1];
-    const colors = stops.map((u) => {
-      const t = shape(u);
-      const smooth = t * t * t * (t * (t * 6 - 15) + 10);
-      return toRgbaWithAlpha(tint, smooth * opacity);
-    }) as [string, string, ...string[]];
-    return { colors, axis: GRADIENT_AXIS[position] };
-  }, [curve, opacity, position, tint]);
+  const blurRadiusPx = Math.max(16, Math.min(48, Math.round(strength * 18)));
+  const nativeIntensity = Math.max(20, Math.min(90, Math.round(strength * 30)));
 
   const edgePositionStyle: ViewStyle = {
     position: 'absolute',
@@ -197,47 +106,68 @@ export const GradualBlur: React.FC<GradualBlurProps> = React.memo(({
     overflow: 'hidden',
   };
 
-  if (Platform.OS === 'web' && webStack) {
+  const gradientAxis = GRADIENT_AXIS[position];
+
+  // Native iOS / Android: Single continuous BlurView with smooth LinearGradient fade
+  const fadeColors = useMemo(() => {
+    const baseColor = tint && tint !== 'transparent' ? tint : (isDark ? '#000000' : '#FFFFFF');
+    return [
+      toRgbaWithAlpha(baseColor, 0),
+      toRgbaWithAlpha(baseColor, 0.15 * opacity),
+      toRgbaWithAlpha(baseColor, 0.55 * opacity),
+      toRgbaWithAlpha(baseColor, 0.88 * opacity),
+    ] as [string, string, string, string];
+  }, [tint, isDark, opacity]);
+
+  if (Platform.OS === 'web') {
+    const direction = CSS_DIRECTIONS[position];
+    const mask = `linear-gradient(${direction}, transparent 0%, rgba(0, 0, 0, 0.4) 30%, #000000 100%)`;
+    const filter = saturation > 1
+      ? `blur(${blurRadiusPx}px) saturate(${saturation.toFixed(2)})`
+      : `blur(${blurRadiusPx}px)`;
+
     return (
       <View pointerEvents="none" style={[edgePositionStyle, style]}>
-        {webStack.steps.map((layerStyle, idx) => (
-          <View key={idx} style={layerStyle as unknown as ViewStyle} />
-        ))}
-        {webStack.wash ? <View style={webStack.wash as unknown as ViewStyle} /> : null}
+        <View
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backdropFilter: filter,
+            WebkitBackdropFilter: filter,
+            maskImage: mask,
+            WebkitMaskImage: mask,
+            opacity,
+          } as unknown as ViewStyle}
+        />
+        {tint && tint !== 'transparent' ? (
+          <View
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: tint,
+              maskImage: mask,
+              WebkitMaskImage: mask,
+              opacity,
+            } as unknown as ViewStyle}
+          />
+        ) : null}
       </View>
     );
   }
 
   return (
     <View pointerEvents="none" style={[edgePositionStyle, style]}>
-      {nativeSlices.map((slice) => {
-        const sliceStyle: ViewStyle = {
-          position: 'absolute',
-          top: position === 'bottom' ? undefined : 0,
-          bottom: position === 'top' ? undefined : 0,
-          left: position === 'right' ? undefined : 0,
-          right: position === 'left' ? undefined : 0,
-          height: vertical ? slice.coveragePct : undefined,
-          width: vertical ? undefined : slice.coveragePct,
-          opacity,
-        };
-        return (
-          <BlurView
-            key={slice.key}
-            intensity={slice.intensity}
-            tint={isDark ? 'dark' : 'light'}
-            style={sliceStyle}
-          />
-        );
-      })}
-      {nativeGradient && (
-        <LinearGradient
-          colors={nativeGradient.colors}
-          start={nativeGradient.axis.start}
-          end={nativeGradient.axis.end}
-          style={StyleSheet.absoluteFill}
-        />
-      )}
+      <BlurView
+        intensity={nativeIntensity}
+        tint={isDark ? 'dark' : 'light'}
+        style={[StyleSheet.absoluteFill, { opacity }]}
+      />
+      <LinearGradient
+        colors={fadeColors}
+        start={gradientAxis.start}
+        end={gradientAxis.end}
+        style={StyleSheet.absoluteFill}
+      />
     </View>
   );
 });

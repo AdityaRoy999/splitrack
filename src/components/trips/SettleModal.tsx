@@ -22,6 +22,7 @@ import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassPill } from '../glass/GlassPill';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { GlassModalSheet } from '../common/GlassModalSheet';
 import { UpiQrModal } from '../upi/UpiQrModal';
 
 interface SettleModalProps {
@@ -36,7 +37,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
   targetFriendId,
 }) => {
   const { accounts, friends, selectedAccountId, getSimplifiedDebts, settleWithFriend } = useSplitTrack();
-  const { formatAmount, themeMode } = useLiquidGlass();
+  const { formatAmount, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [toastSeq, setToastSeq] = useState(0);
   const [showQrModal, setShowQrModal] = useState(false);
@@ -111,11 +112,14 @@ export const SettleModal: React.FC<SettleModalProps> = ({
     } catch {}
   };
 
-  const bgSheet = isDark ? '#09090B' : '#F2F2F7';
-  const cardSurface = isDark ? '#141418' : '#FFFFFF';
+  const cardSurface = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
+    : (isDark ? '#141418' : '#FFFFFF');
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
-  const pillSurface = isDark ? '#1B1B20' : '#F2F2F7';
+  const pillSurface = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
+    : (isDark ? '#1B1B20' : '#F2F2F7');
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
 
   const renderDebtGroup = (
@@ -244,12 +248,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
           onPress={onClose}
           accessibilityLabel="Dismiss modal backdrop"
         />
-        <View
-          style={[
-            styles.sheetContainer,
-            { backgroundColor: bgSheet },
-          ]}
-        >
+        <GlassModalSheet style={styles.sheetContainer}>
           <View style={styles.dragHandleWrap}>
             <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
           </View>
@@ -344,7 +343,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
             )}
             </ScrollView>
           </View>
-        </View>
+        </GlassModalSheet>
 
         {successMsg && (
           <Animated.View

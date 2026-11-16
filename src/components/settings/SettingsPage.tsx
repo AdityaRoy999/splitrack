@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -33,6 +33,7 @@ import { FileTextIcon } from '@solar-icons/react-native/bold/file-text';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { DangerCircleIcon } from '@solar-icons/react-native/bold/danger-circle';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
+import { UserAvatar } from '../common/UserAvatar';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { JellyRadio } from '../common/JellyRadio';
@@ -270,33 +271,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   return (
-    <View style={[styles.pageContainer, { backgroundColor: rootBg, paddingTop: Math.max(16, insets.top) }]}>
-      {/* Header Bar with Back Button */}
-      <View style={styles.headerRow}>
-        <AnimatedPressable
-          scaleTo={0.92}
-          onPress={() => {
-            triggerImpact(ImpactStyle.Light);
-            onBack();
-          }}
-          accessibilityLabel="Back to previous screen"
-          contentStyle={[styles.backBtn, { backgroundColor: cardBg }]}
-        >
-          <AltArrowLeftIcon size={18} color={textColor} />
-          <Text style={[styles.backBtnText, { color: textColor }]}>Back</Text>
-        </AnimatedPressable>
-
-        <Text style={[styles.headerTitle, { color: textColor }]}>Settings</Text>
-
-        <View style={styles.headerRightPlaceholder} />
-      </View>
-
+    <View style={[styles.pageContainer, { backgroundColor: rootBg }]}>
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: Math.max(128, insets.bottom + 88) },
+          {
+            paddingTop: insets.top + 54 + 14,
+            paddingBottom: Math.max(128, insets.bottom + 88),
+          },
         ]}
       >
         {/* User Profile Card Header */}
@@ -307,16 +291,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             style={styles.profileAvatarWrap}
             accessibilityLabel="Change profile photo"
           >
-            <Image
-              source={
-                avatarUri
-                  ? { uri: avatarUri }
-                  : isDark
-                  ? require('../../../assets/icon-dark.png')
-                  : require('../../../assets/icon-light.png')
-              }
-              style={[styles.profileAvatar, { backgroundColor: isDark ? '#000000' : '#FFFFFF' }]}
-              resizeMode="cover"
+            <UserAvatar
+              avatarUri={avatarUri}
+              size={92}
+              borderRadius={28}
+              isDark={isDark}
             />
             {/* Cutout Verified Badge */}
             <View style={styles.verifiedBadgeWrap}>
@@ -832,6 +811,58 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </View>
       </ScrollView>
 
+      {/* Sticky Gaussian Blur Header Bar with Back Button extending behind status bar */}
+      <View
+        style={[
+          styles.stickyHeaderWrap,
+          {
+            height: insets.top + 54,
+            paddingTop: insets.top,
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        <BlurView
+          intensity={isDark ? 85 : 95}
+          tint={isDark ? 'dark' : 'light'}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: isDark
+                ? 'rgba(0, 0, 0, 0.72)'
+                : 'rgba(248, 249, 253, 0.78)',
+            },
+            Platform.OS === 'web'
+              ? ({
+                  backdropFilter: 'blur(24px)',
+                  WebkitBackdropFilter: 'blur(24px)',
+                } as any)
+              : undefined,
+          ]}
+        />
+        <View style={styles.headerRow}>
+          <AnimatedPressable
+            scaleTo={0.92}
+            onPress={() => {
+              triggerImpact(ImpactStyle.Light);
+              onBack();
+            }}
+            accessibilityLabel="Back to previous screen"
+            contentStyle={[styles.backBtn, { backgroundColor: cardBg }]}
+          >
+            <AltArrowLeftIcon size={18} color={textColor} />
+            <Text style={[styles.backBtnText, { color: textColor }]}>Back</Text>
+          </AnimatedPressable>
+
+          <Text style={[styles.headerTitle, { color: textColor }]}>Settings</Text>
+
+          <View style={styles.headerRightPlaceholder} />
+        </View>
+      </View>
+
       {/* Erase All Data Confirmation Dialog */}
       <Modal
         visible={showEraseConfirm}
@@ -910,6 +941,15 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     width: '100%',
+  },
+  stickyHeaderWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    overflow: 'hidden',
+    justifyContent: 'center',
   },
   headerRow: {
     flexDirection: 'row',

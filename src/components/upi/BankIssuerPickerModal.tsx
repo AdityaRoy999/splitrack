@@ -42,7 +42,7 @@ export const BankIssuerPickerModal: React.FC<BankIssuerPickerModalProps> = ({
   onAddCustomBank,
 }) => {
   const insets = useSafeAreaInsets();
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,10 +50,16 @@ export const BankIssuerPickerModal: React.FC<BankIssuerPickerModalProps> = ({
   const [customBankInput, setCustomBankInput] = useState('');
   const [showCustomBankForm, setShowCustomBankForm] = useState(false);
 
-  const bgSheet = isDark ? '#09090B' : '#F4F4F8';
-  const cardBg = isDark ? '#141418' : '#FFFFFF';
-  const inputBg = isDark ? '#1B1B22' : '#ECECF2';
-  const chipBg = isDark ? '#1C1C24' : '#E6E7EE';
+  const bgSheet = isDark ? '#000000' : '#F4F4F8';
+  const cardBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)')
+    : (isDark ? '#141418' : '#FFFFFF');
+  const inputBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.09)' : 'rgba(0, 0, 0, 0.05)')
+    : (isDark ? '#1B1B22' : '#ECECF2');
+  const chipBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
+    : (isDark ? '#1C1C24' : '#E6E7EE');
   const activeBg = isDark ? '#FFFFFF' : '#18181B';
   const activeText = isDark ? '#09090B' : '#FFFFFF';
   const textColor = isDark ? '#F4F4F5' : '#09090B';

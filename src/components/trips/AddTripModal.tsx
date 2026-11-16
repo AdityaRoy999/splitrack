@@ -20,6 +20,7 @@ import { NotificationType, triggerNotification } from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassPill } from '../glass/GlassPill';
+import { GlassModalSheet } from '../common/GlassModalSheet';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
@@ -69,7 +70,7 @@ const TRIP_CATEGORIES = [
 
 export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) => {
   const { friends, categories, addTrip } = useSplitTrack();
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const [tripName, setTripName] = useState('');
@@ -166,8 +167,12 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
   };
 
   const bgSheet = isDark ? '#09090B' : '#FFFFFF';
-  const inputBg = isDark ? '#18181D' : '#F3F4F6';
-  const chipBg = isDark ? '#1C1C22' : '#EFEFF4';
+  const inputBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
+    : (isDark ? '#18181D' : '#F3F4F6');
+  const chipBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.04)')
+    : (isDark ? '#1C1C22' : '#EFEFF4');
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
@@ -186,12 +191,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
           onPress={onClose}
           accessibilityLabel="Dismiss modal backdrop"
         />
-        <View
-          style={[
-            styles.sheetContainer,
-            { backgroundColor: bgSheet },
-          ]}
-        >
+        <GlassModalSheet style={styles.sheetContainer}>
           <View style={styles.dragHandleWrap}>
             <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
           </View>
@@ -414,7 +414,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
             onPress={handleCreate}
             style={styles.createBtn}
           />
-        </View>
+        </GlassModalSheet>
       </View>
 
       <AddCategoryModal

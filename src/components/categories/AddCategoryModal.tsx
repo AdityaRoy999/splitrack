@@ -28,6 +28,7 @@ import {
   triggerNotification,
 } from '../../utils/haptics';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { GlassModalSheet } from '../common/GlassModalSheet';
 import { JellyRadio } from '../common/JellyRadio';
 import { GlassPill } from '../glass/GlassPill';
 
@@ -60,7 +61,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
   onDeleted,
 }) => {
   const { addCategory, updateCategory, deleteCategory } = useSplitTrack();
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const [name, setName] = useState(() => categoryToEdit?.name || '');
@@ -72,9 +73,12 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
 
   const iconTileWidth = gridWidth > 0 ? Math.floor((gridWidth - 24) / 4) : undefined;
 
-  const sheetBg = isDark ? '#0B0B0E' : '#F6F7FB';
-  const cardBg = isDark ? '#141418' : '#FFFFFF';
-  const inputBg = isDark ? '#1D1D22' : '#EFEFF4';
+  const cardBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
+    : (isDark ? '#141418' : '#FFFFFF');
+  const inputBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
+    : (isDark ? '#1D1D22' : '#EFEFF4');
   const textColor = isDark ? '#FFFFFF' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
 
@@ -142,12 +146,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
           onPress={onClose}
           accessibilityLabel="Dismiss category modal backdrop"
         />
-        <View
-          style={[
-            styles.sheet,
-            { backgroundColor: sheetBg },
-          ]}
-        >
+        <GlassModalSheet style={styles.sheet}>
           <View style={styles.dragHandleWrap}>
             <View
               style={[
@@ -351,7 +350,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
             size="lg"
             style={styles.saveBtn}
           />
-        </View>
+        </GlassModalSheet>
       </View>
     </Modal>
   );

@@ -20,6 +20,7 @@ import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
 import { GlassPill } from '../glass/GlassPill';
+import { GlassModalSheet } from '../common/GlassModalSheet';
 import { BankIssuerPickerModal } from './BankIssuerPickerModal';
 import { UpiAppPickerModal } from './UpiAppPickerModal';
 import { BankItem, BANKS_CATALOG } from '../../constants/banksCatalog';
@@ -49,7 +50,7 @@ interface FormContentProps {
 
 const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClose }) => {
   const { addUpiAccount, updateUpiAccount, setSelectedAccountId } = useSplitTrack();
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const [kind, setKind] = useState<PaymentProfileKind>(
@@ -93,10 +94,15 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
 
   const isEditing = Boolean(editingAccount);
 
-  const bgSheet = isDark ? '#09090B' : '#F4F4F8';
-  const cardBg = isDark ? '#121216' : '#FFFFFF';
-  const inputBg = isDark ? '#1B1B20' : '#F2F3F7';
-  const chipBg = isDark ? '#1C1C22' : '#EFEFF4';
+  const cardBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
+    : (isDark ? '#121216' : '#FFFFFF');
+  const inputBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
+    : (isDark ? '#1B1B20' : '#F2F3F7');
+  const chipBg = isLiquidGlassEnabled
+    ? (isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.04)')
+    : (isDark ? '#1C1C22' : '#EFEFF4');
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
@@ -235,7 +241,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
 
   return (
     <>
-      <View style={[styles.sheetContainer, { backgroundColor: bgSheet }]}>
+      <GlassModalSheet style={styles.sheetContainer}>
         <View style={styles.dragHandleWrap}>
           <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
         </View>
@@ -490,7 +496,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
             />
           </ScrollView>
         </View>
-      </View>
+      </GlassModalSheet>
 
       {/* Dedicated Bank Issuer Picker (Full Page with Authentic Logos) */}
       <BankIssuerPickerModal

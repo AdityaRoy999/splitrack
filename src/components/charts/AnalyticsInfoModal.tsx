@@ -15,6 +15,7 @@ import { CursorIcon } from '@solar-icons/react-native/bold/cursor';
 import { HandIcon } from '@solar-icons/react-native/bold/hand';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { GlassModalSheet } from '../common/GlassModalSheet';
 
 interface AnalyticsInfoModalProps {
   visible: boolean;
@@ -79,13 +80,6 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
-  const sheetBg = isLiquidGlassEnabled
-    ? isDark
-      ? '#0A0A10'
-      : '#EEF2FA'
-    : isDark
-      ? '#0E0E12'
-      : '#FFFFFF';
   const cardBg = isLiquidGlassEnabled
     ? isDark
       ? 'rgba(255,255,255,0.06)'
@@ -117,12 +111,7 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
           onPress={onClose}
           accessibilityLabel="Dismiss analytics modal backdrop"
         />
-        <View
-          style={[
-            styles.sheet,
-            { backgroundColor: sheetBg },
-          ]}
-        >
+        <GlassModalSheet style={styles.sheet}>
           <View style={styles.dragHandleWrap}>
             <View
               style={[
@@ -192,7 +181,7 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
               Got It
             </Text>
           </AnimatedPressable>
-        </View>
+        </GlassModalSheet>
       </View>
     </Modal>
   );
