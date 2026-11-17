@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   scrollWrap: {
     position: 'relative',
     flex: 1,
-    minHeight: 120,
+    minHeight: 0,
     overflow: 'hidden',
   },
   scrollContent: {
