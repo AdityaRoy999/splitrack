@@ -11,12 +11,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.23",
-      "versionDate": "2026-11-16T19:13:12Z",
-      "versionDescription": "fix: instant tab switching with zero delay, top gradual blur behind status bar, bottom sheet slide up, and fix settings header blur overlap",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-23/Splittrack-unsigned.ipa",
-      "size": 13762145,
+      "version": "1.0.24",
+      "versionDate": "2026-11-17T08:17:33Z",
+      "versionDescription": "fix: onboarding button layout, bottom sheet flush pinning, smooth gaussian blur, and instant navbar pill snap",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-24/Splittrack-unsigned.ipa",
+      "size": 13761322,
       "versions": [
+        {
+          "version": "1.0.24",
+          "buildVersion": "24",
+          "date": "2026-11-17T08:17:33Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-24/Splittrack-unsigned.ipa",
+          "size": 13761322,
+          "localizedDescription": "fix: onboarding button layout, bottom sheet flush pinning, smooth gaussian blur, and instant navbar pill snap"
+        },
         {
           "version": "1.0.23",
           "buildVersion": "23",
