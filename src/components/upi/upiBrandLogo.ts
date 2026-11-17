@@ -1,4 +1,5 @@
-import { BankBrand, UpiAccount, UpiProvider } from '../../types';
+import { BankBrand, UpiProvider } from '../../types';
+import { UPI_APPS_CATALOG } from '../../constants/upiAppsCatalog';
 
 export interface UpiBrandMeta {
   id: UpiProvider;
@@ -82,14 +83,18 @@ const PROVIDER_META: Record<UpiProvider, UpiBrandMeta> = {
 };
 
 export const getUpiBrandMeta = (provider: UpiProvider, _bankBrand?: BankBrand): UpiBrandMeta => {
-  return PROVIDER_META[provider] || PROVIDER_META.bank;
+  const known = PROVIDER_META[provider];
+  if (known) return known;
+  const app = UPI_APPS_CATALOG.find((item) => item.id === provider);
+  if (!app) return PROVIDER_META.bank;
+  return {
+    id: app.id, label: app.name, primary: app.accentColor, secondary: app.secondaryColor,
+    badgeFill: app.accentColor, qrGradientStart: '#09090B', qrGradientEnd: '#27272A',
+    eyeOuterColor: '#18181B', eyeInnerColor: '#09090B',
+  };
 };
 
-export const buildUpiPaymentUri = (account: UpiAccount): string => {
-  const pa = encodeURIComponent(account.upiId.trim());
-  const pn = encodeURIComponent(account.title.trim() || 'SplitTrack');
-  return `upi://pay?pa=${pa}&pn=${pn}&cu=INR`;
-};
+export { buildUpiPaymentUri } from '../../utils/upi';
 
 const getInnerBrandSvgMarkup = (provider: UpiProvider): string => {
   switch (provider) {

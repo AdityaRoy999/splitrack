@@ -9,7 +9,7 @@ export interface CurrencyConfig {
 
 export type ThemeMode = 'dark' | 'light';
 
-export type UpiProvider = 'slice' | 'gpay' | 'phonepe' | 'paytm' | 'bank' | 'cred';
+export type UpiProvider = 'slice' | 'gpay' | 'phonepe' | 'paytm' | 'bank' | 'cred' | string;
 
 export type PaymentProfileKind =
   | 'upi'

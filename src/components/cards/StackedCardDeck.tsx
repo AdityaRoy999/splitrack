@@ -156,6 +156,7 @@ export const StackedCardDeck: React.FC<{
                     speed={0.9}
                     glow={0.6}
                     layers={2}
+                    paused={!isExpanded && !isSelected && index !== 0}
                     direction="bottom"
                     opacity={0.78}
                     lightMode={false}

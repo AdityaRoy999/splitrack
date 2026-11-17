@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Easing,
   GestureResponderEvent,
   Platform,
   StyleSheet,
@@ -26,8 +25,7 @@ import {
   shiftIsoDate,
   useDateMonthSwipeGesture,
 } from '../../hooks/useDateMonthSwipeGesture';
-
-const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+import { useChartTransition } from '../../hooks/useChartTransition';
 
 type DistributionGranularity = 'All' | 'Date' | 'Month' | 'Year';
 
@@ -62,6 +60,7 @@ export const DonutPieChart: React.FC = () => {
   const isDark = themeMode === 'dark';
 
   const [granularity, setGranularity] = useState<DistributionGranularity>('All');
+  const [requestedGranularity, setRequestedGranularity] = useState<DistributionGranularity>('All');
   const [selectedDate, setSelectedDate] = useState<string | null>(() => getTodayLocalISO());
   const [selectedMonth, setSelectedMonth] = useState<number>(() => new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(() => new Date().getFullYear());
@@ -69,63 +68,12 @@ export const DonutPieChart: React.FC = () => {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [sweepProgress, setSweepProgress] = useState<number>(() =>
-    typeof requestAnimationFrame !== 'undefined' ? 0 : 1
-  );
-  const [entranceAnim] = useState(() => new Animated.Value(0));
-  const [swipeX] = useState(() => new Animated.Value(0));
-  const [swipeOpacity] = useState(() => new Animated.Value(1));
+  const { runChartTransition, opacity: swipeOpacity, translateX: swipeX, revision } = useChartTransition();
   const lastGlidedSegRef = useRef<string | null>(null);
-  const transitionSeqRef = useRef(0);
-  const hasEnteredRef = useRef(false);
-
-  const runChartTransition = useCallback(
-    (delta: -1 | 0 | 1, commit: () => void) => {
-      const seq = ++transitionSeqRef.current;
-      swipeOpacity.stopAnimation();
-      swipeX.stopAnimation();
-
-      Animated.parallel([
-        Animated.timing(swipeOpacity, {
-          toValue: 0,
-          duration: 115,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(swipeX, {
-          toValue: delta === 0 ? 0 : -delta * 22,
-          duration: 115,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-      ]).start(({ finished }) => {
-        if (!finished && seq !== transitionSeqRef.current) return;
-        if (seq !== transitionSeqRef.current) return;
-
-        setSweepProgress(0);
-        commit();
-        swipeX.setValue(delta === 0 ? 0 : delta * 24);
-        Animated.parallel([
-          Animated.timing(swipeOpacity, {
-            toValue: 1,
-            duration: 280,
-            easing: Easing.bezier(0.22, 1, 0.36, 1),
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }),
-          Animated.timing(swipeX, {
-            toValue: 0,
-            duration: 300,
-            easing: Easing.bezier(0.22, 1, 0.36, 1),
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }),
-        ]).start();
-      });
-    },
-    [swipeOpacity, swipeX]
-  );
 
   const stepDay = useCallback(
     (delta: -1 | 1) => {
+      setRequestedGranularity('Date');
       runChartTransition(delta, () => {
         const base = selectedDate || getTodayLocalISO();
         const nextIso = shiftIsoDate(base, delta);
@@ -142,6 +90,7 @@ export const DonutPieChart: React.FC = () => {
 
   const stepMonth = useCallback(
     (delta: -1 | 1) => {
+      setRequestedGranularity('Month');
       runChartTransition(delta, () => {
         let nextMonth = selectedMonth + delta;
         let nextYear = selectedYear;
@@ -164,7 +113,13 @@ export const DonutPieChart: React.FC = () => {
   const { gestureHandlers, isMonthHoldReady, dragAnim } = useDateMonthSwipeGesture({
     onStepDay: stepDay,
     onStepMonth: stepMonth,
+    preserveDragOnCommit: true,
   });
+
+  useLayoutEffect(() => {
+    dragAnim.stopAnimation();
+    dragAnim.setValue(0);
+  }, [revision, dragAnim]);
 
   const combinedTranslateX = useMemo(
     () => Animated.add(dragAnim, swipeX),
@@ -213,48 +168,6 @@ export const DonutPieChart: React.FC = () => {
         y: 50,
       }));
   }, [granularity, selectedDate, selectedMonth, selectedYear, transactions, categoryMetrics]);
-
-  useEffect(() => {
-    let rafId = 0;
-    const duration = 480;
-    let startTime: number | null = null;
-
-    if (!hasEnteredRef.current) {
-      hasEnteredRef.current = true;
-      entranceAnim.setValue(0);
-      Animated.spring(entranceAnim, {
-        toValue: 1,
-        friction: 8,
-        tension: 65,
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }).start();
-    } else {
-      entranceAnim.setValue(1);
-    }
-
-    const tick = (now: number) => {
-      if (startTime === null) {
-        startTime = now;
-      }
-      const elapsed = now - startTime;
-      const raw = Math.min(1, Math.max(0, elapsed / duration));
-      const eased = 1 - Math.pow(1 - raw, 3);
-      setSweepProgress(eased);
-      if (raw < 1 && typeof requestAnimationFrame !== 'undefined') {
-        rafId = requestAnimationFrame(tick);
-      }
-    };
-
-    if (typeof requestAnimationFrame !== 'undefined') {
-      rafId = requestAnimationFrame(tick);
-    }
-
-    return () => {
-      if (rafId && typeof cancelAnimationFrame !== 'undefined') {
-        cancelAnimationFrame(rafId);
-      }
-    };
-  }, [granularity, selectedDate, selectedMonth, selectedYear, entranceAnim]);
 
   const totalAmount = filteredMetrics.reduce((sum, item) => sum + item.amount, 0);
   const activeId = hoveredId ?? selectedId;
@@ -412,12 +325,7 @@ export const DonutPieChart: React.FC = () => {
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';
 
-  const animatedScale = entranceAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.92, 1],
-  });
-
-  const currentSweepLength = sweepProgress * circumference;
+  const chartBodyHeight = size + 18 + Math.ceil(Math.max(categoryMetrics.length, segments.length, 1) / 2) * 36;
 
   return (
     <GlassCard borderRadius={24} style={styles.card}>
@@ -482,13 +390,12 @@ export const DonutPieChart: React.FC = () => {
 
             <JellyRadio
               items={['All', 'Date', 'Month', 'Year']}
-              value={granularity}
+              value={requestedGranularity}
               onChange={(val) => {
                 const next = val as DistributionGranularity;
-                if (next === granularity) return;
-                const order: DistributionGranularity[] = ['All', 'Date', 'Month', 'Year'];
-                const dir: -1 | 1 = order.indexOf(next) >= order.indexOf(granularity) ? 1 : -1;
-                runChartTransition(dir, () => {
+                if (next === requestedGranularity) return;
+                setRequestedGranularity(next);
+                runChartTransition(0, () => {
                   setSelectedId(null);
                   setGranularity(next);
                 });
@@ -532,19 +439,21 @@ export const DonutPieChart: React.FC = () => {
         <Animated.View
           style={{
             width: '100%',
+            minHeight: chartBodyHeight,
             alignItems: 'center',
             opacity: swipeOpacity,
             transform: [{ translateX: combinedTranslateX }],
           }}
         >
         {segments.length === 0 ? (
-          <View style={styles.emptyState}>
+          <View style={[styles.emptyState, { minHeight: chartBodyHeight }]}>
             <Text style={[styles.emptyStateText, { color: mutedText }]}>
               No expenses recorded for {centerLabel}.
             </Text>
             <AnimatedPressable
               scaleTo={0.95}
               onPress={() => {
+                setRequestedGranularity('All');
                 runChartTransition(-1, () => {
                   setSelectedId(null);
                   setGranularity('All');
@@ -557,16 +466,8 @@ export const DonutPieChart: React.FC = () => {
           </View>
         ) : (
           <>
-            {/* Animated Non-Overlapping Donut Ring */}
-            <Animated.View
-              style={[
-                styles.chartWrapper,
-                {
-                  opacity: entranceAnim,
-                  transform: [{ scale: animatedScale }],
-                },
-              ]}
-            >
+            {/* Stable SVG geometry; its outer view handles the transition. */}
+            <View style={styles.chartWrapper}>
               <View
                 style={{ width: size, height: size, position: 'relative' }}
                 onStartShouldSetResponder={(e: GestureResponderEvent) =>
@@ -630,10 +531,7 @@ export const DonutPieChart: React.FC = () => {
                   <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
                     {segments.map((seg) => {
                       const isSelected = activeId === seg.id;
-                      const availableInArc = currentSweepLength - seg.offset;
-                      if (availableInArc <= 0.4) return null;
-
-                      const visibleLen = Math.min(seg.segmentLength, availableInArc);
+                      const visibleLen = seg.segmentLength;
                       const activeStrokeWidth = isSelected
                         ? strokeWidth + 3
                         : strokeWidth;
@@ -647,7 +545,7 @@ export const DonutPieChart: React.FC = () => {
                           stroke={seg.color}
                           strokeWidth={activeStrokeWidth}
                           strokeDasharray={
-                            segments.length === 1 && sweepProgress >= 0.999
+                            segments.length === 1
                               ? undefined
                               : `${visibleLen} ${Math.max(1, circumference - visibleLen)}`
                           }
@@ -683,7 +581,7 @@ export const DonutPieChart: React.FC = () => {
                   {centerLabel}
                 </Text>
               </AnimatedPressable>
-            </Animated.View>
+            </View>
 
             {/* Interactive Legend Chips */}
             <View style={styles.legendGrid}>
@@ -747,6 +645,7 @@ export const DonutPieChart: React.FC = () => {
         visible={showCalendar}
         selectedDate={selectedDate}
         onSelectDate={(iso) => {
+          if (iso) setRequestedGranularity('Date');
           const dir: -1 | 1 =
             iso && selectedDate ? (iso >= selectedDate ? 1 : -1) : iso ? 1 : -1;
           runChartTransition(dir, () => {

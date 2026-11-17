@@ -16,6 +16,7 @@ import {
 } from '../../utils/haptics';
 import { Aurora } from '../effects/Aurora';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { BrandEmblemIcon } from '../common/BrandEmblemIcon';
 import { GlassPill } from '../glass/GlassPill';
 import { GlassSurface } from '../glass/GlassSurface';
 import { AddUpiProfileModal } from './AddUpiProfileModal';
@@ -79,6 +80,7 @@ interface ProfileDeckCardProps {
   isExpanded: boolean;
   isDefault: boolean;
   isCopied: boolean;
+  effectsPaused: boolean;
   trackedSpend: number;
   isDark: boolean;
   textColor: string;
@@ -104,6 +106,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
   isExpanded,
   isDefault,
   isCopied,
+  effectsPaused,
   trackedSpend,
   isDark,
   textColor,
@@ -180,6 +183,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
           speed={0.85}
           glow={0.48}
           layers={2}
+          paused={effectsPaused || (!isExpanded && !isDefault)}
           direction="bottom"
           opacity={isCardProfile ? (isDark ? 0.88 : 0.72) : isDark ? 0.82 : 0.68}
           lightMode={!isDark}
@@ -197,6 +201,13 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
 
         {/* Card Top Header */}
         <View style={styles.cardTopRow} pointerEvents="box-none">
+          <BrandEmblemIcon
+            id={isCardProfile || acc.provider === 'bank' ? acc.bankBrand : acc.provider}
+            name={acc.bankName || acc.title}
+            accentColor={auroraStops[0]}
+            size={30}
+            borderRadius={8}
+          />
           <View style={styles.cardTopInfo} pointerEvents="none">
             {isCardProfile ? (
               <>
@@ -500,6 +511,7 @@ export const UpiProfilesSection: React.FC = () => {
               isExpanded={isExpanded}
               isDefault={acc.id === activeId}
               isCopied={copiedId === acc.id}
+              effectsPaused={showAddProfile || !!accountToDelete || !!qrAccount}
               trackedSpend={trackedSpend}
               isDark={isDark}
               textColor={textColor}
@@ -582,13 +594,7 @@ export const UpiProfilesSection: React.FC = () => {
         </Modal>
       )}
 
-      {qrAccount && (
-        <UpiQrModal
-          visible={!!qrAccount}
-          onClose={() => setQrAccount(null)}
-          account={qrAccount}
-        />
-      )}
+      <UpiQrModal visible={!!qrAccount} onClose={() => setQrAccount(null)} account={qrAccount} />
     </View>
   );
 };
@@ -659,6 +665,7 @@ const styles = StyleSheet.create({
   },
   cardTopInfo: {
     flex: 1,
+    minWidth: 0,
     gap: 3,
   },
   bankTitleRow: {
@@ -667,6 +674,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   bankHeading: {
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: '500',
     letterSpacing: 0.6,

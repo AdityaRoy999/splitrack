@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  GestureResponderEvent,
   LayoutChangeEvent,
   Platform,
   StyleSheet,
@@ -19,6 +20,7 @@ import { ImpactStyle, triggerImpact } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassSurface } from './GlassSurface';
 import { NativeGlassContainer } from '../common/AppleNativeControls';
+import { measureNodeInWindow, type ViewRefNode } from '../../utils/measureWindow';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -41,7 +43,8 @@ const DockTabButton: React.FC<{
   item: NavItemConfig;
   isActive: boolean;
   isDark: boolean;
-}> = ({ item, isActive, isDark }) => {
+  onPress: () => void;
+}> = ({ item, isActive, isDark, onPress }) => {
   const contentColor = item.isAction
     ? isDark
       ? '#FFFFFF'
@@ -55,11 +58,14 @@ const DockTabButton: React.FC<{
         : '#64748B';
 
   return (
-    <View
-      accessibilityRole="tab"
-      accessibilityState={{ selected: isActive }}
+    <TouchableOpacity
+      accessibilityRole={item.isAction ? 'button' : 'tab'}
+      accessibilityLabel={item.isAction ? 'Add split expense' : item.label}
+      accessibilityState={item.isAction ? undefined : { selected: isActive }}
+      aria-selected={item.isAction ? undefined : isActive}
+      onPress={onPress}
+      activeOpacity={0.8}
       style={styles.tabBtn}
-      pointerEvents="none"
     >
       <View style={styles.tabInner}>
         {item.icon(contentColor)}
@@ -76,7 +82,7 @@ const DockTabButton: React.FC<{
           {item.label}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -84,11 +90,11 @@ const DockTabButton: React.FC<{
  * Floating pill capsule navbar with real-time zero-delay sliding gestures
  * and authentic iOS Liquid Glass jelly physics (holding expansion, stretch & squish bounce).
  */
-export const GlassDock: React.FC<GlassDockProps> = ({
+export const GlassDock = memo(function GlassDock({
   currentTab,
   onTabChange,
   onQuickAdd,
-}) => {
+}: GlassDockProps) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
@@ -138,50 +144,42 @@ export const GlassDock: React.FC<GlassDockProps> = ({
   const slotWidth = rowWidth / mainNavItems.length;
 
   const [slideX] = useState(() => new Animated.Value(activeIndex * slotWidth));
-  const [stretchX] = useState(() => new Animated.Value(1));
-  const [squishY] = useState(() => new Animated.Value(1));
   const [capsuleScale] = useState(() => new Animated.Value(1));
 
   const [hoverSlot, setHoverSlot] = useState<number>(activeIndex);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const isDraggingRef = useRef<boolean>(false);
-  const lastTouchXRef = useRef<number>(0);
+  const hoverSlotRef = useRef<number>(activeIndex);
+  const rowRef = useRef<ViewRefNode>(null);
+  const rowXRef = useRef((windowWidth - maxTotalWidth) / 2 + 6);
+  const touchStartRef = useRef({ x: 0, y: 0 });
 
-  // Sync position with currentTab when not actively dragging with instant, snappy native spring
+  // Sync position with currentTab with smooth native spring
   useEffect(() => {
     if (isDraggingRef.current) return;
+    hoverSlotRef.current = activeIndex;
     setHoverSlot(activeIndex);
     const targetX = activeIndex * slotWidth;
 
-    Animated.parallel([
-      Animated.spring(slideX, {
-        toValue: targetX,
-        stiffness: 580,
-        damping: 34,
-        mass: 0.6,
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }),
-      Animated.spring(stretchX, {
-        toValue: 1,
-        stiffness: 600,
-        damping: 32,
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }),
-      Animated.spring(squishY, {
-        toValue: 1,
-        stiffness: 600,
-        damping: 32,
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }),
-    ]).start();
-  }, [activeIndex, slotWidth, slideX, stretchX, squishY]);
+    Animated.spring(slideX, {
+      toValue: targetX,
+      stiffness: 480,
+      damping: 32,
+      mass: 0.55,
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [activeIndex, slotWidth, slideX]);
 
   const handleRowLayout = (e: LayoutChangeEvent) => {
     const measured = e.nativeEvent.layout.width;
     if (measured > 0) {
       setRowWidth(measured);
+      measureNodeInWindow(rowRef.current, (rect) => { rowXRef.current = rect.x; });
     }
   };
+
+  const getTouchX = (event: GestureResponderEvent) =>
+    event.nativeEvent.pageX - rowXRef.current;
 
   const getSlotFromX = (touchX: number) => {
     if (rowWidth <= 0 || mainNavItems.length === 0) return 0;
@@ -194,142 +192,82 @@ export const GlassDock: React.FC<GlassDockProps> = ({
   const onTouchGrant = (touchX: number) => {
     isDraggingRef.current = true;
     setIsDragging(true);
-    lastTouchXRef.current = touchX;
     const initialSlot = getSlotFromX(touchX);
+    hoverSlotRef.current = initialSlot;
     setHoverSlot(initialSlot);
-    const initialItem = mainNavItems[initialSlot];
-    if (initialItem && !initialItem.isAction) {
-      onTabChange(initialItem.key);
-    }
 
-    // Holding navbar breathing expansion (authentic iOS liquid glass)
-    Animated.spring(capsuleScale, {
-      toValue: 1.032,
-      stiffness: 380,
-      damping: 22,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-
-    // Move slider immediately to touch position
-    const targetPillX = Math.max(0, Math.min(rowWidth - slotWidth, touchX - slotWidth / 2));
+    // Slide cleanly to slot center
+    const targetX = initialSlot * slotWidth;
     Animated.spring(slideX, {
-      toValue: targetPillX,
-      stiffness: 600,
+      toValue: targetX,
+      stiffness: 500,
       damping: 30,
-      mass: 0.6,
+      mass: 0.5,
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
 
-    // Subtle holding feedback
-    Animated.parallel([
-      Animated.spring(stretchX, {
-        toValue: 1.04,
-        stiffness: 550,
-        damping: 28,
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }),
-      Animated.spring(squishY, {
-        toValue: 0.97,
-        stiffness: 550,
-        damping: 28,
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }),
-    ]).start();
+    // Subtle press-down scale
+    Animated.spring(capsuleScale, {
+      toValue: 0.985,
+      stiffness: 400,
+      damping: 24,
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
 
     triggerImpact(ImpactStyle.Light);
+
   };
 
   const onTouchMove = (touchX: number) => {
     if (!isDraggingRef.current || rowWidth <= 0) return;
 
-    const deltaX = Math.abs(touchX - (lastTouchXRef.current || touchX));
-    lastTouchXRef.current = touchX;
-
-    // Follow finger directly with ZERO delay
-    const targetPillX = Math.max(0, Math.min(rowWidth - slotWidth, touchX - slotWidth / 2));
-    Animated.spring(slideX, {
-      toValue: targetPillX,
-      stiffness: 750,
-      damping: 34,
-      mass: 0.5,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-
-    // Dynamic jelly stretch based on movement
-    const dynamicStretch = Math.min(1.08, 1.02 + deltaX * 0.005);
-    const dynamicSquish = Math.max(0.95, 0.98 - deltaX * 0.004);
-    Animated.parallel([
-      Animated.spring(stretchX, {
-        toValue: dynamicStretch,
-        stiffness: 550,
-        damping: 28,
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }),
-      Animated.spring(squishY, {
-        toValue: dynamicSquish,
-        stiffness: 550,
-        damping: 28,
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }),
-    ]).start();
-
-    // Check slot change
     const newSlot = getSlotFromX(touchX);
-    if (newSlot !== hoverSlot) {
+    if (newSlot !== hoverSlotRef.current) {
+      hoverSlotRef.current = newSlot;
       setHoverSlot(newSlot);
       triggerImpact(ImpactStyle.Light);
-      const targetItem = mainNavItems[newSlot];
-      if (targetItem && !targetItem.isAction) {
-        onTabChange(targetItem.key);
-      }
+      const targetX = newSlot * slotWidth;
+      Animated.spring(slideX, {
+        toValue: targetX,
+        stiffness: 500,
+        damping: 30,
+        mass: 0.5,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }).start();
     }
   };
 
-  const onTouchRelease = (touchX: number) => {
+  const onTouchRelease = (touchX?: number) => {
+    if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
     setIsDragging(false);
-    const finalSlot = getSlotFromX(touchX);
-    setHoverSlot(finalSlot);
+    const finalSlot = touchX === undefined ? activeIndex : getSlotFromX(touchX);
+    const finalItem = mainNavItems[finalSlot];
+    const restingSlot = finalItem?.isAction ? activeIndex : finalSlot;
+    hoverSlotRef.current = restingSlot;
+    setHoverSlot(restingSlot);
 
-    // Release capsule scale back to normal
-    Animated.spring(capsuleScale, {
-      toValue: 1,
-      stiffness: 480,
-      damping: 28,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-
-    // Snap slider instantly to final target slot with zero lag
-    const finalTargetX = finalSlot * slotWidth;
     Animated.parallel([
+      Animated.spring(capsuleScale, {
+        toValue: 1,
+        stiffness: 450,
+        damping: 26,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
       Animated.spring(slideX, {
-        toValue: finalTargetX,
-        stiffness: 580,
-        damping: 34,
-        mass: 0.6,
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }),
-      Animated.spring(stretchX, {
-        toValue: 1,
-        stiffness: 600,
+        toValue: restingSlot * slotWidth,
+        stiffness: 500,
         damping: 30,
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }),
-      Animated.spring(squishY, {
-        toValue: 1,
-        stiffness: 600,
-        damping: 30,
+        mass: 0.5,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
 
-    triggerImpact(ImpactStyle.Light);
-
-    // Commit tab switch
-    const targetItem = mainNavItems[finalSlot];
-    if (targetItem) {
-      if (targetItem.isAction) onQuickAdd();
-      else onTabChange(targetItem.key);
+    // Open the modal only after the gesture ends, so its backdrop cannot
+    // receive the remainder of the opening press. Cancellation never opens it.
+    if (touchX !== undefined && finalItem) {
+      if (finalItem.isAction) onQuickAdd();
+      else onTabChange(finalItem.key);
     }
   };
 
@@ -361,16 +299,25 @@ export const GlassDock: React.FC<GlassDockProps> = ({
             style={[styles.navbarCapsule, { width: capsuleWidth }]}
           >
             <View
+              ref={rowRef}
+              collapsable={false}
               style={styles.navRow}
               onLayout={handleRowLayout}
-              onStartShouldSetResponder={() => true}
-              onMoveShouldSetResponder={() => true}
-              onResponderGrant={(e) => onTouchGrant(e.nativeEvent.locationX)}
-              onResponderMove={(e) => onTouchMove(e.nativeEvent.locationX)}
-              onResponderRelease={(e) => onTouchRelease(e.nativeEvent.locationX)}
-              onResponderTerminate={(e) => onTouchRelease(e.nativeEvent.locationX)}
+              onStartShouldSetResponderCapture={(e) => {
+                touchStartRef.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+                return false;
+              }}
+              onMoveShouldSetResponderCapture={(e) => {
+                const dx = Math.abs(e.nativeEvent.pageX - touchStartRef.current.x);
+                const dy = Math.abs(e.nativeEvent.pageY - touchStartRef.current.y);
+                return dx > 8 && dx > dy;
+              }}
+              onResponderGrant={(e) => onTouchGrant(getTouchX(e))}
+              onResponderMove={(e) => onTouchMove(getTouchX(e))}
+              onResponderRelease={(e) => onTouchRelease(getTouchX(e))}
+              onResponderTerminate={() => onTouchRelease()}
             >
-              {/* Sliding active section pill indicator with Jelly physics */}
+              {/* Sliding active section pill indicator */}
               <Animated.View
                 pointerEvents="none"
                 style={[
@@ -378,11 +325,7 @@ export const GlassDock: React.FC<GlassDockProps> = ({
                   {
                     width: slotWidth,
                     backgroundColor: activePillBg,
-                    transform: [
-                      { translateX: slideX },
-                      { scaleX: stretchX },
-                      { scaleY: squishY },
-                    ],
+                    transform: [{ translateX: slideX }],
                   },
                 ]}
               />
@@ -393,6 +336,11 @@ export const GlassDock: React.FC<GlassDockProps> = ({
                   item={item}
                   isActive={isDragging ? hoverSlot === idx : currentTab === item.key}
                   isDark={isDark}
+                  onPress={() => {
+                    triggerImpact(ImpactStyle.Light);
+                    if (item.isAction) onQuickAdd();
+                    else onTabChange(item.key);
+                  }}
                 />
               ))}
             </View>
@@ -422,7 +370,7 @@ export const GlassDock: React.FC<GlassDockProps> = ({
       </NativeGlassContainer>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   outerContainer: {

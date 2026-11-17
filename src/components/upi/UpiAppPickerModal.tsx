@@ -1,7 +1,10 @@
+import { ModalPage } from '../common/ModalPage';
+import { SheetModal } from '../common/SheetModal';
+import { JellyRadio } from '../common/JellyRadio';
+import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import React, { useMemo, useState } from 'react';
 import {
   FlatList,
-  Modal,
   Platform,
   StyleSheet,
   Text,
@@ -117,12 +120,13 @@ export const UpiAppPickerModal: React.FC<UpiAppPickerModalProps> = ({
   };
 
   return (
-    <Modal
+    <SheetModal
       visible={visible}
       animationType="fade"
       statusBarTranslucent
       onRequestClose={onClose}
     >
+      <ModalPage>
       <View
         style={[
           styles.pageContainer,
@@ -172,7 +176,7 @@ export const UpiAppPickerModal: React.FC<UpiAppPickerModalProps> = ({
                     boxShadow: 'none',
                   } as any),
               ]}
-              placeholder="Search app or handle (e.g. Google Pay, @slice)..."
+              placeholder="Search app or handle (e.g. Google Pay, @slc)..."
               placeholderTextColor={mutedText}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -190,45 +194,24 @@ export const UpiAppPickerModal: React.FC<UpiAppPickerModalProps> = ({
           </View>
         </View>
 
-        {/* Category Horizontal Filter Chips */}
-        <View style={styles.categoriesWrap}>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={UPI_APP_CATEGORIES}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.categoryChipsList}
-            renderItem={({ item }) => {
-              const isSelected = activeCategory === item.id;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() => {
-                    triggerImpact(ImpactStyle.Light);
-                    setActiveCategory(item.id);
-                  }}
-                  activeOpacity={0.8}
-                  style={[
-                    styles.categoryChip,
-                    { backgroundColor: isSelected ? activeBg : chipBg },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      { color: isSelected ? activeText : textColor },
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
+        <JellyRadio
+          scrollable
+          items={UPI_APP_CATEGORIES.map((category) => ({ value: category.id, label: category.id === 'all' ? `All (${UPI_APPS_CATALOG.length})` : category.label }))}
+          value={activeCategory}
+          onChange={(value) => setActiveCategory(value as UpiAppCategory | 'all')}
+          chipColor={chipBg}
+          activeColor={activeBg}
+          textColor={textColor}
+          activeTextColor={activeText}
+          fadeColor={bgSheet}
+          blurWidth={28}
+          size="sm"
+          style={styles.categoriesWrap}
+        />
 
         {/* Borderless Apps List */}
-        <FlatList
+        <ScrollEdgeFade tint={bgSheet}>
+          <FlatList
           data={filteredApps}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
@@ -288,7 +271,7 @@ export const UpiAppPickerModal: React.FC<UpiAppPickerModalProps> = ({
                     </Text>
                     <View style={[styles.handleBadge, { backgroundColor: inputBg }]}>
                       <Text style={[styles.handleBadgeText, { color: mutedText }]}>
-                        {item.defaultHandle}
+                        {item.defaultHandle || 'Full UPI ID'}
                       </Text>
                     </View>
                   </View>
@@ -306,6 +289,7 @@ export const UpiAppPickerModal: React.FC<UpiAppPickerModalProps> = ({
             );
           }}
         />
+        </ScrollEdgeFade>
 
         {/* Add Custom UPI App Option */}
         <View style={styles.bottomBar}>
@@ -380,7 +364,8 @@ export const UpiAppPickerModal: React.FC<UpiAppPickerModalProps> = ({
           )}
         </View>
       </View>
-    </Modal>
+      </ModalPage>
+    </SheetModal>
   );
 };
 
@@ -449,6 +434,7 @@ const styles = StyleSheet.create({
   },
   categoriesWrap: {
     marginBottom: 8,
+    marginHorizontal: 16,
   },
   categoryChipsList: {
     paddingHorizontal: 16,

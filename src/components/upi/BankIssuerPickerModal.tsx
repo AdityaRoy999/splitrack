@@ -1,7 +1,10 @@
+import { ModalPage } from '../common/ModalPage';
+import { SheetModal } from '../common/SheetModal';
+import { JellyRadio } from '../common/JellyRadio';
+import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import React, { useMemo, useState } from 'react';
 import {
   FlatList,
-  Modal,
   Platform,
   StyleSheet,
   Text,
@@ -109,12 +112,13 @@ export const BankIssuerPickerModal: React.FC<BankIssuerPickerModalProps> = ({
   };
 
   return (
-    <Modal
+    <SheetModal
       visible={visible}
       animationType="fade"
       statusBarTranslucent
       onRequestClose={onClose}
     >
+      <ModalPage>
       <View
         style={[
           styles.pageContainer,
@@ -182,45 +186,24 @@ export const BankIssuerPickerModal: React.FC<BankIssuerPickerModalProps> = ({
           </View>
         </View>
 
-        {/* Category Horizontal Filter Chips */}
-        <View style={styles.categoriesWrap}>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={BANK_CATEGORIES}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.categoryChipsList}
-            renderItem={({ item }) => {
-              const isSelected = activeCategory === item.id;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() => {
-                    triggerImpact(ImpactStyle.Light);
-                    setActiveCategory(item.id);
-                  }}
-                  activeOpacity={0.8}
-                  style={[
-                    styles.categoryChip,
-                    { backgroundColor: isSelected ? activeBg : chipBg },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      { color: isSelected ? activeText : textColor },
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
+        <JellyRadio
+          scrollable
+          items={BANK_CATEGORIES.map((category) => ({ value: category.id, label: category.id === 'all' ? `All (${BANKS_CATALOG.length})` : category.label }))}
+          value={activeCategory}
+          onChange={(value) => setActiveCategory(value as BankCategory | 'all')}
+          chipColor={chipBg}
+          activeColor={activeBg}
+          textColor={textColor}
+          activeTextColor={activeText}
+          fadeColor={bgSheet}
+          blurWidth={28}
+          size="sm"
+          style={styles.categoriesWrap}
+        />
 
         {/* Borderless Banks List */}
-        <FlatList
+        <ScrollEdgeFade tint={bgSheet}>
+          <FlatList
           data={filteredBanks}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
@@ -298,6 +281,7 @@ export const BankIssuerPickerModal: React.FC<BankIssuerPickerModalProps> = ({
             );
           }}
         />
+        </ScrollEdgeFade>
 
         {/* Add Custom Bank Option */}
         <View style={styles.bottomBar}>
@@ -353,7 +337,8 @@ export const BankIssuerPickerModal: React.FC<BankIssuerPickerModalProps> = ({
           )}
         </View>
       </View>
-    </Modal>
+      </ModalPage>
+    </SheetModal>
   );
 };
 
@@ -422,6 +407,7 @@ const styles = StyleSheet.create({
   },
   categoriesWrap: {
     marginBottom: 8,
+    marginHorizontal: 16,
   },
   categoryChipsList: {
     paddingHorizontal: 16,

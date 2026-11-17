@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
+import { MinusCircleIcon } from '@solar-icons/react-native/bold/minus-circle';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { UsersGroupRoundedIcon } from '@solar-icons/react-native/bold/users-group-rounded';
@@ -14,6 +15,7 @@ import { GlassCard } from '../glass/GlassCard';
 import { SpotlightCard } from '../glass/SpotlightCard';
 import { GlassPill } from '../glass/GlassPill';
 import { AddMemberModal } from './AddMemberModal';
+import { TripMemberPill } from './TripMemberPill';
 
 interface TripDetailViewProps {
   trip: Trip;
@@ -30,9 +32,10 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
   onOpenSettle,
   onSelectTransaction,
 }) => {
-  const { friends, transactions, categories } = useSplitTrack();
+  const { friends, transactions, categories, removeMemberFromTrip } = useSplitTrack();
   const { formatAmount, themeMode } = useLiquidGlass();
   const [showAddMember, setShowAddMember] = useState(false);
+  const [removingMembers, setRemovingMembers] = useState(false);
   const isDark = themeMode === 'dark';
 
   const textColor = isDark ? '#FFFFFF' : '#09090B';
@@ -41,6 +44,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
 
   const tripFriends = friends.filter((f) => trip.members.includes(f.id));
+  const removalMode = removingMembers && tripFriends.length > 0;
   const tripTransactions = transactions.filter((tx) => tx.tripId === trip.id);
 
   const getCategoryMeta = (catName: string, fallbackIcon: string) => {
@@ -123,14 +127,27 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
           <Text style={[styles.sectionHeading, { color: textColor }]}>
             Members ({trip.members.length})
           </Text>
-          <AnimatedPressable
-            scaleTo={0.9}
-            onPress={() => setShowAddMember(true)}
-            accessibilityLabel="Add trip member"
-            contentStyle={[styles.addMemberBtn, { backgroundColor: pillSurface }]}
-          >
-            <AddCircleIcon size={16} color={textColor} />
-          </AnimatedPressable>
+          <View style={styles.memberControls}>
+            <AnimatedPressable
+              scaleTo={0.9}
+              disabled={tripFriends.length === 0}
+              onPress={() => setRemovingMembers((value) => !value)}
+              accessibilityLabel={removalMode ? 'Finish removing trip members' : 'Remove trip members'}
+              style={styles.memberControlHitArea}
+              contentStyle={[styles.addMemberBtn, { backgroundColor: removalMode ? (isDark ? '#3F3F46' : '#D4D4D8') : pillSurface }]}
+            >
+              <MinusCircleIcon size={18} color={textColor} />
+            </AnimatedPressable>
+            <AnimatedPressable
+              scaleTo={0.9}
+              onPress={() => { setRemovingMembers(false); setShowAddMember(true); }}
+              accessibilityLabel="Add trip member"
+              style={styles.memberControlHitArea}
+              contentStyle={[styles.addMemberBtn, { backgroundColor: pillSurface }]}
+            >
+              <AddCircleIcon size={18} color={textColor} />
+            </AnimatedPressable>
+          </View>
         </View>
         <GlassCard borderRadius={22} style={styles.membersCard}>
           <View style={styles.membersWrap}>
@@ -139,24 +156,12 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
               <Text style={[styles.memberName, { color: textColor }]}>You</Text>
             </View>
 
-            {tripFriends.map((f) => (
-              <View key={f.id} style={[styles.memberPill, { backgroundColor: pillSurface }]}>
-                {f.avatar ? (
-                  <Image source={{ uri: f.avatar }} style={styles.memberAvatar} />
-                ) : (
-                  <View
-                    style={[
-                      styles.memberInitialCircle,
-                      { backgroundColor: isDark ? '#27272F' : '#D4D4D8' },
-                    ]}
-                  >
-                    <Text style={[styles.memberInitialText, { color: textColor }]}>
-                      {f.name.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-                <Text style={[styles.memberName, { color: textColor }]}>{f.name}</Text>
-              </View>
+            {tripFriends.map((member) => (
+              <TripMemberPill key={member.id} member={member} removalMode={removalMode} onRemove={() => {
+                const removed = removeMemberFromTrip(trip.id, member.id);
+                if (removed && tripFriends.length === 1) setRemovingMembers(false);
+                return removed;
+              }} />
             ))}
           </View>
         </GlassCard>
@@ -373,6 +378,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  memberControls: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  memberControlHitArea: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   memberPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -385,22 +392,6 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-  },
-  memberAvatar: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  memberInitialCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  memberInitialText: {
-    fontSize: 10,
-    fontWeight: '600',
   },
   addMemberBtn: {
     width: 30,

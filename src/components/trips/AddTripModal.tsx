@@ -1,10 +1,10 @@
+import { ModalBackdrop } from '../common/ModalBackdrop';
+import { SheetModal } from '../common/SheetModal';
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Image,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +20,7 @@ import { NotificationType, triggerNotification } from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassPill } from '../glass/GlassPill';
+import { HorizontalEdgeFade, ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
@@ -179,7 +180,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
   const mutedText = isDark ? '#8E8E93' : '#71717A';
 
   return (
-    <Modal
+    <SheetModal
       visible={visible}
       transparent
       animationType="fade"
@@ -188,11 +189,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityLabel="Dismiss modal backdrop"
-        />
+        <ModalBackdrop onClose={onClose} />
         <GlassModalSheet style={styles.sheetContainer}>
           <View style={styles.dragHandleWrap}>
             <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
@@ -207,7 +204,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
             </TouchableOpacity>
           </View>
 
-          <View style={styles.scrollAreaWrap}>
+          <ScrollEdgeFade style={styles.scrollAreaWrap}>
             <ScrollView contentContainerStyle={styles.formContent} showsVerticalScrollIndicator={false}>
               {/* Name Input */}
               <View style={styles.fieldGroup}>
@@ -263,7 +260,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
               {/* Album Cover Photo Selector */}
               <View style={styles.fieldGroup}>
                 <Text style={[styles.fieldLabel, { color: mutedText }]}>ALBUM COVER PHOTO</Text>
-                <View style={styles.horizontalBlurWrap}>
+                <HorizontalEdgeFade style={styles.horizontalBlurWrap} tint={inputBg} width={16}>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -343,7 +340,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
                   );
                 })}
                   </ScrollView>
-                </View>
+                </HorizontalEdgeFade>
               </View>
 
               {/* Members Selection using React Bits SpringCheck */}
@@ -407,7 +404,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
                 </View>
               </View>
             </ScrollView>
-          </View>
+          </ScrollEdgeFade>
 
           <GlassPill
             label="Create Trip"
@@ -424,27 +421,28 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
         onClose={() => setShowAddCategory(false)}
         onCreated={(created) => setCategory(created.name)}
       />
-    </Modal>
+    </SheetModal>
   );
 };
 
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+
     justifyContent: 'flex-end',
   },
   sheetContainer: {
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     paddingTop: 10,
     paddingHorizontal: 20,
-    paddingBottom: 36,
-    maxHeight: '85%',
     borderWidth: 0,
+    marginBottom: 0,
   },
   dragHandleWrap: {
     alignItems: 'center',
@@ -481,7 +479,8 @@ const styles = StyleSheet.create({
   },
   scrollAreaWrap: {
     position: 'relative',
-    flexShrink: 1,
+    flex: 1,
+    minHeight: 120,
     overflow: 'hidden',
   },
   catHeaderRow: {
@@ -519,6 +518,7 @@ const styles = StyleSheet.create({
   },
   coverRow: {
     gap: 8,
+    paddingHorizontal: 18,
   },
   coverTile: {
     width: 84,

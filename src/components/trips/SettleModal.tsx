@@ -1,10 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { ModalBackdrop } from '../common/ModalBackdrop';
+import { SheetModal } from '../common/SheetModal';
+import React, { useCallback, useState } from 'react';
 import {
-  Animated,
-  Easing,
-  Modal,
-  Platform,
-  Pressable,
   ScrollView,
   Share,
   StyleSheet,
@@ -22,8 +19,12 @@ import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassPill } from '../glass/GlassPill';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
 import { UpiQrModal } from '../upi/UpiQrModal';
+import { BottomBubble, type BubbleNotice } from '../common/BottomBubble';
+import { buildUpiPaymentUri, formatUpiAmount, getReceivingUpiAccount, type UpiPaymentDetails } from '../../utils/upi';
+import type { UpiAccount } from '../../types';
 
 interface SettleModalProps {
   visible: boolean;
@@ -38,35 +39,10 @@ export const SettleModal: React.FC<SettleModalProps> = ({
 }) => {
   const { accounts, friends, selectedAccountId, getSimplifiedDebts, settleWithFriend } = useSplitTrack();
   const { formatAmount, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [toastSeq, setToastSeq] = useState(0);
-  const [showQrModal, setShowQrModal] = useState(false);
-  const [toastAnim] = useState(() => new Animated.Value(0));
-  const useNativeDriver = Platform.OS !== 'web';
-
-  useEffect(() => {
-    if (!successMsg || toastSeq === 0) return undefined;
-    toastAnim.setValue(0);
-    Animated.spring(toastAnim, {
-      toValue: 1,
-      friction: 8,
-      tension: 85,
-      useNativeDriver,
-    }).start();
-
-    const timer = setTimeout(() => {
-      Animated.timing(toastAnim, {
-        toValue: 0,
-        duration: 220,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver,
-      }).start(({ finished }) => {
-        if (finished) setSuccessMsg(null);
-      });
-    }, 2600);
-
-    return () => clearTimeout(timer);
-  }, [successMsg, toastSeq, toastAnim, useNativeDriver]);
+  const [notice, setNotice] = useState<BubbleNotice | null>(null);
+  const [qrRequest, setQrRequest] = useState<({ account: UpiAccount } & UpiPaymentDetails) | null>(null);
+  const dismissNotice = useCallback(() => setNotice(null), []);
+  const closeQr = useCallback(() => setQrRequest(null), []);
 
   const isDark = themeMode === 'dark';
   const rawDebts = getSimplifiedDebts();
@@ -81,10 +57,16 @@ export const SettleModal: React.FC<SettleModalProps> = ({
     : [];
   const simplifiedDebts = rawDebts;
   const targetHasPendingDebt = targetDebts.length > 0;
-  const activeAccount = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
-  const activeUpiAccount =
-    (activeAccount?.upiId ? activeAccount : accounts.find((a) => Boolean(a.upiId))) ||
-    activeAccount;
+  const receivingAccount = getReceivingUpiAccount(accounts, selectedAccountId);
+
+  const openPaymentQr = (amount?: number, debtorName?: string) => {
+    if (!receivingAccount) return;
+    triggerImpact(ImpactStyle.Light);
+    setQrRequest({
+      account: receivingAccount, amount,
+      note: debtorName ? `SplitTrack settlement with ${debtorName}` : undefined,
+    });
+  };
 
   const handleSettle = (fromId: string, toId: string, amount: number) => {
     triggerNotification(NotificationType.Success);
@@ -92,22 +74,17 @@ export const SettleModal: React.FC<SettleModalProps> = ({
     const friendId = fromId === 'user' ? toId : fromId;
     settleWithFriend(friendId, amount);
 
-    setSuccessMsg(`Settled ${formatAmount(amount)} successfully!`);
-    setToastSeq((seq) => seq + 1);
+    setNotice((previous) => ({ id: (previous?.id ?? 0) + 1, message: `Settled ${formatAmount(amount)} successfully!` }));
   };
 
   const handleSendReminder = async (debtorName: string, amount: number) => {
     try {
       triggerImpact(ImpactStyle.Light);
-      const preferredUpi =
-        (activeAccount?.upiId ? activeAccount : accounts.find((a) => Boolean(a.upiId))) ||
-        activeAccount;
-      const handleText = preferredUpi?.upiId
-        ? ` Pay via UPI: ${preferredUpi.upiId}.`
-        : preferredUpi?.title
-          ? ` Account: ${preferredUpi.title}.`
-          : '';
-      const message = `Hey ${debtorName}, a quick reminder from SplitTrack: you have a pending split of ${formatAmount(amount)}.${handleText} Thanks!`;
+      const paymentLink = receivingAccount
+        ? buildUpiPaymentUri(receivingAccount, { amount, note: `SplitTrack settlement with ${debtorName}` })
+        : '';
+      const paymentText = paymentLink ? ` Pay ₹${formatUpiAmount(amount)} via UPI: ${receivingAccount!.upiId}.\n${paymentLink}` : '';
+      const message = `Hey ${debtorName}, a quick reminder from SplitTrack: you have a pending split of ${formatAmount(amount)}.${paymentText}\nThanks!`;
       await Share.share({ message });
     } catch {}
   };
@@ -170,12 +147,24 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                 </View>
 
                 <View style={styles.partyBoxRight}>
+                  <View style={styles.recipientNameRow}>
+                    {isUserCreditor && receivingAccount ? (
+                      <AnimatedPressable
+                        scaleTo={0.93}
+                        onPress={() => openPaymentQr(item.amount, item.fromName)}
+                        accessibilityLabel={`Show payment QR for ${item.fromName} to pay you ${formatUpiAmount(item.amount)} rupees`}
+                        contentStyle={[styles.debtQrButton, { backgroundColor: pillSurface }]}
+                      >
+                        <QrCodeIcon size={17} color={textColor} />
+                      </AnimatedPressable>
+                    ) : null}
                   <Text
                     style={[styles.partyName, styles.partyNameRight, { color: textColor }]}
                     numberOfLines={1}
                   >
                     {item.toName}
                   </Text>
+                  </View>
                   <Text style={[styles.partyRole, styles.partyRoleRight, { color: mutedText }]}>
                     receives
                   </Text>
@@ -236,7 +225,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
   );
 
   return (
-    <Modal
+    <SheetModal
       visible={visible}
       transparent
       animationType="fade"
@@ -245,11 +234,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityLabel="Dismiss modal backdrop"
-        />
+        <ModalBackdrop onClose={onClose} />
         <GlassModalSheet style={styles.sheetContainer}>
           <View style={styles.dragHandleWrap}>
             <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
@@ -274,7 +259,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {activeAccount && (
+          {receivingAccount ? (
             <View
               style={[
                 styles.activeProfileStrip,
@@ -290,22 +275,23 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                   Receiving UPI Profile
                 </Text>
                 <Text style={[styles.activeProfileValue, { color: textColor }]} numberOfLines={1}>
-                  {activeAccount.title} • {activeAccount.upiId || activeAccount.bankName || 'Default'}
+                  {receivingAccount.title} • {receivingAccount.upiId}
                 </Text>
               </View>
               <AnimatedPressable
                 scaleTo={0.93}
                 onPress={() => {
-                  triggerImpact(ImpactStyle.Light);
-                  setShowQrModal(true);
+                  const focusedDebt = targetFriendId ? targetDebts.find((debt) => debt.toId === 'user') : undefined;
+                  openPaymentQr(focusedDebt?.amount, focusedDebt?.fromName);
                 }}
+                accessibilityLabel="Show receiving UPI profile QR"
                 contentStyle={[styles.qrMiniPill, { backgroundColor: pillSurface }]}
               >
                 <QrCodeIcon size={14} color={textColor} />
                 <Text style={[styles.qrMiniText, { color: textColor }]}>QR</Text>
               </AnimatedPressable>
             </View>
-          )}
+          ) : <Text style={[styles.profileHint, { color: mutedText }]}>Add a UPI profile to receive payments by QR.</Text>}
 
           {targetFriend && !targetHasPendingDebt && simplifiedDebts.length > 0 && (
             <View style={styles.successBanner}>
@@ -318,7 +304,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
             </View>
           )}
 
-          <View style={styles.scrollAreaWrap}>
+          <ScrollEdgeFade style={styles.scrollAreaWrap}>
             <ScrollView contentContainerStyle={styles.debtsList} showsVerticalScrollIndicator={false}>
             {simplifiedDebts.length === 0 ? (
               <View style={styles.emptyContainer}>
@@ -344,76 +330,35 @@ export const SettleModal: React.FC<SettleModalProps> = ({
               </>
             )}
             </ScrollView>
-          </View>
+          </ScrollEdgeFade>
         </GlassModalSheet>
 
-        {successMsg && (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.bottomBubbleWrap,
-              {
-                opacity: toastAnim,
-                transform: [
-                  {
-                    translateY: toastAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [72, 0],
-                    }),
-                  },
-                  {
-                    scale: toastAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.9, 1],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.bottomBubblePill,
-                {
-                  backgroundColor: isDark ? '#1F2026' : '#18181B',
-                },
-              ]}
-            >
-              <CheckCircleIcon size={18} color="#10B981" />
-              <Text style={styles.bottomBubbleText}>{successMsg}</Text>
-            </View>
-          </Animated.View>
-        )}
+        <BottomBubble notice={notice} onDismiss={dismissNotice} />
       </View>
 
-      {activeUpiAccount && (
-        <UpiQrModal
-          visible={showQrModal}
-          onClose={() => setShowQrModal(false)}
-          account={activeUpiAccount}
-        />
-      )}
-    </Modal>
+      <UpiQrModal visible={Boolean(qrRequest)} onClose={closeQr} account={qrRequest?.account ?? null} amount={qrRequest?.amount} note={qrRequest?.note} />
+    </SheetModal>
   );
 };
 
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+
     justifyContent: 'flex-end',
   },
   sheetContainer: {
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     paddingTop: 14,
     paddingHorizontal: 20,
-    paddingBottom: 40,
-    maxHeight: '85%',
     borderWidth: 0,
+    marginBottom: 0,
   },
   dragHandleWrap: {
     alignItems: 'center',
@@ -485,7 +430,8 @@ const styles = StyleSheet.create({
   },
   scrollAreaWrap: {
     position: 'relative',
-    flexShrink: 1,
+    flex: 1,
+    minHeight: 120,
     overflow: 'hidden',
   },
   emptyContainer: {
@@ -531,12 +477,16 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'flex-end',
   },
+  recipientNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, maxWidth: '100%' },
+  debtQrButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  profileHint: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
   partyName: {
     fontSize: 15,
     fontWeight: '500',
   },
   partyNameRight: {
     textAlign: 'right',
+    flexShrink: 1,
   },
   partyRole: {
     fontSize: 11,
@@ -553,6 +503,8 @@ const styles = StyleSheet.create({
   },
   amountActionRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 8,
@@ -563,9 +515,11 @@ const styles = StyleSheet.create({
   },
   actionsGroup: {
     flexDirection: 'row',
+    maxWidth: '100%',
   },
   creditorBtnRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   activeProfileStrip: {
@@ -596,37 +550,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 6,
     borderRadius: 999,
+    minHeight: 44,
     gap: 5,
   },
   qrMiniText: {
     fontSize: 12,
-    fontWeight: '500',
-  },
-  bottomBubbleWrap: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 26,
-    alignItems: 'center',
-    zIndex: 999,
-  },
-  bottomBubblePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 999,
-    gap: 9,
-    borderWidth: 0,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.28,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  bottomBubbleText: {
-    color: '#FFFFFF',
-    fontSize: 13,
     fontWeight: '500',
   },
 });

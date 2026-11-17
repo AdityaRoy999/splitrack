@@ -1,12 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import { SheetModal } from '../common/SheetModal';
+import React, { memo, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
   Easing,
   Image,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -35,7 +34,9 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { currencies } from '../../theme/colors';
 import { renderSolarIcon } from '../../constants/solarIconsCatalog';
 import { GlassPill } from '../glass/GlassPill';
+import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
+import { ModalBackdrop } from '../common/ModalBackdrop';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
@@ -55,12 +56,12 @@ interface AddExpenseModalProps {
   defaultFriendIds?: string[];
 }
 
-export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
+export const AddExpenseModal = memo(function AddExpenseModal({
   visible,
   onClose,
   defaultTripId,
   defaultFriendIds,
-}) => {
+}: AddExpenseModalProps) {
   const { accounts, friends, trips, transactions, categories, addTransaction, selectedAccountId } =
     useSplitTrack();
   const { currency, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
@@ -806,21 +807,19 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     );
   };
 
+  // Preserve the draft state without mounting hidden native controls or sheets.
+
   return (
-    <Modal
+    <SheetModal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="none"
       presentationStyle="overFullScreen"
       statusBarTranslucent
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityLabel="Dismiss modal backdrop"
-        />
+        <ModalBackdrop onClose={onClose} />
         <GlassModalSheet style={styles.sheetContainer}>
           <View style={styles.dragHandleWrap}>
             <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
@@ -849,7 +848,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </AnimatedPressable>
           </View>
 
-          <View style={styles.scrollAreaWrap}>
+          <ScrollEdgeFade style={styles.scrollAreaWrap}>
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {/* Amount, Description & Category */}
             <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
@@ -1028,37 +1027,21 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 </AnimatedPressable>
               </View>
               {locationSuggestions.length > 0 && (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.locationChipsRow}
+                <JellyRadio
+                  scrollable
+                  fadeColor={cardBg}
+                  items={locationSuggestions}
+                  value={locationSuggestions.find((option) => location.trim().toLowerCase() === option.toLowerCase()) ?? ''}
+                  onChange={(value) => setLocation(location.trim().toLowerCase() === value.toLowerCase() ? '' : value)}
+                  chipColor={chipBg}
+                  activeColor={activeBg}
+                  textColor={textColor}
+                  activeTextColor={activeText}
+                  size="xs"
+                  gap={6}
+                  radius={999}
                   style={styles.locationChipsScroll}
-                >
-                  {locationSuggestions.map((locOption) => {
-                    const isPicked = location.trim().toLowerCase() === locOption.toLowerCase();
-                    return (
-                      <AnimatedPressable
-                        key={locOption}
-                        scaleTo={0.95}
-                        onPress={() => setLocation(isPicked ? '' : locOption)}
-                        contentStyle={[
-                          styles.locationChip,
-                          { backgroundColor: isPicked ? activeBg : chipBg },
-                        ]}
-                      >
-                        <Text
-                          numberOfLines={1}
-                          style={[
-                            styles.locationChipText,
-                            { color: isPicked ? activeText : textColor },
-                          ]}
-                        >
-                          {locOption}
-                        </Text>
-                      </AnimatedPressable>
-                    );
-                  })}
-                </ScrollView>
+                />
               )}
             </View>
 
@@ -1216,7 +1199,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 <JellyRadio
                   scrollable
                   fadeColor={cardBg}
-                  blurWidth={0}
                   items={visiblePaidByItems}
                   value={paidBy}
                   onChange={(val) => setPaidBy(val)}
@@ -1450,7 +1432,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               </View>
             </View>
             </ScrollView>
-          </View>
+          </ScrollEdgeFade>
 
           <GlassPill
             label="Save & Split Expense"
@@ -1475,7 +1457,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       />
 
       <AddCategoryModal
-        key={categoryToEdit ? `edit-${categoryToEdit.id}` : 'new-cat'}
         visible={showAddCategory}
         categoryToEdit={categoryToEdit}
         onClose={() => {
@@ -1486,29 +1467,25 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         onUpdated={(updated) => setCategory(updated.name)}
         onDeleted={() => setCategory(categories[0]?.name || 'Food & Drinks')}
       />
-    </Modal>
+    </SheetModal>
   );
-};
+});
 
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
     justifyContent: 'flex-end',
-    marginBottom: 0,
-    paddingBottom: 0,
   },
   sheetContainer: {
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     paddingTop: 10,
     paddingHorizontal: 16,
-    maxHeight: '92%',
     borderWidth: 0,
     marginBottom: 0,
   },
@@ -1548,7 +1525,8 @@ const styles = StyleSheet.create({
   },
   scrollAreaWrap: {
     position: 'relative',
-    flexShrink: 1,
+    flex: 1,
+    minHeight: 120,
     overflow: 'hidden',
   },
   scrollContent: {
@@ -1787,19 +1765,6 @@ const styles = StyleSheet.create({
   },
   locationChipsScroll: {
     marginTop: 8,
-  },
-  locationChipsRow: {
-    gap: 6,
-    paddingRight: 8,
-  },
-  locationChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-  locationChipText: {
-    fontSize: 11,
-    fontWeight: '500',
   },
   catActionsRow: {
     flexDirection: 'row',

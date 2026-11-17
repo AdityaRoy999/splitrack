@@ -1,47 +1,37 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   Animated,
-  Dimensions,
   Platform,
   StyleProp,
   StyleSheet,
+  useWindowDimensions,
   ViewStyle,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassSurface } from '../glass/GlassSurface';
+import { useSheetMotion } from './useSheetMotion';
 
 interface GlassModalSheetProps {
   style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }
 
-const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-
 export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
   style,
   children,
 }) => {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const { themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const bgMatte = isDark ? '#09090B' : '#F4F4F8';
   const tintGlass = isDark ? 'rgba(18, 18, 24, 0.88)' : 'rgba(255, 255, 255, 0.92)';
 
-  // Start well off-screen so the sheet smoothly slides up from the true bottom
-  const [slideAnim] = useState(() => new Animated.Value(Math.min(SCREEN_HEIGHT, 650)));
-
-  useEffect(() => {
-    Animated.spring(slideAnim, {
-      toValue: 0,
-      stiffness: 380,
-      damping: 30,
-      mass: 0.7,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-  }, [slideAnim]);
+  const maxSheetHeight = Math.round(windowHeight * 0.90);
+  const { translateY, panHandlers, close } = useSheetMotion(windowHeight);
 
   const bottomPadding = Math.max(34, insets.bottom + 16);
 
@@ -50,7 +40,8 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
       style={[
         styles.animWrap,
         {
-          transform: [{ translateY: slideAnim }],
+          maxHeight: maxSheetHeight,
+          transform: [{ translateY }],
         },
       ]}
     >
@@ -68,6 +59,7 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
           styles.sheetBase,
           style,
           {
+            maxHeight: maxSheetHeight,
             borderBottomLeftRadius: 0,
             borderBottomRightRadius: 0,
             marginBottom: 0,
@@ -77,16 +69,21 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
       >
         {children}
       </GlassSurface>
+      <View {...panHandlers} accessibilityLabel="Swipe down to close sheet" onAccessibilityTap={close} style={[styles.dragArea, Platform.OS === 'web' ? ({ touchAction: 'none', userSelect: 'none' } as ViewStyle) : undefined]} />
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
+  dragArea: { position: 'absolute', top: 0, left: 50, right: 50, height: 24, zIndex: 50 },
   animWrap: {
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
-    marginBottom: 0,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    overflow: 'hidden',
+    zIndex: 10,
   },
   sheetBase: {
     width: '100%',
@@ -96,5 +93,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderWidth: 0,
     overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   },
 });

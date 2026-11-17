@@ -1,27 +1,28 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  Image,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+  FlatList, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
+  Text, TextInput, TouchableOpacity, View, type ViewStyle,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraIcon } from '@solar-icons/react-native/bold/camera';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { UserRoundedIcon } from '@solar-icons/react-native/bold/user-rounded';
-import { ImpactStyle, NotificationType, triggerImpact, triggerNotification } from '../../utils/haptics';
+import { MagnifierIcon } from '@solar-icons/react-native/bold/magnifier';
+import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
+import { NotificationType, triggerNotification } from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
-import { Friend } from '../../types';
+import type { Friend } from '../../types';
+import { MEMBER_DIRECTORY } from '../../data/memberDirectory';
+import { availableUsername, buildMemberDirectory, normalizeUsername, searchMembers, type DirectoryMember } from '../../utils/memberProfiles';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassPill } from '../glass/GlassPill';
-import { GlassModalSheet } from '../common/GlassModalSheet';
+import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
+import { ModalBackdrop } from '../common/ModalBackdrop';
+import { ModalPage } from '../common/ModalPage';
+import { SheetModal } from '../common/SheetModal';
+import { BottomBubble, type BubbleNotice } from '../common/BottomBubble';
 
 interface AddMemberModalProps {
   visible: boolean;
@@ -30,690 +31,235 @@ interface AddMemberModalProps {
   editingFriend?: Friend | null;
 }
 
-const WEB_INPUT_RESET =
-  Platform.OS === 'web'
-    ? ({
-        outlineStyle: 'none',
-        outlineWidth: 0,
-        outlineColor: 'transparent',
-        outline: 'none',
-        boxShadow: 'none',
-      } as any)
-    : undefined;
+const WEB_INPUT_RESET = Platform.OS === 'web'
+  ? ({ outlineStyle: 'none', boxShadow: 'none' } as unknown as ViewStyle)
+  : undefined;
 
-// Directory of network members to allow searching by name or unique @username
-const DIRECTORY_PROFILES: Omit<Friend, 'id' | 'netBalance'>[] = [
-  {
-    name: 'Aditya Roy',
-    handle: '@aditya',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-    upiId: 'aditya@okaxis',
-    phone: '+91 91376 57510',
-  },
-  {
-    name: 'Aditya Sharma',
-    handle: '@aditya_sharma',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    upiId: 'adityasharma@paytm',
-    phone: '+91 98201 44321',
-  },
-  {
-    name: 'Aditya Verma',
-    handle: '@adityav',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-    upiId: 'adi@slice',
-    phone: '+91 97112 88490',
-  },
-  {
-    name: 'Alex Chen',
-    handle: '@alex',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
-    upiId: 'alex@slice',
-    phone: '+91 98765 43210',
-  },
-  {
-    name: 'Emily Smith',
-    handle: '@emily_s',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80',
-    upiId: 'emily@okhdfcbank',
-    phone: '+91 98112 33445',
-  },
-  {
-    name: 'Olivia Wilson',
-    handle: '@olivia_w',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
-    upiId: 'olivia@okaxis',
-    phone: '+91 99203 11892',
-  },
-  {
-    name: 'James Davis',
-    handle: '@james_d',
-    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=200&q=80',
-    upiId: 'james@ybl',
-    phone: '+91 98701 55678',
-  },
-  {
-    name: 'Robert Smith',
-    handle: '@robert_s',
-    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=200&q=80',
-    upiId: 'robert@paytm',
-    phone: '+91 98334 22110',
-  },
-  {
-    name: 'William Smith',
-    handle: '@william_s',
-    avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=200&q=80',
-    upiId: 'william@upi',
-    phone: '+91 98450 99887',
-  },
-  {
-    name: 'Priya Kapoor',
-    handle: '@priya_k',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80',
-    upiId: 'priya@okicici',
-    phone: '+91 98200 77123',
-  },
-  {
-    name: 'Rahul Mehta',
-    handle: '@rahul_m',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-    upiId: 'rahul@slice',
-    phone: '+91 98711 00223',
-  },
-  {
-    name: 'Ananya Rao',
-    handle: '@ananya_r',
-    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=200&q=80',
-    upiId: 'ananya@jupiteraxis',
-    phone: '+91 99100 44556',
-  },
-];
+export function AddMemberModal({ visible, onClose, tripId, editingFriend }: AddMemberModalProps) {
+  return (
+    <SheetModal visible={visible} statusBarTranslucent presentationStyle="overFullScreen" onRequestClose={onClose}>
+      <ModalBackdrop onClose={onClose} />
+      <ModalPage>
+        {visible ? (
+          <MemberPageContent key={editingFriend?.id ?? tripId ?? 'new-member'} editingFriend={editingFriend} tripId={tripId} onClose={onClose} />
+        ) : null}
+      </ModalPage>
+    </SheetModal>
+  );
+}
 
-export const AddMemberModal: React.FC<AddMemberModalProps> = ({
-  visible,
-  onClose,
-  tripId,
-  editingFriend,
-}) => {
-  const { friends, addFriend, updateFriend, addMemberToTrip } = useSplitTrack();
-  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
+function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberModalProps, 'visible'>) {
+  const { friends, trips, addFriend, updateFriend, addMemberToTrip } = useSplitTrack();
+  const { themeMode } = useLiquidGlass();
+  const insets = useSafeAreaInsets();
   const isDark = themeMode === 'dark';
   const isEditing = Boolean(editingFriend);
-
+  const [query, setQuery] = useState('');
   const [name, setName] = useState(editingFriend?.name ?? '');
   const [handle, setHandle] = useState(editingFriend?.handle ?? '');
   const [upiId, setUpiId] = useState(editingFriend?.upiId ?? '');
   const [phone, setPhone] = useState(editingFriend?.phone ?? '');
-  const [photoUri, setPhotoUri] = useState<string>(editingFriend?.avatar ?? '');
+  const [photoUri, setPhotoUri] = useState(editingFriend?.avatar ?? '');
   const [picking, setPicking] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState<BubbleNotice | null>(null);
+  const dismissNotice = useCallback(() => setNotice(null), []);
+  const adding = useRef(new Set<string>());
 
-  const cardBg = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
-    : (isDark ? '#121216' : '#FFFFFF');
-  const inputBg = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
-    : (isDark ? '#1B1B20' : '#F2F3F7');
-  const chipBg = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.04)')
-    : (isDark ? '#23232C' : '#E5E7EB');
-  const textColor = isDark ? '#F4F4F5' : '#09090B';
-  const mutedText = isDark ? '#8E8E93' : '#71717A';
+  const bg = isDark ? '#09090B' : '#F4F4F8';
+  const surface = isDark ? '#1C1C22' : '#EFEFF4';
+  const textColor = isDark ? '#F4F4F5' : '#18181B';
+  const mutedText = isDark ? '#A1A1AA' : '#71717A';
+  const accent = isDark ? '#34D399' : '#047857';
+  const directory = useMemo(() => buildMemberDirectory(friends, MEMBER_DIRECTORY), [friends]);
+  const results = useMemo(() => searchMembers(directory, query), [directory, query]);
+  const trip = tripId ? trips.find((item) => item.id === tripId) : undefined;
+  const addedHandles = useMemo(() => new Set(
+    friends.filter((friend) => !tripId || trip?.members.includes(friend.id)).map((friend) => normalizeUsername(friend.handle))
+  ), [friends, trip, tripId]);
 
-  // Search through all known friends & directory users by name OR username
-  const searchMatches = useMemo(() => {
-    if (isEditing) return [];
-    const q = (name || handle).trim().toLowerCase().replace(/^@/, '');
-    if (!q || q.length < 1) return [];
-
-    const pool = [
-      ...friends.map((f) => ({
-        name: f.name,
-        handle: f.handle,
-        avatar: f.avatar,
-        upiId: f.upiId || '',
-        phone: f.phone || '',
-        isKnownFriend: true,
-      })),
-      ...DIRECTORY_PROFILES.map((p) => ({
-        ...p,
-        isKnownFriend: false,
-      })),
-    ];
-
-    const seenHandles = new Set<string>();
-    const results: typeof pool = [];
-
-    for (const person of pool) {
-      const hKey = person.handle.toLowerCase();
-      if (seenHandles.has(hKey)) continue;
-
-      const matchName = person.name.toLowerCase().includes(q);
-      const matchHandle = person.handle.toLowerCase().includes(q);
-
-      if (matchName || matchHandle) {
-        seenHandles.add(hKey);
-        results.push(person);
-        if (results.length >= 5) break;
-      }
+  const addProfile = (profile: DirectoryMember) => {
+    const username = normalizeUsername(profile.handle);
+    if (addedHandles.has(username) || adding.current.has(username)) return;
+    adding.current.add(username);
+    const member = tripId
+      ? addMemberToTrip(tripId, profile.friendId ?? profile)
+      : addFriend(profile);
+    if (member) {
+      setNotice((previous) => ({ id: (previous?.id ?? 0) + 1, message: `${member.name} added${tripId ? ' to the trip' : ''}` }));
+      setError('');
+      if (!tripId) triggerNotification(NotificationType.Success);
+    } else {
+      setError('This trip is no longer available. Reopen it to add members.');
     }
-
-    return results;
-  }, [name, handle, friends, isEditing]);
-
-  const handleSelectSuggested = (person: (typeof searchMatches)[0]) => {
-    triggerImpact(ImpactStyle.Light);
-    setName(person.name);
-    setHandle(person.handle);
-    if (person.avatar) setPhotoUri(person.avatar);
-    if (person.upiId) setUpiId(person.upiId);
-    if (person.phone) setPhone(person.phone);
-    setShowSuggestions(false);
+    adding.current.delete(username);
   };
 
-  const handlePickPhoto = async () => {
+  const pickPhoto = async () => {
     if (picking) return;
     setPicking(true);
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        triggerNotification(NotificationType.Error);
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setError('Allow photo library access to choose a picture.');
         return;
       }
-
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
+        mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7,
         base64: Platform.OS === 'web',
       });
-
-      if (!result.canceled && result.assets?.[0]) {
-        const asset = result.assets[0];
-        if (asset.base64) {
-          const mime = asset.mimeType || 'image/jpeg';
-          setPhotoUri(`data:${mime};base64,${asset.base64}`);
-        } else if (asset.uri) {
-          setPhotoUri(asset.uri);
-        }
+      const asset = !result.canceled ? result.assets[0] : undefined;
+      if (asset) {
+        setPhotoUri(asset.base64 ? `data:${asset.mimeType ?? 'image/jpeg'};base64,${asset.base64}` : asset.uri);
+        setError('');
       }
-    } catch (err) {
-      console.warn('Photo pick failed', err);
+    } catch {
+      setError('The photo could not be opened. Please try again.');
     } finally {
       setPicking(false);
     }
   };
 
-  const handleSave = () => {
+  const saveDetails = () => {
     const cleanName = name.trim();
-    if (!cleanName) {
-      triggerNotification(NotificationType.Error);
+    if (!cleanName) { setError('Enter a full name.'); return; }
+    const username = normalizeUsername(handle);
+    if (username && !/^[a-z0-9._]+$/.test(username)) {
+      setError('Use letters, numbers, dots, or underscores in the username.');
       return;
     }
-
-    const fallbackSlug =
-      cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') ||
-      'member';
-    const rawHandle = handle.trim();
-    const formattedHandle = rawHandle
-      ? rawHandle.startsWith('@')
-        ? rawHandle
-        : `@${rawHandle}`
-      : `@${fallbackSlug}`;
-    const cleanUpi = upiId.trim();
-    const cleanPhone = phone.trim();
-
-    if (editingFriend) {
-      updateFriend(editingFriend.id, {
-        name: cleanName,
-        handle: formattedHandle,
-        avatar: photoUri,
-        upiId: cleanUpi || undefined,
-        phone: cleanPhone || undefined,
-      });
-      onClose();
+    const collision = username ? directory.find((profile) =>
+      normalizeUsername(profile.handle) === username && (!editingFriend || profile.friendId !== editingFriend.id)
+    ) : undefined;
+    if (collision) {
+      setError(`That username belongs to ${collision.name}. ${isEditing ? 'Choose a different username.' : 'Add their profile from search.'}`);
       return;
     }
-
-    if (tripId) {
-      addMemberToTrip(tripId, { name: cleanName, avatar: photoUri });
-    } else {
-      addFriend({
-        name: cleanName,
-        handle: formattedHandle,
-        avatar: photoUri,
-        upiId: cleanUpi || undefined,
-        phone: cleanPhone || undefined,
-      });
-      triggerNotification(NotificationType.Success);
-    }
-
-    setName('');
-    setHandle('');
-    setUpiId('');
-    setPhone('');
-    setPhotoUri('');
+    const details = {
+      name: cleanName, handle: username ? `@${username}` : availableUsername(cleanName, directory),
+      avatar: photoUri, upiId: upiId.trim() || undefined, phone: phone.trim() || undefined,
+    };
+    if (!editingFriend) return;
+    const member = updateFriend(editingFriend.id, details);
+    if (!member) { setError('The member could not be saved. Check the username and try again.'); return; }
     onClose();
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      presentationStyle="overFullScreen"
-      statusBarTranslucent
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityLabel="Dismiss modal backdrop"
-        />
-        <GlassModalSheet style={styles.sheetContainer}>
-          <View style={styles.dragHandleWrap}>
-            <View
-              style={[
-                styles.dragHandle,
-                { backgroundColor: isDark ? '#27272A' : '#D4D4D8' },
-              ]}
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.page, { backgroundColor: bg }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 28 }]}>
+        <View pointerEvents="none" style={[styles.handle, { top: insets.top + 8, backgroundColor: mutedText }]} />
+        <View style={styles.headerRow}>
+          <View style={styles.headerButton} />
+          <Text style={[styles.title, { color: textColor }]}>{isEditing ? 'Edit Member' : 'Add Members'}</Text>
+          <TouchableOpacity onPress={onClose} accessibilityLabel="Close member page" style={styles.headerButton}>
+            <CloseCircleIcon size={24} color={textColor} />
+          </TouchableOpacity>
+        </View>
+        {!isEditing ? (
+          <View style={[styles.searchBar, { backgroundColor: surface }]}>
+            <MagnifierIcon size={21} color={mutedText} />
+            <TextInput
+              accessibilityLabel="Search members by name or username" placeholder="Search names or @usernames"
+              placeholderTextColor={mutedText} value={query} onChangeText={setQuery}
+              autoCapitalize="none" autoCorrect={false} returnKeyType="search"
+              style={[styles.searchInput, { color: textColor }, WEB_INPUT_RESET]}
             />
+            {query ? <TouchableOpacity accessibilityLabel="Clear member search" onPress={() => setQuery('')} style={styles.clearButton}><CloseCircleIcon size={20} color={mutedText} /></TouchableOpacity> : null}
           </View>
-
-          <View style={styles.headerRow}>
-            <View>
-              <Text style={[styles.title, { color: textColor }]}>
-                {isEditing ? 'Edit Member' : 'Add Member'}
-              </Text>
-              <Text style={[styles.subtitleText, { color: mutedText }]}>
-                {isEditing
-                  ? 'Update photo, name, and payment details'
-                  : 'Search by name or unique @username to add'}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={onClose}
-              accessibilityLabel="Close member modal"
-              style={[styles.closeBtn, { backgroundColor: cardBg }]}
-            >
-              <CloseCircleIcon size={20} color={textColor} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.scrollWrap}>
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <View style={[styles.card, { backgroundColor: cardBg }]}>
-                <AnimatedPressable
-                  scaleTo={0.94}
-                  onPress={handlePickPhoto}
-                  accessibilityLabel="Upload member photo"
-                  contentStyle={[styles.avatarPickerBox, { backgroundColor: inputBg }]}
-                >
-                  {photoUri ? (
-                    <Image source={{ uri: photoUri }} style={styles.avatarPreview} />
-                  ) : (
-                    <View style={styles.avatarPlaceholder}>
-                      <UserRoundedIcon size={34} color={mutedText} />
-                    </View>
-                  )}
-                  <View
-                    style={[
-                      styles.cameraBadge,
-                      { backgroundColor: isDark ? '#F4F4F5' : '#18181B' },
-                    ]}
-                  >
-                    <CameraIcon size={13} color={isDark ? '#18181B' : '#FFFFFF'} />
-                  </View>
-                </AnimatedPressable>
-
-                <View style={styles.photoActionRow}>
-                  <AnimatedPressable scaleTo={0.95} onPress={handlePickPhoto}>
-                    <Text style={[styles.photoHint, { color: mutedText }]}>
-                      {photoUri ? 'Tap photo to change' : 'Upload Photo'}
-                    </Text>
-                  </AnimatedPressable>
-                  {photoUri ? (
-                    <AnimatedPressable
-                      scaleTo={0.94}
-                      onPress={() => setPhotoUri('')}
-                      contentStyle={[styles.removePhotoPill, { backgroundColor: inputBg }]}
-                    >
-                      <Text style={[styles.removePhotoText, { color: mutedText }]}>
-                        Remove
-                      </Text>
-                    </AnimatedPressable>
-                  ) : null}
-                </View>
-
-                {/* Name Input with Auto-search */}
-                <Text style={[styles.fieldLabel, { color: mutedText }]}>FULL NAME</Text>
-                <TextInput
-                  style={[styles.textInput, { backgroundColor: inputBg, color: textColor }, WEB_INPUT_RESET]}
-                  placeholder="e.g. Aditya Roy"
-                  placeholderTextColor={mutedText}
-                  value={name}
-                  onChangeText={(val) => {
-                    setName(val);
-                    setShowSuggestions(true);
-                  }}
-                  onFocus={() => setShowSuggestions(true)}
-                  returnKeyType="next"
-                />
-
-                {/* Dropdown Suggestions when searching by Name or Username */}
-                {showSuggestions && searchMatches.length > 0 && (
-                  <View style={[styles.dropdownContainer, { backgroundColor: inputBg, borderColor: chipBg }]}>
-                    <View style={styles.dropdownHeader}>
-                      <Text style={[styles.dropdownHeaderText, { color: mutedText }]}>
-                        SELECT UNIQUE USERNAME ({searchMatches.length})
-                      </Text>
-                      <TouchableOpacity onPress={() => setShowSuggestions(false)}>
-                        <CloseCircleIcon size={13} color={mutedText} />
-                      </TouchableOpacity>
-                    </View>
-
-                    {searchMatches.map((person) => (
-                      <TouchableOpacity
-                        key={person.handle}
-                        onPress={() => handleSelectSuggested(person)}
-                        activeOpacity={0.75}
-                        style={[styles.dropdownItem, { borderBottomColor: chipBg }]}
-                      >
-                        {person.avatar ? (
-                          <Image source={{ uri: person.avatar }} style={styles.dropdownAvatar} />
-                        ) : (
-                          <View style={[styles.dropdownAvatarFallback, { backgroundColor: chipBg }]}>
-                            <Text style={[styles.dropdownAvatarText, { color: textColor }]}>
-                              {person.name.slice(0, 2).toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
-
-                        <View style={styles.dropdownItemInfo}>
-                          <Text style={[styles.dropdownItemName, { color: textColor }]} numberOfLines={1}>
-                            {person.name}
-                          </Text>
-                          <Text style={[styles.dropdownItemHandle, { color: '#10B981' }]} numberOfLines={1}>
-                            {person.handle}
-                          </Text>
-                        </View>
-
-                        {person.upiId ? (
-                          <View style={[styles.dropdownUpiBadge, { backgroundColor: chipBg }]}>
-                            <Text style={[styles.dropdownUpiText, { color: mutedText }]} numberOfLines={1}>
-                              {person.upiId}
-                            </Text>
-                          </View>
-                        ) : null}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-
-                {/* Username / Handle Input */}
-                <Text style={[styles.fieldLabel, styles.fieldSpacing, { color: mutedText }]}>
-                  UNIQUE USERNAME
-                </Text>
-                <TextInput
-                  style={[styles.textInput, { backgroundColor: inputBg, color: textColor }, WEB_INPUT_RESET]}
-                  placeholder="@username (e.g. @aditya)"
-                  placeholderTextColor={mutedText}
-                  value={handle}
-                  onChangeText={(val) => {
-                    setHandle(val);
-                    setShowSuggestions(true);
-                  }}
-                  onFocus={() => setShowSuggestions(true)}
-                  autoCapitalize="none"
-                  returnKeyType="next"
-                />
-
-                <Text style={[styles.fieldLabel, styles.fieldSpacing, { color: mutedText }]}>
-                  UPI ID (OPTIONAL)
-                </Text>
-                <TextInput
-                  style={[styles.textInput, { backgroundColor: inputBg, color: textColor }, WEB_INPUT_RESET]}
-                  placeholder="name@okaxis"
-                  placeholderTextColor={mutedText}
-                  value={upiId}
-                  onChangeText={setUpiId}
-                  autoCapitalize="none"
-                  returnKeyType="next"
-                />
-
-                <Text style={[styles.fieldLabel, styles.fieldSpacing, { color: mutedText }]}>
-                  PHONE (OPTIONAL)
-                </Text>
-                <TextInput
-                  style={[styles.textInput, { backgroundColor: inputBg, color: textColor }, WEB_INPUT_RESET]}
-                  placeholder="+91 98765 43210"
-                  placeholderTextColor={mutedText}
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  returnKeyType="done"
-                  onSubmitEditing={handleSave}
-                />
-              </View>
-            </ScrollView>
-          </View>
-
-          <GlassPill
-            label={isEditing ? 'Save Changes' : 'Add Member'}
-            variant="accent"
-            size="lg"
-            onPress={handleSave}
-            style={styles.saveBtn}
-          />
-        </GlassModalSheet>
+        ) : <Text style={[styles.subtitle, { color: mutedText }]}>Update their photo and payment details</Text>}
       </View>
-    </Modal>
+
+      {!isEditing ? (
+          <ScrollEdgeFade tint={bg} top={12} bottom={24}>
+            <FlatList
+              data={results} keyExtractor={(profile) => profile.handle} extraData={addedHandles}
+              initialNumToRender={10} windowSize={5} showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+              contentContainerStyle={[styles.resultsContent, { paddingBottom: Math.max(28, insets.bottom + 16) }]}
+              renderItem={({ item }) => {
+                const added = addedHandles.has(normalizeUsername(item.handle));
+                return (
+                  <View style={styles.personRow}>
+                    {item.avatar ? <Image source={{ uri: item.avatar }} style={styles.personAvatar} /> : <View style={[styles.personAvatar, styles.avatarFallback, { backgroundColor: surface }]}><UserRoundedIcon size={26} color={mutedText} /></View>}
+                    <View style={styles.personInfo}>
+                      <Text numberOfLines={1} style={[styles.personName, { color: textColor }]}>{item.name}</Text>
+                      <Text numberOfLines={1} style={[styles.personHandle, { color: mutedText }]}>{item.handle}</Text>
+                    </View>
+                    <AnimatedPressable disabled={added} onPress={() => addProfile(item)} accessibilityLabel={`${added ? 'Added' : 'Add'} ${item.name} ${item.handle}`} contentStyle={[styles.addButton, { backgroundColor: surface }]}>
+                      {added ? <CheckCircleIcon size={15} color="#10B981" /> : null}
+                      <Text style={[styles.addButtonText, { color: textColor }]}>{added ? 'Added' : 'Add'}</Text>
+                    </AnimatedPressable>
+                  </View>
+                );
+              }}
+              ListEmptyComponent={<View style={styles.empty}><UserRoundedIcon size={38} color={mutedText} /><Text style={[styles.emptyTitle, { color: textColor }]}>No members found</Text><Text style={[styles.emptyText, { color: mutedText }]}>Try another name or @username.</Text></View>}
+            />
+          </ScrollEdgeFade>
+      ) : (
+        <ScrollEdgeFade tint={bg}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.formContent}>
+            <AnimatedPressable disabled={picking} onPress={pickPhoto} accessibilityLabel="Upload member photo" contentStyle={[styles.photoPicker, { backgroundColor: surface }]}>
+              {photoUri ? <Image source={{ uri: photoUri }} style={styles.photo} /> : <UserRoundedIcon size={40} color={mutedText} />}
+              <View style={[styles.cameraBadge, { backgroundColor: accent }]}><CameraIcon size={15} color="#FFFFFF" /></View>
+            </AnimatedPressable>
+            <View style={styles.photoActions}>
+              <TouchableOpacity onPress={pickPhoto}><Text style={{ color: mutedText }}>{picking ? 'Opening photos…' : photoUri ? 'Change photo' : 'Upload photo'}</Text></TouchableOpacity>
+              {photoUri ? <TouchableOpacity onPress={() => setPhotoUri('')}><Text style={{ color: mutedText }}>Remove</Text></TouchableOpacity> : null}
+            </View>
+            <Text style={[styles.fieldLabel, { color: mutedText }]}>FULL NAME</Text>
+            <TextInput accessibilityLabel="Member full name" placeholder="e.g. Aditya Roy" placeholderTextColor={mutedText} value={name} onChangeText={setName} style={[styles.input, { backgroundColor: surface, color: textColor }, WEB_INPUT_RESET]} />
+            <Text style={[styles.fieldLabel, { color: mutedText }]}>USERNAME</Text>
+            <TextInput accessibilityLabel="Member username" placeholder="@username" placeholderTextColor={mutedText} value={handle} onChangeText={setHandle} autoCapitalize="none" autoCorrect={false} style={[styles.input, { backgroundColor: surface, color: textColor }, WEB_INPUT_RESET]} />
+            <Text style={[styles.fieldLabel, { color: mutedText }]}>UPI ID (OPTIONAL)</Text>
+            <TextInput accessibilityLabel="Member UPI ID" placeholder="name@okaxis" placeholderTextColor={mutedText} value={upiId} onChangeText={setUpiId} autoCapitalize="none" autoCorrect={false} style={[styles.input, { backgroundColor: surface, color: textColor }, WEB_INPUT_RESET]} />
+            <Text style={[styles.fieldLabel, { color: mutedText }]}>PHONE (OPTIONAL)</Text>
+            <TextInput accessibilityLabel="Member phone" placeholder="+91 98765 43210" placeholderTextColor={mutedText} value={phone} onChangeText={setPhone} keyboardType="phone-pad" returnKeyType="done" onSubmitEditing={saveDetails} style={[styles.input, { backgroundColor: surface, color: textColor }, WEB_INPUT_RESET]} />
+          </ScrollView>
+        </ScrollEdgeFade>
+      )}
+
+      {isEditing || error ? (
+        <View style={[styles.footer, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
+          {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
+          {isEditing ? <GlassPill label="Save Changes" variant="accent" size="lg" onPress={saveDetails} /> : null}
+        </View>
+      ) : null}
+      <BottomBubble notice={notice} onDismiss={dismissNotice} />
+    </KeyboardAvoidingView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
-    justifyContent: 'flex-end',
-  },
-  sheetContainer: {
-    width: '100%',
-    maxWidth: 480,
-    alignSelf: 'center',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 10,
-    paddingHorizontal: 18,
-    paddingBottom: 28,
-    maxHeight: '90%',
-    borderWidth: 0,
-  },
-  dragHandleWrap: {
-    alignItems: 'center',
-    paddingBottom: 10,
-  },
-  dragHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 19,
-    fontWeight: '500',
-    letterSpacing: -0.3,
-  },
-  subtitleText: {
-    fontSize: 12,
-    fontWeight: '400',
-    marginTop: 2,
-  },
-  closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollWrap: {
-    position: 'relative',
-    flexShrink: 1,
-    overflow: 'hidden',
-  },
-  scrollContent: {
-    paddingBottom: 18,
-    gap: 12,
-  },
-  card: {
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 0,
-  },
-  avatarPickerBox: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    alignSelf: 'center',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    overflow: 'visible',
-    marginBottom: 6,
-  },
-  avatarPreview: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-  },
-  avatarPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cameraBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginBottom: 14,
-  },
-  photoHint: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  removePhotoPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  removePhotoText: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  fieldLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    letterSpacing: 0.9,
-    marginBottom: 6,
-  },
-  fieldSpacing: {
-    marginTop: 12,
-  },
-  textInput: {
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
-    fontWeight: '400',
-    borderWidth: 0,
-  },
-  dropdownContainer: {
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 6,
-    overflow: 'hidden',
-    paddingVertical: 4,
-  },
-  dropdownHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  dropdownHeaderText: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 10,
-    borderBottomWidth: 1,
-  },
-  dropdownAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  dropdownAvatarFallback: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dropdownAvatarText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  dropdownItemInfo: {
-    flex: 1,
-    gap: 1,
-  },
-  dropdownItemName: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  dropdownItemHandle: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  dropdownUpiBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    maxWidth: 120,
-  },
-  dropdownUpiText: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  saveBtn: {
-    marginTop: 8,
-  },
+  page: { flex: 1, minHeight: 0 },
+  header: { paddingHorizontal: 20, paddingBottom: 16 },
+  handle: { position: 'absolute', width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 21, fontWeight: '600', letterSpacing: -0.4 },
+  subtitle: { fontSize: 14, textAlign: 'center' },
+  searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingLeft: 14, minHeight: 50 },
+  searchInput: { flex: 1, minWidth: 0, fontSize: 16, paddingVertical: 14, paddingHorizontal: 10 },
+  clearButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  resultsContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28, flexGrow: 1 },
+  personRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 82 },
+  personAvatar: { width: 52, height: 52, borderRadius: 26 },
+  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
+  personInfo: { flex: 1, minWidth: 0, gap: 4 },
+  personName: { fontSize: 15, fontWeight: '600' },
+  personHandle: { fontSize: 13 },
+  addButton: { minWidth: 78, minHeight: 44, borderRadius: 12, borderWidth: 0, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  addButtonText: { fontSize: 13, fontWeight: '600' },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 24, paddingVertical: 60 },
+  emptyTitle: { fontSize: 18, fontWeight: '600' },
+  emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 21 },
+  formContent: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 32 },
+  photoPicker: { width: 92, height: 92, borderRadius: 46, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
+  photo: { width: 92, height: 92, borderRadius: 46 },
+  cameraBadge: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  photoActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, paddingVertical: 18 },
+  fieldLabel: { fontSize: 11, letterSpacing: 0.8, fontWeight: '500', marginTop: 14, marginBottom: 8 },
+  input: { minHeight: 52, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16 },
+  footer: { paddingHorizontal: 24, paddingTop: 12 },
+  error: { color: '#F87171', fontSize: 13, lineHeight: 19, marginBottom: 12 },
 });

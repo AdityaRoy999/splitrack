@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import { ModalBackdrop } from '../common/ModalBackdrop';
+import { SheetModal } from '../common/SheetModal';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
+import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { MinimalisticMagnifierIcon } from '@solar-icons/react-native/bold/minimalistic-magnifier';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { useSplitTrack } from '../../store/SplitTrackStore';
@@ -22,12 +23,11 @@ import {
 } from '../../constants/solarIconsCatalog';
 import { ExpenseCategory } from '../../types';
 import {
-  ImpactStyle,
   NotificationType,
-  triggerImpact,
   triggerNotification,
 } from '../../utils/haptics';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
 import { JellyRadio } from '../common/JellyRadio';
 import { GlassPill } from '../glass/GlassPill';
@@ -69,9 +69,18 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
   const [selectedGroup, setSelectedGroup] = useState<SolarIconGroup>('All');
   const [selectedIconKey, setSelectedIconKey] = useState(() => categoryToEdit?.iconKey || 'cup-hot');
   const [selectedColor, setSelectedColor] = useState(() => categoryToEdit?.color || ACCENT_PALETTE[0]);
-  const [gridWidth, setGridWidth] = useState(0);
+  const wasVisible = useRef(false);
+  useLayoutEffect(() => {
+    if (visible && !wasVisible.current) {
+      setName(categoryToEdit?.name || '');
+      setSelectedIconKey(categoryToEdit?.iconKey || 'cup-hot');
+      setSelectedColor(categoryToEdit?.color || ACCENT_PALETTE[0]);
+      setSearchQuery('');
+      setSelectedGroup('All');
+    }
+    wasVisible.current = visible;
+  }, [categoryToEdit, visible]);
 
-  const iconTileWidth = gridWidth > 0 ? Math.floor((gridWidth - 24) / 4) : undefined;
 
   const cardBg = isLiquidGlassEnabled
     ? (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
@@ -125,7 +134,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
   };
 
   return (
-    <Modal
+    <SheetModal
       visible={visible}
       transparent
       animationType="fade"
@@ -141,11 +150,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
           },
         ]}
       >
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityLabel="Dismiss category modal backdrop"
-        />
+        <ModalBackdrop onClose={onClose} />
         <GlassModalSheet style={styles.sheet}>
           <View style={styles.dragHandleWrap}>
             <View
@@ -189,7 +194,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
             </View>
           </View>
 
-          <View style={styles.scrollAreaWrap}>
+          <ScrollEdgeFade style={styles.scrollAreaWrap}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {/* Category Preview + Name Input */}
             <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
@@ -218,31 +223,18 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
               </View>
 
               <Text style={[styles.fieldLabel, { color: mutedText }]}>ACCENT COLOR</Text>
-              <View style={styles.colorRow}>
-                {ACCENT_PALETTE.map((hex) => {
-                  const active = selectedColor === hex;
-                  return (
-                    <AnimatedPressable
-                      key={hex}
-                      scaleTo={0.9}
-                      onPress={() => {
-                        triggerImpact(ImpactStyle.Light);
-                        setSelectedColor(hex);
-                      }}
-                      contentStyle={[
-                        styles.colorCircle,
-                        {
-                          backgroundColor: hex,
-                          transform: [{ scale: active ? 1.15 : 1 }],
-                          opacity: active ? 1 : 0.6,
-                        },
-                      ]}
-                    >
-                      <View />
-                    </AnimatedPressable>
-                  );
-                })}
-              </View>
+              <JellyRadio
+                variant="swatch"
+                items={ACCENT_PALETTE.map((hex) => ({
+                  value: hex, label: '', color: hex,
+                  accessibilityLabel: `Accent color ${hex}`,
+                  icon: selectedColor === hex ? <CheckCircleIcon size={14} color="#FFFFFF" /> : undefined,
+                }))}
+                value={selectedColor}
+                onChange={setSelectedColor}
+                size="sm"
+                gap={10}
+              />
             </View>
 
             {/* Solar Bold Icon Menu */}
@@ -295,53 +287,28 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                 />
               </View>
 
-              <View
-                style={styles.iconsGrid}
-                onLayout={(e) => {
-                  const nextW = Math.floor(e.nativeEvent.layout.width);
-                  if (nextW > 0 && Math.abs(nextW - gridWidth) > 1) {
-                    setGridWidth(nextW);
-                  }
-                }}
-              >
-                {filteredIcons.map((item) => {
-                  const active = selectedIconKey === item.key;
-                  return (
-                    <AnimatedPressable
-                      key={item.key}
-                      scaleTo={0.92}
-                      onPress={() => {
-                        triggerImpact(ImpactStyle.Light);
-                        setSelectedIconKey(item.key);
-                      }}
-                      style={
-                        iconTileWidth ? { width: iconTileWidth } : styles.iconTileWrapFallback
-                      }
-                      contentStyle={[
-                        styles.iconTile,
-                        {
-                          width: '100%',
-                          backgroundColor: active ? selectedColor : inputBg,
-                        },
-                      ]}
-                    >
-                      {renderSolarIcon(item.key, 20, active ? '#FFFFFF' : textColor)}
-                      <Text
-                        style={[
-                          styles.iconTileLabel,
-                          { color: active ? '#FFFFFF' : mutedText },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {item.label}
-                      </Text>
-                    </AnimatedPressable>
-                  );
-                })}
-              </View>
+              <JellyRadio
+                variant="tile"
+                columns={4}
+                items={filteredIcons.map((item) => ({
+                  value: item.key,
+                  label: item.label,
+                  accessibilityLabel: `Category icon ${item.label}`,
+                  icon: renderSolarIcon(item.key, 20, selectedIconKey === item.key ? '#FFFFFF' : textColor),
+                }))}
+                value={selectedIconKey}
+                onChange={setSelectedIconKey}
+                chipColor={inputBg}
+                activeColor={selectedColor}
+                textColor={mutedText}
+                activeTextColor="#FFFFFF"
+                size="sm"
+                radius={14}
+                gap={8}
+              />
             </View>
             </ScrollView>
-          </View>
+          </ScrollEdgeFade>
 
           <GlassPill
             label={categoryToEdit ? 'Save Changes' : 'Create Category'}
@@ -352,7 +319,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
           />
         </GlassModalSheet>
       </View>
-    </Modal>
+    </SheetModal>
   );
 };
 
@@ -365,13 +332,14 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     paddingTop: 10,
     paddingHorizontal: 18,
-    paddingBottom: 24,
-    maxHeight: '88%',
     borderWidth: 0,
+    marginBottom: 0,
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -410,7 +378,8 @@ const styles = StyleSheet.create({
   },
   scrollAreaWrap: {
     position: 'relative',
-    flexShrink: 1,
+    flex: 1,
+    minHeight: 120,
     overflow: 'hidden',
   },
   scrollContent: {
@@ -453,17 +422,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     marginBottom: 8,
   },
-  colorRow: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-  },
-  colorCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 0,
-  },
   menuHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -492,30 +450,6 @@ const styles = StyleSheet.create({
   },
   groupRadioWrap: {
     marginBottom: 10,
-  },
-  iconsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    alignItems: 'stretch',
-  },
-  iconTileWrapFallback: {
-    width: '23%',
-    minWidth: 68,
-  },
-  iconTile: {
-    borderRadius: 14,
-    paddingVertical: 11,
-    paddingHorizontal: 6,
-    height: 66,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    borderWidth: 0,
-  },
-  iconTileLabel: {
-    fontSize: 10,
-    fontWeight: '400',
   },
   saveBtn: {
     marginTop: 8,

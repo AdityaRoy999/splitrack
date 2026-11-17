@@ -58,10 +58,7 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
         onPressOut={() => animateTo(1)}
         hitSlop={hitSlop}
         accessibilityLabel={accessibilityLabel}
-        style={[
-          { alignItems: 'center', justifyContent: 'center' },
-          contentStyle,
-        ]}
+        style={contentStyle}
       >
         {children}
       </TouchableOpacity>

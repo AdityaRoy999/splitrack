@@ -34,6 +34,7 @@ import { DangerCircleIcon } from '@solar-icons/react-native/bold/danger-circle';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { UserAvatar } from '../common/UserAvatar';
 import { GradualBlur } from '../effects/GradualBlur';
+import { HorizontalEdgeFade } from '../common/ScrollEdgeFade';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { JellyRadio } from '../common/JellyRadio';
@@ -272,17 +273,55 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   return (
     <View style={[styles.pageContainer, { backgroundColor: rootBg }]}>
+      <GradualBlur
+        position="top"
+        height={Math.max(44, insets.top + 24)}
+        strength={1.6}
+        layers={8}
+        curve="bezier"
+        tint={
+          isLiquidGlassEnabled
+            ? isDark
+              ? 'rgba(5, 5, 10, 0.7)'
+              : 'rgba(232, 237, 246, 0.7)'
+            : isDark
+              ? 'rgba(9, 9, 11, 0.88)'
+              : 'rgba(242, 242, 247, 0.88)'
+        }
+        zIndex={10}
+      />
+
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: insets.top + 52,
+            paddingTop: Math.max(16, insets.top + 10),
             paddingBottom: Math.max(128, insets.bottom + 88),
           },
         ]}
       >
+        {/* Natural Scrolling Header Bar (not stuck) */}
+        <View style={styles.headerRow}>
+          <AnimatedPressable
+            scaleTo={0.92}
+            onPress={() => {
+              triggerImpact(ImpactStyle.Light);
+              onBack();
+            }}
+            accessibilityLabel="Back to previous screen"
+            contentStyle={[styles.backBtn, { backgroundColor: cardBg }]}
+          >
+            <AltArrowLeftIcon size={18} color={textColor} />
+            <Text style={[styles.backBtnText, { color: textColor }]}>Back</Text>
+          </AnimatedPressable>
+
+          <Text style={[styles.headerTitle, { color: textColor }]}>Settings</Text>
+
+          <View style={styles.headerRightPlaceholder} />
+        </View>
+
         {/* User Profile Card Header */}
         <View style={[styles.profileCard, { backgroundColor: cardBg }]}>
           <TouchableOpacity
@@ -682,6 +721,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <Text style={[styles.accountPickLabel, { color: mutedText }]}>
                   LINK TO UPI / CARD PROFILE:
                 </Text>
+                <HorizontalEdgeFade tint={cardBg}>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -711,6 +751,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     );
                   })}
                 </ScrollView>
+                </HorizontalEdgeFade>
 
                 {/* Preview Rows */}
                 <View style={styles.previewEntriesList}>
@@ -811,43 +852,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </View>
       </ScrollView>
 
-      {/* Top Seamless Gaussian Blur Header Bar with Back Button extending behind status bar */}
-      <View
-        style={[
-          styles.stickyHeaderWrap,
-          {
-            height: insets.top + 54,
-            paddingTop: insets.top,
-          },
-        ]}
-        pointerEvents="box-none"
-      >
-        <GradualBlur
-          position="top"
-          height={insets.top + 64}
-          strength={1.8}
-          tint={isDark ? 'rgba(0, 0, 0, 0.85)' : 'rgba(248, 249, 253, 0.88)'}
-          zIndex={1}
-        />
-        <View style={styles.headerRow} pointerEvents="box-none">
-          <AnimatedPressable
-            scaleTo={0.92}
-            onPress={() => {
-              triggerImpact(ImpactStyle.Light);
-              onBack();
-            }}
-            accessibilityLabel="Back to previous screen"
-            contentStyle={[styles.backBtn, { backgroundColor: cardBg }]}
-          >
-            <AltArrowLeftIcon size={18} color={textColor} />
-            <Text style={[styles.backBtnText, { color: textColor }]}>Back</Text>
-          </AnimatedPressable>
 
-          <Text style={[styles.headerTitle, { color: textColor }]}>Settings</Text>
-
-          <View style={styles.headerRightPlaceholder} />
-        </View>
-      </View>
 
       {/* Erase All Data Confirmation Dialog */}
       <Modal
@@ -1190,6 +1195,7 @@ const styles = StyleSheet.create({
   },
   accountPickRow: {
     gap: 6,
+    paddingHorizontal: 22,
     paddingVertical: 2,
   },
   accountPickChip: {

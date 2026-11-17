@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Local reference repository, maintained separately from the mobile app.
+/AWS-SplitTrack/

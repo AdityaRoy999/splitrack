@@ -1,7 +1,7 @@
+import { ModalBackdrop } from '../common/ModalBackdrop';
+import { SheetModal } from '../common/SheetModal';
 import React from 'react';
 import {
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +15,7 @@ import { CursorIcon } from '@solar-icons/react-native/bold/cursor';
 import { HandIcon } from '@solar-icons/react-native/bold/hand';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
 
 interface AnalyticsInfoModalProps {
@@ -90,7 +91,7 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
   return (
-    <Modal
+    <SheetModal
       visible={visible}
       transparent
       animationType="fade"
@@ -106,11 +107,7 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
           },
         ]}
       >
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityLabel="Dismiss analytics modal backdrop"
-        />
+        <ModalBackdrop onClose={onClose} />
         <GlassModalSheet style={styles.sheet}>
           <View style={styles.dragHandleWrap}>
             <View
@@ -141,7 +138,7 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
             </AnimatedPressable>
           </View>
 
-          <View style={styles.scrollWrap}>
+          <ScrollEdgeFade style={styles.scrollWrap}>
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}
@@ -167,7 +164,7 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
                 </View>
               ))}
             </ScrollView>
-          </View>
+          </ScrollEdgeFade>
 
           <AnimatedPressable
             scaleTo={0.97}
@@ -183,7 +180,7 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
           </AnimatedPressable>
         </GlassModalSheet>
       </View>
-    </Modal>
+    </SheetModal>
   );
 };
 
@@ -193,16 +190,17 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 24,
-    maxHeight: '88%',
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
     borderWidth: 0,
+    marginBottom: 0,
   },
   dragHandleWrap: {
     alignItems: 'center',
@@ -238,7 +236,9 @@ const styles = StyleSheet.create({
   },
   scrollWrap: {
     position: 'relative',
-    flexShrink: 1,
+    flex: 1,
+    minHeight: 120,
+    overflow: 'hidden',
   },
   scrollContent: {
     gap: 10,

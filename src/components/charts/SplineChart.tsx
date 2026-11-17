@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Easing,
   GestureResponderEvent,
   Platform,
   StyleSheet,
@@ -27,8 +26,8 @@ import {
   shiftIsoDate,
   useDateMonthSwipeGesture,
 } from '../../hooks/useDateMonthSwipeGesture';
+import { useChartTransition } from '../../hooks/useChartTransition';
 
-const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 type CashFlowGranularity = 'Date' | 'Month' | 'Year';
 
@@ -62,15 +61,13 @@ const MONTH_SHORT = [
 
 function computeSmoothCurve(points: PointCoord[]): {
   path: string;
-  length: number;
 } {
-  if (points.length === 0) return { path: '', length: 0 };
+  if (points.length === 0) return { path: '' };
   if (points.length === 1) {
-    return { path: `M ${points[0].x} ${points[0].y}`, length: 1 };
+    return { path: `M ${points[0].x} ${points[0].y}` };
   }
 
   let path = `M ${points[0].x} ${points[0].y}`;
-  let length = 0;
 
   for (let i = 0; i < points.length - 1; i++) {
     const p1 = points[i];
@@ -81,29 +78,9 @@ function computeSmoothCurve(points: PointCoord[]): {
     const cp2y = p2.y;
     path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
 
-    // Approximate cubic segment length with 8 sub-steps
-    let prevX = p1.x;
-    let prevY = p1.y;
-    for (let s = 1; s <= 8; s++) {
-      const t = s / 8;
-      const omt = 1 - t;
-      const sx =
-        omt * omt * omt * p1.x +
-        3 * omt * omt * t * cp1x +
-        3 * omt * t * t * cp2x +
-        t * t * t * p2.x;
-      const sy =
-        omt * omt * omt * p1.y +
-        3 * omt * omt * t * cp1y +
-        3 * omt * t * t * cp2y +
-        t * t * t * p2.y;
-      length += Math.hypot(sx - prevX, sy - prevY);
-      prevX = sx;
-      prevY = sy;
-    }
   }
 
-  return { path, length };
+  return { path };
 }
 
 export const SplineChart: React.FC = () => {
@@ -112,20 +89,16 @@ export const SplineChart: React.FC = () => {
   const { themeMode, formatAmount } = useLiquidGlass();
 
   const [granularity, setGranularity] = useState<CashFlowGranularity>('Month');
+  const [requestedGranularity, setRequestedGranularity] = useState<CashFlowGranularity>('Month');
   const [selectedYear, setSelectedYear] = useState<number>(() => new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(() => new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [drawProgress, setDrawProgress] = useState<number>(() =>
-    typeof requestAnimationFrame !== 'undefined' ? 0 : 1
-  );
   const [plotBoxWidth, setPlotBoxWidth] = useState<number>(() =>
     Math.max(240, Math.min(windowWidth - 64, 416))
   );
-  const [swipeX] = useState(() => new Animated.Value(0));
-  const [swipeOpacity] = useState(() => new Animated.Value(1));
-  const transitionSeqRef = useRef(0);
+  const { runChartTransition, opacity: swipeOpacity, translateX: swipeX, revision } = useChartTransition();
 
   const isDark = themeMode === 'dark';
   const width = plotBoxWidth;
@@ -134,53 +107,9 @@ export const SplineChart: React.FC = () => {
   const paddingTop = 34;
   const paddingBottom = 26;
 
-  const runChartTransition = useCallback(
-    (delta: -1 | 0 | 1, commit: () => void) => {
-      const seq = ++transitionSeqRef.current;
-      swipeOpacity.stopAnimation();
-      swipeX.stopAnimation();
-
-      Animated.parallel([
-        Animated.timing(swipeOpacity, {
-          toValue: 0,
-          duration: 115,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(swipeX, {
-          toValue: delta === 0 ? 0 : -delta * 22,
-          duration: 115,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-      ]).start(({ finished }) => {
-        if (!finished && seq !== transitionSeqRef.current) return;
-        if (seq !== transitionSeqRef.current) return;
-
-        setDrawProgress(0);
-        commit();
-        swipeX.setValue(delta === 0 ? 0 : delta * 24);
-        Animated.parallel([
-          Animated.timing(swipeOpacity, {
-            toValue: 1,
-            duration: 280,
-            easing: Easing.bezier(0.22, 1, 0.36, 1),
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }),
-          Animated.timing(swipeX, {
-            toValue: 0,
-            duration: 300,
-            easing: Easing.bezier(0.22, 1, 0.36, 1),
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }),
-        ]).start();
-      });
-    },
-    [swipeOpacity, swipeX]
-  );
-
   const stepDay = useCallback(
     (delta: -1 | 1) => {
+      setRequestedGranularity('Date');
       runChartTransition(delta, () => {
         const base = selectedDate || getTodayLocalISO();
         const nextIso = shiftIsoDate(base, delta);
@@ -197,6 +126,7 @@ export const SplineChart: React.FC = () => {
 
   const stepMonth = useCallback(
     (delta: -1 | 1) => {
+      setRequestedGranularity('Month');
       runChartTransition(delta, () => {
         let nextMonth = selectedMonth + delta;
         let nextYear = selectedYear;
@@ -219,7 +149,13 @@ export const SplineChart: React.FC = () => {
   const { gestureHandlers, isMonthHoldReady, dragAnim } = useDateMonthSwipeGesture({
     onStepDay: stepDay,
     onStepMonth: stepMonth,
+    preserveDragOnCommit: true,
   });
+
+  useLayoutEffect(() => {
+    dragAnim.stopAnimation();
+    dragAnim.setValue(0);
+  }, [revision, dragAnim]);
 
   const combinedTranslateX = useMemo(
     () => Animated.add(dragAnim, swipeX),
@@ -375,34 +311,6 @@ export const SplineChart: React.FC = () => {
       : Math.max(0, Math.min(selectedIndex, Math.max(0, pointsData.length - 1)));
   const activePoint = pointsData[safeIndex];
 
-  useEffect(() => {
-    if (typeof requestAnimationFrame === 'undefined') {
-      return;
-    }
-
-    let rafId = 0;
-    const duration = 500;
-    let startTime: number | null = null;
-
-    const step = (now: number) => {
-      if (startTime === null) startTime = now;
-      const elapsed = now - startTime;
-      const raw = Math.min(1, Math.max(0, elapsed / duration));
-      const eased = 1 - Math.pow(1 - raw, 3);
-      setDrawProgress(eased);
-      if (raw < 1) {
-        rafId = requestAnimationFrame(step);
-      }
-    };
-
-    rafId = requestAnimationFrame(step);
-    return () => {
-      if (rafId && typeof cancelAnimationFrame !== 'undefined') {
-        cancelAnimationFrame(rafId);
-      }
-    };
-  }, [granularity, selectedDate, selectedMonth, selectedYear, pointsData.length]);
-
   const lastScrubIdxRef = useRef<number>(safeIndex);
   useEffect(() => {
     lastScrubIdxRef.current = safeIndex;
@@ -451,35 +359,39 @@ export const SplineChart: React.FC = () => {
     [scrubAtX]
   );
 
-  const maxVal = Math.max(
-    50,
-    ...pointsData.map((d) => Math.max(d.income, d.expense))
-  );
+  const { expenseCoords, incomeCurve, expenseCurve, incomeArea } = useMemo(() => {
+    const maxVal = Math.max(
+      50,
+      ...pointsData.map((d) => Math.max(d.income, d.expense))
+    );
 
-  const getCoordinates = (val: number, index: number, total: number): PointCoord => {
-    const plotWidth = Math.max(40, width - paddingHorizontal * 2);
-    const stepX = total > 1 ? plotWidth / (total - 1) : 0;
-    const x =
-      total > 1 ? paddingHorizontal + index * stepX : paddingHorizontal + plotWidth / 2;
-    const plotHeight = height - paddingTop - paddingBottom;
-    const ratio = val / (maxVal * 1.15);
-    const y = paddingTop + plotHeight * (1 - Math.min(1, Math.max(0, ratio)));
-    return { x, y };
-  };
+    const getCoordinates = (val: number, index: number, total: number): PointCoord => {
+      const plotWidth = Math.max(40, width - paddingHorizontal * 2);
+      const stepX = total > 1 ? plotWidth / (total - 1) : 0;
+      const x =
+        total > 1 ? paddingHorizontal + index * stepX : paddingHorizontal + plotWidth / 2;
+      const plotHeight = height - paddingTop - paddingBottom;
+      const ratio = val / (maxVal * 1.15);
+      const y = paddingTop + plotHeight * (1 - Math.min(1, Math.max(0, ratio)));
+      return { x, y };
+    };
 
-  const incomeCoords = pointsData.map((d, i) =>
-    getCoordinates(d.income, i, pointsData.length)
-  );
-  const expenseCoords = pointsData.map((d, i) =>
-    getCoordinates(d.expense, i, pointsData.length)
-  );
+    const incomeCoords = pointsData.map((d, i) =>
+      getCoordinates(d.income, i, pointsData.length)
+    );
+    const expenseCoords = pointsData.map((d, i) =>
+      getCoordinates(d.expense, i, pointsData.length)
+    );
 
-  const incomeCurve = computeSmoothCurve(incomeCoords);
-  const expenseCurve = computeSmoothCurve(expenseCoords);
-  const incomeArea =
-    incomeCoords.length >= 2
-      ? `${incomeCurve.path} L ${incomeCoords[incomeCoords.length - 1].x} ${height - paddingBottom} L ${incomeCoords[0].x} ${height - paddingBottom} Z`
-      : '';
+    const incomeCurve = computeSmoothCurve(incomeCoords);
+    const expenseCurve = computeSmoothCurve(expenseCoords);
+    const incomeArea =
+      incomeCoords.length >= 2
+        ? `${incomeCurve.path} L ${incomeCoords[incomeCoords.length - 1].x} ${height - paddingBottom} L ${incomeCoords[0].x} ${height - paddingBottom} Z`
+        : '';
+
+    return { expenseCoords, incomeCurve, expenseCurve, incomeArea };
+  }, [pointsData, width, height, paddingHorizontal, paddingTop, paddingBottom]);
 
   const activeExpenseCoord =
     expenseCoords[safeIndex] || { x: width / 2, y: height / 2 };
@@ -489,9 +401,6 @@ export const SplineChart: React.FC = () => {
   const surfacePill = isDark ? '#18181D' : '#F3F4F6';
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';
-
-  const incomeDrawLen = Math.max(0.01, drawProgress * incomeCurve.length);
-  const expenseDrawLen = Math.max(0.01, drawProgress * expenseCurve.length);
 
   const activeScopeSubtitle = isMonthHoldReady
     ? 'Month Mode Ready • Swipe ↔'
@@ -550,13 +459,12 @@ export const SplineChart: React.FC = () => {
 
             <JellyRadio
               items={['Date', 'Month', 'Year']}
-              value={granularity}
+              value={requestedGranularity}
               onChange={(val) => {
                 const next = val as CashFlowGranularity;
-                if (next === granularity) return;
-                const order: CashFlowGranularity[] = ['Date', 'Month', 'Year'];
-                const dir: -1 | 1 = order.indexOf(next) >= order.indexOf(granularity) ? 1 : -1;
-                runChartTransition(dir, () => {
+                if (next === requestedGranularity) return;
+                setRequestedGranularity(next);
+                runChartTransition(0, () => {
                   setSelectedIndex(null);
                   setGranularity(next);
                 });
@@ -619,6 +527,7 @@ export const SplineChart: React.FC = () => {
         <Animated.View
           style={{
             width: '100%',
+            minHeight: height + 40,
             opacity: swipeOpacity,
             transform: [{ translateX: combinedTranslateX }],
           }}
@@ -630,7 +539,7 @@ export const SplineChart: React.FC = () => {
           }}
         >
         {pointsData.length === 0 ? (
-          <View style={styles.emptyBox}>
+          <View style={[styles.emptyBox, { minHeight: height + 40 }]}>
             <Text style={[styles.emptyText, { color: mutedText }]}>
               No cash flow recorded on{' '}
               {selectedDate ? formatDisplayDate(selectedDate, true) : 'this selection'}.
@@ -660,7 +569,6 @@ export const SplineChart: React.FC = () => {
                     backgroundColor: isDark ? '#FFFFFF' : '#000000',
                     left: Math.max(10, Math.min(width - 108, activeExpenseCoord.x - 48)),
                     top: Math.max(0, activeExpenseCoord.y - 48),
-                    opacity: drawProgress > 0.35 ? 1 : 0,
                   },
                 ]}
               >
@@ -677,7 +585,7 @@ export const SplineChart: React.FC = () => {
               <Svg width={width} height={height}>
                 <Defs>
                   <LinearGradient id="goldFillGrad" x1="0" y1="0" x2="0" y2="1">
-                    <Stop offset="0%" stopColor="#F59E0B" stopOpacity={0.25 * drawProgress} />
+                    <Stop offset="0%" stopColor="#F59E0B" stopOpacity={0.25} />
                     <Stop offset="100%" stopColor="#F59E0B" stopOpacity={0.0} />
                   </LinearGradient>
                   <LinearGradient id="goldCurveGrad" x1="0" y1="0" x2="1" y2="0">
@@ -690,8 +598,7 @@ export const SplineChart: React.FC = () => {
                   </LinearGradient>
                 </Defs>
 
-                {drawProgress > 0.35 && (
-                  <Line
+                <Line
                     x1={activeExpenseCoord.x}
                     y1={paddingTop - 6}
                     x2={activeExpenseCoord.x}
@@ -699,11 +606,10 @@ export const SplineChart: React.FC = () => {
                     stroke={isDark ? 'rgba(255,255,255,0.16)' : 'rgba(15,23,42,0.14)'}
                     strokeWidth={1.25}
                     strokeDasharray="3 4"
-                  />
-                )}
+                />
 
                 {incomeArea ? (
-                  <Path d={incomeArea} fill="url(#goldFillGrad)" opacity={drawProgress} />
+                  <Path d={incomeArea} fill="url(#goldFillGrad)" />
                 ) : null}
 
                 {incomeCurve.path ? (
@@ -713,11 +619,6 @@ export const SplineChart: React.FC = () => {
                     stroke="url(#goldCurveGrad)"
                     strokeWidth={2.8}
                     strokeLinecap="round"
-                    strokeDasharray={
-                      incomeCurve.length > 0 && drawProgress < 0.999
-                        ? `${incomeDrawLen} ${incomeCurve.length + 20}`
-                        : undefined
-                    }
                   />
                 ) : null}
 
@@ -728,11 +629,6 @@ export const SplineChart: React.FC = () => {
                     stroke="url(#coralCurveGrad)"
                     strokeWidth={2.2}
                     strokeLinecap="round"
-                    strokeDasharray={
-                      expenseCurve.length > 0 && drawProgress < 0.999
-                        ? `${expenseDrawLen} ${expenseCurve.length + 20}`
-                        : undefined
-                    }
                   />
                 ) : null}
 
@@ -744,11 +640,10 @@ export const SplineChart: React.FC = () => {
                       key={`dot-${idx}`}
                       cx={pt.x}
                       cy={pt.y}
-                      r={Math.max(1.5, 5.5 * drawProgress)}
+                      r={5.5}
                       fill="#FFFFFF"
                       stroke="#F59E0B"
                       strokeWidth={3}
-                      opacity={drawProgress > 0.2 ? 1 : 0}
                     />
                   );
                 })}
@@ -848,6 +743,7 @@ export const SplineChart: React.FC = () => {
         visible={showCalendar}
         selectedDate={selectedDate}
         onSelectDate={(iso) => {
+          if (iso) setRequestedGranularity('Date');
           const dir: -1 | 1 =
             iso && selectedDate ? (iso >= selectedDate ? 1 : -1) : iso ? 1 : -1;
           runChartTransition(dir, () => {

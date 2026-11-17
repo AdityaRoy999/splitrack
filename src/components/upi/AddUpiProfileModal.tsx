@@ -1,8 +1,8 @@
+import { ModalBackdrop } from '../common/ModalBackdrop';
+import { SheetModal } from '../common/SheetModal';
 import React, { useState } from 'react';
 import {
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,11 +20,13 @@ import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
 import { GlassPill } from '../glass/GlassPill';
+import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
 import { BankIssuerPickerModal } from './BankIssuerPickerModal';
 import { UpiAppPickerModal } from './UpiAppPickerModal';
 import { BankItem, BANKS_CATALOG } from '../../constants/banksCatalog';
 import { UpiAppItem, UPI_APPS_CATALOG } from '../../constants/upiAppsCatalog';
+import { isValidUpiId } from '../../utils/upi';
 
 interface AddUpiProfileModalProps {
   visible: boolean;
@@ -42,6 +44,10 @@ const QUICK_PROVIDERS: { value: UpiProvider; label: string }[] = [
 ];
 
 const CARD_NETWORKS: ('VISA' | 'Mastercard' | 'RuPay')[] = ['VISA', 'Mastercard', 'RuPay'];
+const BANK_UPI_APP: UpiAppItem = {
+  id: 'bank', name: 'Bank UPI', company: 'Your bank', defaultHandle: '', supportedHandles: [],
+  category: 'bank', accentColor: '#059669', secondaryColor: '#0D9488', logoLetter: 'UPI',
+};
 
 interface FormContentProps {
   editingAccount?: UpiAccount | null;
@@ -49,7 +55,7 @@ interface FormContentProps {
 }
 
 const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClose }) => {
-  const { addUpiAccount, updateUpiAccount, setSelectedAccountId } = useSplitTrack();
+  const { addUpiAccount, updateUpiAccount, setSelectedAccountId, selectedAccountId } = useSplitTrack();
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
@@ -65,9 +71,16 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
     if (editingAccount?.provider) {
       const match = UPI_APPS_CATALOG.find((a) => a.id === editingAccount.provider);
       if (match) return match;
+      return {
+        ...BANK_UPI_APP, id: editingAccount.provider,
+        name: editingAccount.provider === 'bank' ? 'Bank UPI' : editingAccount.title,
+        accentColor: editingAccount.accentColor, secondaryColor: editingAccount.secondaryColor,
+      };
     }
     return UPI_APPS_CATALOG[0];
   });
+  const [suggestedHandle, setSuggestedHandle] = useState(() => selectedUpiApp.defaultHandle);
+  const [formError, setFormError] = useState('');
   const [bankBrand, setBankBrand] = useState<BankBrand>(
     () => (editingAccount?.bankBrand as BankBrand) || 'hdfc'
   );
@@ -86,7 +99,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
     () => (editingAccount?.cardType as any) || 'VISA'
   );
   const [makeActive, setMakeActive] = useState(() =>
-    editingAccount ? Boolean(editingAccount.isDefault) : true
+    editingAccount ? editingAccount.id === selectedAccountId : true
   );
 
   const [showBankPicker, setShowBankPicker] = useState(false);
@@ -115,17 +128,23 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
 
   const handleSelectUpiApp = (app: UpiAppItem) => {
     setSelectedUpiApp(app);
-    setProvider((app.id as UpiProvider) || 'bank');
-    if (!upiId || upiId.includes('@')) {
-      const prefix = upiId.includes('@') ? upiId.split('@')[0] : 'alex';
-      setUpiId(`${prefix}${app.defaultHandle}`);
-    }
+    setProvider(app.id || 'bank');
+    setSuggestedHandle(app.defaultHandle);
+    setFormError('');
+  };
+
+  const handleSelectSuffix = (suffix: string) => {
+    setSuggestedHandle(suffix);
+    const username = upiId.trim().split('@')[0];
+    if (username) setUpiId(`${username}${suffix}`);
+    setFormError('');
   };
 
   const handleSave = () => {
     if (kind === 'upi') {
-      const cleanUpi = upiId.trim();
-      if (!cleanUpi || !cleanUpi.includes('@')) {
+      const cleanUpi = upiId.trim().toLowerCase();
+      if (!isValidUpiId(cleanUpi)) {
+        setFormError('Enter the full UPI ID shown in your payment app, such as yourname@bank.');
         triggerNotification(NotificationType.Error);
         return;
       }
@@ -168,6 +187,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
     } else {
       const cleanLast4 = last4.replace(/\D/g, '').slice(-4);
       if (cleanLast4.length < 4 && kind !== 'netbanking' && kind !== 'wallet') {
+        setFormError('Enter the last four digits of the card.');
         triggerNotification(NotificationType.Error);
         return;
       }
@@ -267,7 +287,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
           </AnimatedPressable>
         </View>
 
-        <View style={styles.scrollAreaWrap}>
+        <ScrollEdgeFade style={styles.scrollAreaWrap}>
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
@@ -276,7 +296,6 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
               <Text style={[styles.fieldLabel, { color: mutedText }]}>PROFILE TYPE</Text>
               <JellyRadio
                 scrollable
-                blurWidth={0}
                 items={[
                   { value: 'upi', label: 'UPI ID' },
                   { value: 'debit', label: 'Debit Card' },
@@ -322,13 +341,30 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
                       { backgroundColor: inputBg, color: textColor },
                       webOutlineNone,
                     ]}
-                    placeholder="e.g. alex@slice or 9137657510@okaxis"
+                    accessibilityLabel="Full UPI ID from your payment app"
+                    placeholder={suggestedHandle ? `yourname${suggestedHandle}` : 'Enter your full UPI ID'}
                     placeholderTextColor={mutedText}
                     autoCapitalize="none"
                     autoCorrect={false}
                     value={upiId}
-                    onChangeText={setUpiId}
+                    onChangeText={(value) => { setUpiId(value); setFormError(''); }}
                   />
+                  <Text style={[styles.handleHint, { color: mutedText }]}>Copy your full UPI ID from {provider === 'bank' ? 'your bank app' : selectedUpiApp.name}.</Text>
+                  {selectedUpiApp.supportedHandles.length > 0 ? (
+                    <View style={styles.handleChoices}>
+                      <JellyRadio
+                        scrollable
+                        items={selectedUpiApp.supportedHandles.map((suffix) => ({
+                          value: suffix,
+                          label: `${suffix}${selectedUpiApp.walletHandles?.includes(suffix) ? ' • Wallet' : ''}`,
+                        }))}
+                        value={selectedUpiApp.supportedHandles.find((suffix) => upiId.trim().toLowerCase().endsWith(suffix)) ?? suggestedHandle}
+                        onChange={handleSelectSuffix}
+                        chipColor={chipBg} activeColor={activeBg} textColor={textColor} activeTextColor={activeText}
+                        size="sm" gap={6} radius={999}
+                      />
+                    </View>
+                  ) : null}
 
                   {/* UPI App Picker Header with clean search icon button */}
                   <View style={styles.pickerSectionHeader}>
@@ -348,12 +384,10 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
                   <View style={{ marginTop: 4 }}>
                     <JellyRadio
                       scrollable
-                      blurWidth={0}
                       items={QUICK_PROVIDERS.map((p) => ({ value: p.value, label: p.label }))}
                       value={provider}
                       onChange={(val) => {
-                        setProvider(val as UpiProvider);
-                        const matched = UPI_APPS_CATALOG.find((a) => a.id === val);
+                        const matched = val === 'bank' ? BANK_UPI_APP : UPI_APPS_CATALOG.find((a) => a.id === val);
                         if (matched) handleSelectUpiApp(matched);
                       }}
                       chipColor={chipBg}
@@ -386,7 +420,6 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
                   <View style={{ marginTop: 4 }}>
                     <JellyRadio
                       scrollable
-                      blurWidth={0}
                       items={BANKS_CATALOG.slice(0, 6).map((b) => ({
                         value: b.id,
                         label: b.shortName,
@@ -448,7 +481,6 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
                     CARD NETWORK
                   </Text>
                   <JellyRadio
-                    blurWidth={0}
                     items={CARD_NETWORKS.map((n) => ({ value: n, label: n }))}
                     value={cardType}
                     onChange={(val) => setCardType(val as 'VISA' | 'Mastercard' | 'RuPay')}
@@ -481,6 +513,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
               />
             </View>
 
+            {formError ? <Text accessibilityRole="alert" style={styles.formError}>{formError}</Text> : null}
             <GlassPill
               label={
                 isEditing
@@ -495,7 +528,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
               style={styles.saveBtn}
             />
           </ScrollView>
-        </View>
+        </ScrollEdgeFade>
       </GlassModalSheet>
 
       {/* Dedicated Bank Issuer Picker (Full Page with Authentic Logos) */}
@@ -523,7 +556,7 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
   editingAccount,
 }) => {
   return (
-    <Modal
+    <SheetModal
       visible={visible}
       transparent
       animationType="fade"
@@ -532,11 +565,7 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityLabel="Dismiss modal backdrop"
-        />
+        <ModalBackdrop onClose={onClose} />
         {visible ? (
           <ProfileFormContent
             key={editingAccount ? editingAccount.id : 'new-profile-form'}
@@ -545,26 +574,31 @@ export const AddUpiProfileModal: React.FC<AddUpiProfileModalProps> = ({
           />
         ) : null}
       </View>
-    </Modal>
+    </SheetModal>
   );
 };
 
 const styles = StyleSheet.create({
+  handleHint: { fontSize: 12, lineHeight: 18, marginTop: 8 },
+  handleChoices: { marginTop: 10 },
+  formError: { fontSize: 13, lineHeight: 19, color: '#EF4444', marginBottom: 8 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+
     justifyContent: 'flex-end',
   },
   sheetContainer: {
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     paddingTop: 10,
     paddingHorizontal: 16,
-    paddingBottom: 28,
-    maxHeight: '90%',
+    borderWidth: 0,
+    marginBottom: 0,
   },
   dragHandleWrap: {
     alignItems: 'center',
@@ -601,7 +635,8 @@ const styles = StyleSheet.create({
   },
   scrollAreaWrap: {
     position: 'relative',
-    flexShrink: 1,
+    flex: 1,
+    minHeight: 120,
     overflow: 'hidden',
   },
   scrollContent: {

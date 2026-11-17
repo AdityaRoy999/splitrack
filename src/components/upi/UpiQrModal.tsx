@@ -1,10 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Easing,
-  Modal,
   Platform,
-  Pressable,
+  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -24,19 +22,37 @@ import { GlassPill } from '../glass/GlassPill';
 import { GlassSurface } from '../glass/GlassSurface';
 import { StyledUpiQr } from './StyledUpiQr';
 import { getUpiBrandMeta } from './upiBrandLogo';
+import { SheetModal } from '../common/SheetModal';
+import { ModalBackdrop } from '../common/ModalBackdrop';
+import { usePopupMotion } from '../common/usePopupMotion';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { buildUpiPaymentUri, formatUpiAmount, type UpiPaymentDetails } from '../../utils/upi';
 
-interface UpiQrModalProps {
+interface UpiQrModalProps extends UpiPaymentDetails {
   visible: boolean;
   onClose: () => void;
-  account: UpiAccount;
+  account: UpiAccount | null;
 }
 
 export const UpiQrModal: React.FC<UpiQrModalProps> = ({
   visible,
   onClose,
   account,
+  amount,
+  note,
 }) => {
+  return (
+    <SheetModal visible={visible} statusBarTranslucent presentationStyle="overFullScreen" onRequestClose={onClose}>
+      {account ? <QrModalContent key={`${account.id}-${amount ?? 'profile'}`} account={account} amount={amount} note={note} /> : null}
+    </SheetModal>
+  );
+};
+
+function QrModalContent({ account, amount, note }: { account: UpiAccount } & UpiPaymentDetails) {
+  const insets = useSafeAreaInsets();
+  const { progress: animVal, close: handleSmoothClose } = usePopupMotion();
   const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
   const pillBg = isLiquidGlassEnabled
@@ -44,32 +60,17 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
     : (isDark ? '#18181D' : '#F3F4F6');
   const textColor = isDark ? '#FFFFFF' : '#000000';
   const mutedText = isDark ? '#71717A' : '#6B7280';
+  let paymentUri = '';
+  let rupeeAmount = '';
+  let paymentError = '';
+  try {
+    paymentUri = buildUpiPaymentUri(account, { amount, note });
+    if (amount !== undefined) rupeeAmount = `₹${formatUpiAmount(amount)}`;
+  } catch (error) {
+    paymentError = error instanceof Error ? error.message : 'This payment QR is unavailable.';
+  }
 
-  const [animVal] = useState(() => new Animated.Value(0));
-
-  useEffect(() => {
-    if (visible) {
-      Animated.spring(animVal, {
-        toValue: 1,
-        tension: 68,
-        friction: 9,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      animVal.setValue(0);
-    }
-  }, [visible, animVal]);
-
-  const handleSmoothClose = () => {
-    Animated.timing(animVal, {
-      toValue: 0,
-      duration: 170,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      onClose();
-    });
-  };
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   const handleCopy = () => {
     triggerNotification(NotificationType.Success);
@@ -81,14 +82,15 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
       navigator.clipboard.writeText(account.upiId).catch(() => {});
     }
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied(false), 2000);
   };
 
   const handleShare = async () => {
     try {
       triggerImpact(ImpactStyle.Light);
       await Share.share({
-        message: `Pay me on SplitTrack via UPI: ${account.upiId} (${account.title})`,
+        message: `Pay${rupeeAmount ? ` ${rupeeAmount}` : ' me'} on SplitTrack via UPI: ${account.upiId} (${account.title})\n${paymentUri}`,
       });
     } catch {}
   };
@@ -96,15 +98,13 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
   const brandMeta = getUpiBrandMeta(account.provider, account.bankBrand);
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleSmoothClose}>
-      <Animated.View style={[styles.modalOverlay, { opacity: animVal }]}>
+      <View style={[styles.modalOverlay, { paddingTop: Math.max(20, insets.top), paddingBottom: Math.max(20, insets.bottom) }]}>
         {Platform.OS === 'web' ? (
           <View
             pointerEvents="none"
             style={[
               styles.backdropFill,
               {
-                backgroundColor: isDark ? 'rgba(6, 7, 11, 0.56)' : 'rgba(15, 23, 42, 0.34)',
                 backdropFilter: 'blur(20px) saturate(150%)',
                 WebkitBackdropFilter: 'blur(20px) saturate(150%)',
               } as unknown as ViewStyle,
@@ -117,20 +117,10 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
               tint={isDark ? 'dark' : 'light'}
               style={styles.backdropFill}
             />
-            <View
-              style={[
-                styles.backdropFill,
-                { backgroundColor: isDark ? 'rgba(6, 7, 11, 0.44)' : 'rgba(15, 23, 42, 0.24)' },
-              ]}
-            />
           </View>
         )}
 
-        <Pressable
-          accessibilityLabel="Close QR modal backdrop"
-          onPress={handleSmoothClose}
-          style={styles.backdropFill}
-        />
+        <ModalBackdrop label="Close QR modal backdrop" onClose={handleSmoothClose} shadeColor={isDark ? 'rgba(6, 7, 11, 0.44)' : 'rgba(15, 23, 42, 0.24)'} />
 
         <Animated.View
           style={[
@@ -141,6 +131,7 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
                   scale: animVal.interpolate({
                     inputRange: [0, 1],
                     outputRange: [0.88, 1],
+                    extrapolate: 'clamp',
                   }),
                 },
                 {
@@ -153,6 +144,7 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
             },
           ]}
         >
+          <ScrollView style={styles.cardScroll} contentContainerStyle={styles.cardScrollContent} showsVerticalScrollIndicator={false} bounces={false}>
           <GlassSurface
             borderRadius={28}
             glassStyle="regular"
@@ -170,14 +162,19 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
                 <View style={[styles.appDot, { backgroundColor: brandMeta.primary }]} />
                 <Text style={[styles.appBadgeText, { color: textColor }]}>{brandMeta.label}</Text>
               </View>
-              <Text style={[styles.title, { color: textColor }]}>Scan to Pay via UPI</Text>
+              <Text style={[styles.title, { color: textColor }]}>{rupeeAmount ? 'Scan to Settle via UPI' : 'Scan to Pay via UPI'}</Text>
               <Text style={[styles.subtitle, { color: mutedText }]}>{account.title}</Text>
+              {rupeeAmount ? <Text style={[styles.paymentAmount, { color: textColor }]}>{rupeeAmount}</Text> : null}
+              {note ? <Text numberOfLines={2} style={[styles.paymentNote, { color: mutedText }]}>{note}</Text> : null}
             </View>
 
             {/* Stylish Scannable QR Code with UPI App Image in Center */}
-            <View style={styles.qrBox}>
-              <StyledUpiQr account={account} size={216} />
-            </View>
+            {paymentUri ? (
+              <View style={styles.qrBox}>
+                <StyledUpiQr account={account} size={216} amount={amount} note={note} />
+              </View>
+            ) : <Text style={[styles.paymentNote, { color: '#EF4444' }]}>{paymentError}</Text>}
+            {rupeeAmount ? <Text style={[styles.paymentHint, { color: mutedText }]}>Amount is filled in. Confirm the payment in your UPI app.</Text> : null}
 
             {/* UPI ID Pill */}
             <TouchableOpacity onPress={handleCopy} activeOpacity={0.8} style={[styles.upiPill, { backgroundColor: pillBg }]}>
@@ -190,7 +187,7 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
             </TouchableOpacity>
 
             {/* Action buttons */}
-            <View style={styles.actionsRow}>
+            {paymentUri ? <View style={styles.actionsRow}>
               <GlassPill
                 label={copied ? 'Copied!' : 'Copy UPI'}
                 icon={<CopyIcon size={15} color="#000000" />}
@@ -205,13 +202,13 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
                 onPress={handleShare}
                 style={styles.pillAction}
               />
-            </View>
+            </View> : null}
           </GlassSurface>
+          </ScrollView>
         </Animated.View>
-      </Animated.View>
-    </Modal>
+      </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   modalOverlay: {
@@ -230,9 +227,12 @@ const styles = StyleSheet.create({
   contentCardWrap: {
     width: '100%',
     maxWidth: 360,
+    maxHeight: '100%',
     zIndex: 2,
     alignItems: 'center',
   },
+  cardScroll: { width: '100%', flexGrow: 0, flexShrink: 1, borderRadius: 28 },
+  cardScrollContent: { alignItems: 'center' },
   contentCard: {
     width: '100%',
     borderRadius: 28,
@@ -288,6 +288,9 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 2,
   },
+  paymentAmount: { fontSize: 28, fontWeight: '600', marginTop: 10, fontVariant: ['tabular-nums'] },
+  paymentNote: { fontSize: 12, textAlign: 'center', marginTop: 6 },
+  paymentHint: { fontSize: 12, lineHeight: 18, textAlign: 'center', marginBottom: 14 },
   qrBox: {
     padding: 12,
     backgroundColor: '#FFFFFF',

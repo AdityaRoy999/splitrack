@@ -22,6 +22,7 @@ interface UseDateMonthSwipeOptions {
   onStepMonth: (delta: -1 | 1) => void;
   holdDurationMs?: number;
   swipeThreshold?: number;
+  preserveDragOnCommit?: boolean;
 }
 
 interface GesturePointState {
@@ -41,6 +42,7 @@ export function useDateMonthSwipeGesture({
   onStepMonth,
   holdDurationMs = 2000,
   swipeThreshold = 34,
+  preserveDragOnCommit = false,
 }: UseDateMonthSwipeOptions) {
   const [isMonthHoldReady, setIsMonthHoldReady] = useState(false);
   const [dragAnim] = useState(() => new Animated.Value(0));
@@ -71,12 +73,14 @@ export function useDateMonthSwipeGesture({
       friction: 8,
       tension: 110,
       useNativeDriver: USE_NATIVE_DRIVER,
+      isInteraction: false,
     }).start();
   }, [clearHoldTimer, dragAnim]);
 
   const startTrack = useCallback(
     (x: number, y: number) => {
       clearHoldTimer();
+      dragAnim.stopAnimation();
       pointRef.current = {
         active: true,
         startX: x,
@@ -93,7 +97,7 @@ export function useDateMonthSwipeGesture({
         triggerSelection();
       }, holdDurationMs);
     },
-    [clearHoldTimer, holdDurationMs]
+    [clearHoldTimer, dragAnim, holdDurationMs]
   );
 
   const moveTrack = useCallback(
@@ -134,7 +138,8 @@ export function useDateMonthSwipeGesture({
         pointRef.current.active = false;
         pointRef.current.monthUnlocked = false;
         setIsMonthHoldReady(false);
-        dragAnim.setValue(0);
+        // Charts reset this offset while hidden, after their new data commits.
+        if (!preserveDragOnCommit) dragAnim.setValue(0);
         if (useMonthMode) {
           onStepMonth(delta);
         } else {
@@ -145,10 +150,13 @@ export function useDateMonthSwipeGesture({
 
       resetGesture();
     },
-    [clearHoldTimer, dragAnim, holdDurationMs, onStepDay, onStepMonth, resetGesture, swipeThreshold]
+    [clearHoldTimer, dragAnim, holdDurationMs, onStepDay, onStepMonth, preserveDragOnCommit, resetGesture, swipeThreshold]
   );
 
-  useEffect(() => clearHoldTimer, [clearHoldTimer]);
+  useEffect(() => () => {
+    clearHoldTimer();
+    dragAnim.stopAnimation();
+  }, [clearHoldTimer, dragAnim]);
 
   const onTouchStart = useCallback(
     (e: GestureResponderEvent) => {

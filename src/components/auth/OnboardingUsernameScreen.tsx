@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { GlassModalSheet } from '../common/GlassModalSheet';
+import { SheetModal } from '../common/SheetModal';
+import { ModalBackdrop } from '../common/ModalBackdrop';
+import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
+import React, { useMemo, useState } from 'react';
 import {
   Image,
   Keyboard,
-  KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -27,7 +29,6 @@ import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { ImpactStyle, NotificationType, triggerImpact, triggerNotification } from '../../utils/haptics';
 import { CARTOON_AVATARS } from './CartoonAvatars';
-import { GlassSurface } from '../glass/GlassSurface';
 
 interface OnboardingUsernameScreenProps {
   initialDisplayName?: string;
@@ -71,22 +72,6 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
   const [selectedCartoonId, setSelectedCartoonId] = useState<string>('cyber_boy');
   const [customPhotoUri, setCustomPhotoUri] = useState<string>('');
   const [showAvatarPickerModal, setShowAvatarPickerModal] = useState(false);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => setIsKeyboardVisible(true)
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setIsKeyboardVisible(false)
-    );
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   const cleanHandle = cleanHandleText(handle);
 
@@ -95,6 +80,17 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
     if (RESERVED_HANDLES.has(cleanHandle)) return false;
     return true;
   }, [cleanHandle]);
+
+  const handleSuggestions = useMemo(() => {
+    const base = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'aditya';
+    const cleanBase = base.slice(0, 14);
+    return [
+      `@${cleanBase}`,
+      `@${cleanBase}_splits`,
+      `@${cleanBase}_in`,
+      `@the_${cleanBase}`,
+    ];
+  }, [displayName]);
 
   const handlePickPhoto = async () => {
     try {
@@ -136,20 +132,15 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
     triggerImpact(ImpactStyle.Light);
   };
 
-  const handleSuggestions = useMemo(() => {
-    const base = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'aditya';
-    const cleanBase = base.slice(0, 14);
-    return [
-      `@${cleanBase}`,
-      `@${cleanBase}_splits`,
-      `@${cleanBase}_in`,
-      `@the_${cleanBase}`,
-    ];
-  }, [displayName]);
-
   const handleNextStep = () => {
     triggerImpact(ImpactStyle.Light);
+    Keyboard.dismiss();
     if (activeStep === 0) {
+      // Sync handle suggestion from displayName if user hasn't explicitly customized it yet
+      const slug = cleanHandleText(displayName);
+      if (slug && (!handle || handle === 'aditya_roy')) {
+        setHandle(slug);
+      }
       setActiveStep(1);
     } else if (activeStep === 1) {
       setActiveStep(2);
@@ -160,12 +151,14 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
 
   const handlePrevStep = () => {
     triggerImpact(ImpactStyle.Light);
+    Keyboard.dismiss();
     if (activeStep > 0) {
       setActiveStep((prev) => (prev - 1) as any);
     }
   };
 
   const handleFinalFinish = () => {
+    Keyboard.dismiss();
     const finalName = displayName.trim() || 'Aditya Roy';
     const finalHandle = cleanHandle.length >= 3 ? `@${cleanHandle}` : `@${cleanHandleText(finalName) || 'aditya'}`;
     const avatarPayload =
@@ -198,10 +191,7 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
 
   return (
     <View style={[styles.root, { backgroundColor: '#000000', paddingTop: insets.top }]}>
-      <KeyboardAvoidingView
-        style={styles.keyboardWrap}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <View style={styles.keyboardWrap}>
         {/* Top Navigation Row: Back button (if step > 0) */}
         <View style={styles.topNavRow}>
           {activeStep > 0 ? (
@@ -224,16 +214,20 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
           style={styles.contentScroll}
           contentContainerStyle={styles.contentFlex}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          {/* ===================== SCREEN 1: Claim Your Unique Handle ===================== */}
+          {/* ===================== SCREEN 1: Avatar choosing & Name ===================== */}
           {activeStep === 0 && (
             <View style={styles.screenContainer}>
               <View style={styles.visualSlot}>
                 <TouchableOpacity
                   activeOpacity={0.88}
-                  onPress={() => setShowAvatarPickerModal(true)}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setShowAvatarPickerModal(true);
+                  }}
                   style={styles.squircleAvatarWrap}
                   accessibilityLabel="Tap to choose avatar or upload photo"
                 >
@@ -257,7 +251,10 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
 
                 {/* Choose Avatar or Upload quick trigger */}
                 <TouchableOpacity
-                  onPress={() => setShowAvatarPickerModal(true)}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setShowAvatarPickerModal(true);
+                  }}
                   style={styles.avatarTriggerPill}
                   activeOpacity={0.8}
                 >
@@ -270,8 +267,8 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
 
               {/* Title & Subtitle */}
               <View style={styles.textCenterBlock}>
-                <Text style={styles.mainTitle}>What&apos;s Your</Text>
-                <Text style={styles.mainTitle}>Full Name</Text>
+                <Text style={styles.mainTitle}>Choose Your</Text>
+                <Text style={styles.mainTitle}>Avatar & Name</Text>
                 <Text style={styles.mainSubtitle}>
                   Choose a 3D avatar persona and enter your full name.
                 </Text>
@@ -285,12 +282,14 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
                   placeholderTextColor="#64748B"
                   value={displayName}
                   onChangeText={setDisplayName}
+                  returnKeyType="next"
+                  onSubmitEditing={handleNextStep}
                 />
               </View>
             </View>
           )}
 
-          {/* ===================== SCREEN 2: Your Unique Username ===================== */}
+          {/* ===================== SCREEN 2: Username choosing ===================== */}
           {activeStep === 1 && (
             <View style={styles.screenContainer}>
               <View style={styles.radarVisualSlot}>
@@ -313,6 +312,8 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
                     autoCorrect={false}
                     value={cleanHandle}
                     onChangeText={(val) => setHandle(cleanHandleText(val))}
+                    returnKeyType="next"
+                    onSubmitEditing={handleNextStep}
                   />
                   {/* Clean Green Checkmark Badge */}
                   <View
@@ -328,10 +329,10 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
 
               {/* Title & Subtitle */}
               <View style={styles.textCenterBlock}>
-                <Text style={styles.mainTitle}>Your Unique</Text>
-                <Text style={styles.mainTitle}>Username</Text>
+                <Text style={styles.mainTitle}>Claim Your</Text>
+                <Text style={styles.mainTitle}>Unique Handle</Text>
                 <Text style={styles.mainSubtitle}>
-                  A one-of-a-kind username for your profile.
+                  Find and secure your unique handle to make it yours.
                 </Text>
               </View>
 
@@ -363,7 +364,7 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
             </View>
           )}
 
-          {/* ===================== SCREEN 3: Track Everything ===================== */}
+          {/* ===================== SCREEN 3: Track Everything / Get Started ===================== */}
           {activeStep === 2 && (
             <View style={styles.screenContainer}>
               <View style={styles.trackCardVisualSlot}>
@@ -427,33 +428,30 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
           style={[
             styles.bottomBar,
             {
-              paddingBottom: isKeyboardVisible
-                ? Math.max(12, insets.bottom + 4)
-                : Math.max(28, insets.bottom + 12),
-              gap: isKeyboardVisible ? 10 : 20,
+              paddingBottom: Math.max(28, insets.bottom + 12),
+              gap: 20,
             },
           ]}
         >
-          {/* 3-Dot Pagination (hidden when keyboard is open to give comfortable breathing room) */}
-          {!isKeyboardVisible && (
-            <View style={styles.paginationDotsRow}>
-              {[0, 1, 2].map((stepIdx) => (
-                <TouchableOpacity
-                  key={stepIdx}
-                  onPress={() => {
-                    triggerImpact(ImpactStyle.Light);
-                    setActiveStep(stepIdx as any);
-                  }}
-                  style={[
-                    styles.dot,
-                    activeStep === stepIdx ? styles.dotActive : styles.dotInactive,
-                  ]}
-                />
-              ))}
-            </View>
-          )}
+          {/* 3-Dot Pagination */}
+          <View style={styles.paginationDotsRow}>
+            {[0, 1, 2].map((stepIdx) => (
+              <TouchableOpacity
+                key={stepIdx}
+                onPress={() => {
+                  triggerImpact(ImpactStyle.Light);
+                  Keyboard.dismiss();
+                  setActiveStep(stepIdx as any);
+                }}
+                style={[
+                  styles.dot,
+                  activeStep === stepIdx ? styles.dotActive : styles.dotInactive,
+                ]}
+              />
+            ))}
+          </View>
 
-          {/* Continue Pill Button */}
+          {/* Continue / Get Started Pill Button */}
           <AnimatedPressable
             scaleTo={0.96}
             onPress={handleNextStep}
@@ -467,29 +465,18 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
             <AltArrowRightIcon size={18} color="#000000" />
           </AnimatedPressable>
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       {/* ===================== 3D Cartoon Avatar & Photo Picker Modal ===================== */}
-      <Modal
+      <SheetModal
         visible={showAvatarPickerModal}
         transparent
         animationType="fade"
         onRequestClose={() => setShowAvatarPickerModal(false)}
       >
         <View style={styles.pickerModalOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            onPress={() => setShowAvatarPickerModal(false)}
-            activeOpacity={1}
-          />
-          <GlassSurface
-            borderRadius={32}
-            glassStyle="regular"
-            intensity={85}
-            tintColor="rgba(20, 20, 26, 0.88)"
-            matteColor="#141418"
-            style={styles.avatarPickerSheet}
-          >
+          <ModalBackdrop onClose={() => setShowAvatarPickerModal(false)} />
+          <GlassModalSheet style={styles.avatarPickerSheet}>
             <View style={styles.pickerHeaderRow}>
               <View>
                 <Text style={styles.pickerTitle}>Choose Your Avatar</Text>
@@ -522,6 +509,7 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
             <Text style={styles.cartoonGridHeader}>3D CARTOON PERSONAS</Text>
 
             {/* Grid of 3D Cartoon Avatars */}
+            <ScrollEdgeFade tint="#09090B">
             <ScrollView
               contentContainerStyle={styles.cartoonGrid}
               showsVerticalScrollIndicator={false}
@@ -553,9 +541,10 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
                 );
               })}
             </ScrollView>
-          </GlassSurface>
+            </ScrollEdgeFade>
+          </GlassModalSheet>
         </View>
-      </Modal>
+      </SheetModal>
     </View>
   );
 };
@@ -881,7 +870,7 @@ const styles = StyleSheet.create({
   },
   pickerModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+
     justifyContent: 'flex-end',
   },
   avatarPickerSheet: {

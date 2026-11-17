@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { triggerSelection } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
-import { GradualBlur } from '../effects/GradualBlur';
+import { HorizontalEdgeFade, useHorizontalScrollEdges } from './ScrollEdgeFade';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -21,6 +21,7 @@ export interface JellyRadioItem {
   label: string;
   accessibilityLabel?: string;
   icon?: React.ReactNode;
+  color?: string;
   disabled?: boolean;
 }
 
@@ -36,6 +37,7 @@ export interface JellyRadioProps {
   textColor?: string;
   activeTextColor?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg';
+  variant?: 'chip' | 'tile' | 'swatch';
   gap?: number;
   radius?: number;
   columns?: number;
@@ -78,6 +80,7 @@ interface JellyChipProps {
   textColor: string;
   activeTextColor: string;
   size: 'xs' | 'sm' | 'md' | 'lg';
+  variant: 'chip' | 'tile' | 'swatch';
   radius: number;
   swell: number;
   barge: number;
@@ -102,6 +105,7 @@ const JellyChip: React.FC<JellyChipProps> = ({
   textColor,
   activeTextColor,
   size,
+  variant,
   radius,
   swell,
   barge,
@@ -116,7 +120,11 @@ const JellyChip: React.FC<JellyChipProps> = ({
 }) => {
   const [scaleX] = useState(() => new Animated.Value(1));
   const [scaleY] = useState(() => new Animated.Value(1));
-  const [translateX] = useState(() => new Animated.Value(0));
+
+  useEffect(() => () => {
+    scaleX.stopAnimation();
+    scaleY.stopAnimation();
+  }, [scaleX, scaleY]);
 
   const metrics = SIZE_METRICS[size];
   const isDisabled = groupDisabled || !!item.disabled;
@@ -126,7 +134,6 @@ const JellyChip: React.FC<JellyChipProps> = ({
 
     scaleX.stopAnimation();
     scaleY.stopAnimation();
-    translateX.stopAnimation();
 
     if (index === activeIndex) {
       // Elastic Jelly Squash & Stretch (sweet-spot bounciness)
@@ -141,6 +148,7 @@ const JellyChip: React.FC<JellyChipProps> = ({
             toValue: xPeak,
             duration: 70,
             useNativeDriver: USE_NATIVE_DRIVER,
+            isInteraction: false,
           }),
           Animated.spring(scaleX, {
             toValue: 1,
@@ -148,6 +156,7 @@ const JellyChip: React.FC<JellyChipProps> = ({
             damping: 14,
             mass: 0.75,
             useNativeDriver: USE_NATIVE_DRIVER,
+            isInteraction: false,
           }),
         ]),
         Animated.sequence([
@@ -155,6 +164,7 @@ const JellyChip: React.FC<JellyChipProps> = ({
             toValue: yPeak,
             duration: 70,
             useNativeDriver: USE_NATIVE_DRIVER,
+            isInteraction: false,
           }),
           Animated.spring(scaleY, {
             toValue: 1,
@@ -162,6 +172,7 @@ const JellyChip: React.FC<JellyChipProps> = ({
             damping: 14,
             mass: 0.75,
             useNativeDriver: USE_NATIVE_DRIVER,
+            isInteraction: false,
           }),
         ]),
       ]).start();
@@ -180,12 +191,14 @@ const JellyChip: React.FC<JellyChipProps> = ({
             toValue: squash,
             duration: 70,
             useNativeDriver: USE_NATIVE_DRIVER,
+            isInteraction: false,
           }),
           Animated.spring(scaleX, {
             toValue: 1,
             stiffness: 350,
             damping: 16,
             useNativeDriver: USE_NATIVE_DRIVER,
+            isInteraction: false,
           }),
         ]),
         Animated.sequence([
@@ -193,12 +206,14 @@ const JellyChip: React.FC<JellyChipProps> = ({
             toValue: stretch,
             duration: 70,
             useNativeDriver: USE_NATIVE_DRIVER,
+            isInteraction: false,
           }),
           Animated.spring(scaleY, {
             toValue: 1,
             stiffness: 350,
             damping: 16,
             useNativeDriver: USE_NATIVE_DRIVER,
+            isInteraction: false,
           }),
         ]),
       ]).start();
@@ -212,7 +227,6 @@ const JellyChip: React.FC<JellyChipProps> = ({
     jelly,
     scaleX,
     scaleY,
-    translateX,
   ]);
 
   const handlePressIn = () => {
@@ -223,45 +237,50 @@ const JellyChip: React.FC<JellyChipProps> = ({
         stiffness: 650,
         damping: 24,
         useNativeDriver: USE_NATIVE_DRIVER,
+        isInteraction: false,
       }),
       Animated.spring(scaleY, {
         toValue: 0.94,
         stiffness: 650,
         damping: 24,
         useNativeDriver: USE_NATIVE_DRIVER,
+        isInteraction: false,
       }),
     ]).start();
   };
 
   const handlePressOut = () => {
-    if (isDisabled || isSelected) return;
+    if (isDisabled) return;
     Animated.parallel([
       Animated.spring(scaleX, {
         toValue: 1,
         stiffness: 350,
         damping: 18,
         useNativeDriver: USE_NATIVE_DRIVER,
+        isInteraction: false,
       }),
       Animated.spring(scaleY, {
         toValue: 1,
         stiffness: 350,
         damping: 18,
         useNativeDriver: USE_NATIVE_DRIVER,
+        isInteraction: false,
       }),
     ]).start();
   };
 
   const columnWrapStyle: ViewStyle | undefined =
     columns && columns > 1
-      ? { width: `${Math.floor(94 / columns)}%` as `${number}%`, flexGrow: 1 }
+      ? { flex: 1, minWidth: 0 }
       : undefined;
+  const swatchSize = { xs: 22, sm: 26, md: 30, lg: 34 }[size];
 
   return (
     <Animated.View
       style={[
         columnWrapStyle,
         {
-          transform: [{ translateX }, { scaleX }, { scaleY }],
+          transform: [{ scaleX }, { scaleY }],
           opacity: isDisabled ? 0.42 : 1,
         },
       ]}
@@ -274,33 +293,37 @@ const JellyChip: React.FC<JellyChipProps> = ({
         accessibilityRole="radio"
         accessibilityLabel={item.accessibilityLabel ?? item.label}
         accessibilityState={{ checked: isSelected, disabled: isDisabled }}
+        aria-checked={isSelected}
+        aria-disabled={isDisabled}
         style={[
           styles.chip,
           columns && columns > 1 ? { width: '100%' } : null,
           {
-            backgroundColor: isSelected ? activeColor : chipColor,
+            backgroundColor: variant === 'swatch' && item.color ? item.color : isSelected ? activeColor : chipColor,
             borderRadius: radius,
             paddingHorizontal: metrics.paddingHorizontal,
             paddingVertical: metrics.paddingVertical,
             minHeight: metrics.minHeight,
             gap: metrics.iconGap,
           },
+          variant === 'tile' ? styles.tile : null,
+          variant === 'swatch' ? { width: swatchSize, height: swatchSize, minHeight: swatchSize, paddingHorizontal: 0, paddingVertical: 0, opacity: isSelected ? 1 : 0.65 } : null,
         ]}
       >
         {item.icon ? <View style={styles.iconSlot}>{item.icon}</View> : null}
-        <Text
+        {item.label ? <Text
           numberOfLines={1}
           style={[
             styles.chipLabel,
             {
               color: isSelected ? activeTextColor : textColor,
-              fontSize: metrics.fontSize,
+              fontSize: variant === 'tile' ? Math.max(10, metrics.fontSize - 2) : metrics.fontSize,
               fontWeight: '500',
             },
           ]}
         >
           {item.label}
-        </Text>
+        </Text> : null}
       </Pressable>
     </Animated.View>
   );
@@ -316,6 +339,7 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   textColor = '#f5f5f5',
   activeTextColor = '#18181b',
   size = 'md',
+  variant = 'chip',
   gap = 8,
   radius = 999,
   columns,
@@ -330,9 +354,10 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   disabled = false,
   scrollable = false,
   fadeColor,
-  blurWidth = 0,
+  blurWidth = 18,
   style,
 }) => {
+  const scrollEdges = useHorizontalScrollEdges();
   const { themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
   const normalizedItems: JellyRadioItem[] =
@@ -346,12 +371,9 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
     value ?? defaultValue ?? normalizedItems.find((i) => !i.disabled)?.value ?? '';
   const [innerValue, setInnerValue] = useState(initialValue);
   const [selectionSeq, setSelectionSeq] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(-1);
 
   const currentValue = value !== undefined ? value : innerValue;
-  const activeIndex = Math.max(
-    0,
-    normalizedItems.findIndex((i) => i.value === currentValue)
-  );
 
   const handleSelect = (index: number) => {
     const picked = normalizedItems[index];
@@ -360,67 +382,82 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
     if (value === undefined) {
       setInnerValue(picked.value);
     }
+    // Animate the tapped chip once, even if a controlled value commits later.
+    setActiveIndex(index);
     setSelectionSeq((s) => s + 1);
     onChange?.(picked.value, index);
   };
 
+  const gridColumns = !scrollable && columns && columns > 1 ? Math.floor(columns) : 0;
+  const renderChip = (item: JellyRadioItem, idx: number) => (
+    <JellyChip
+      key={item.value}
+      item={item}
+      index={idx}
+      activeIndex={activeIndex}
+      selectionSeq={selectionSeq}
+      isSelected={item.value === currentValue}
+      chipColor={chipColor}
+      activeColor={activeColor}
+      textColor={textColor}
+      activeTextColor={activeTextColor}
+      size={size}
+      variant={variant}
+      radius={radius}
+      swell={swell}
+      barge={barge}
+      shrink={shrink}
+      jelly={jelly}
+      bounce={bounce}
+      stagger={stagger}
+      stiffness={stiffness}
+      columns={gridColumns || undefined}
+      groupDisabled={disabled}
+      onSelect={handleSelect}
+    />
+  );
   const rowContent = (
     <View
       accessibilityRole="radiogroup"
       style={[
-        styles.row,
-        scrollable || noWrap ? styles.rowNoWrap : styles.rowWrap,
+        gridColumns ? styles.grid : styles.row,
+        !gridColumns && (scrollable || noWrap ? styles.rowNoWrap : styles.rowWrap),
         { gap },
         !scrollable && style,
       ]}
     >
-      {normalizedItems.map((item, idx) => (
-        <JellyChip
-          key={item.value}
-          item={item}
-          index={idx}
-          activeIndex={activeIndex}
-          selectionSeq={selectionSeq}
-          isSelected={item.value === currentValue}
-          chipColor={chipColor}
-          activeColor={activeColor}
-          textColor={textColor}
-          activeTextColor={activeTextColor}
-          size={size}
-          radius={radius}
-          swell={swell}
-          barge={barge}
-          shrink={shrink}
-          jelly={jelly}
-          bounce={bounce}
-          stagger={stagger}
-          stiffness={stiffness}
-          columns={columns}
-          groupDisabled={disabled}
-          onSelect={handleSelect}
-        />
-      ))}
+      {gridColumns ? Array.from({ length: Math.ceil(normalizedItems.length / gridColumns) }, (_, row) => (
+        <View key={normalizedItems[row * gridColumns].value} style={[styles.row, { gap }]}>
+          {Array.from({ length: gridColumns }, (_, col) => {
+            const index = row * gridColumns + col;
+            const item = normalizedItems[index];
+            return item ? renderChip(item, index) : <View key={`empty-${col}`} style={{ flex: 1 }} />;
+          })}
+        </View>
+      )) : normalizedItems.map(renderChip)}
     </View>
   );
 
   if (scrollable) {
     const resolvedFade = fadeColor || (isDark ? 'rgba(18, 18, 22, 0.85)' : 'rgba(255, 255, 255, 0.85)');
     return (
-      <View style={[styles.scrollWrap, style]}>
+      <HorizontalEdgeFade style={[styles.scrollWrap, style]} tint={resolvedFade} width={blurWidth} left={scrollEdges.left} right={scrollEdges.right}>
         <ScrollView
           horizontal
+          automaticallyAdjustContentInsets={false}
+          contentInsetAdjustmentBehavior="never"
           showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onLayout={scrollEdges.onLayout}
+          onContentSizeChange={scrollEdges.onContentSizeChange}
+          onScroll={scrollEdges.onScroll}
+          scrollEventThrottle={16}
+          style={styles.scrollViewport}
           contentContainerStyle={styles.scrollContent}
         >
           {rowContent}
         </ScrollView>
-        {blurWidth > 0 && (
-          <>
-            <GradualBlur position="left" width={blurWidth} strength={0.8} layers={3} tint={resolvedFade} />
-            <GradualBlur position="right" width={blurWidth} strength={0.8} layers={3} tint={resolvedFade} />
-          </>
-        )}
-      </View>
+      </HorizontalEdgeFade>
     );
   }
 
@@ -433,6 +470,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'visible',
   },
+  grid: { width: '100%', flexDirection: 'column' },
+  tile: { flexDirection: 'column', paddingHorizontal: 6, paddingVertical: 12, minHeight: 68, gap: 7 },
   rowWrap: {
     flexWrap: 'wrap',
   },
@@ -443,9 +482,16 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
+  scrollViewport: {
+    marginHorizontal: 0,
+    paddingHorizontal: 0,
+  },
   scrollContent: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    // The surrounding form supplies the gutter, including on iOS.
+    paddingHorizontal: 0,
     overflow: 'visible',
   },
   chip: {

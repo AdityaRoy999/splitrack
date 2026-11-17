@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ScrollView,
@@ -27,7 +27,6 @@ import { SplitTrackProvider, useSplitTrack } from './src/store/SplitTrackStore';
 import { renderSolarIcon } from './src/constants/solarIconsCatalog';
 
 // Glass & Modern Nav Components
-import { Aurora } from './src/components/effects/Aurora';
 import { GradualBlur } from './src/components/effects/GradualBlur';
 import { GlassDock, TabKey } from './src/components/glass/GlassDock';
 import { GlassCard } from './src/components/glass/GlassCard';
@@ -61,7 +60,8 @@ import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 import { PreloaderSplash } from './src/components/common/PreloaderSplash';
 import { OnboardingAuthScreen, type AuthLogoRect } from './src/components/auth/OnboardingAuthScreen';
 import { OnboardingUsernameScreen } from './src/components/auth/OnboardingUsernameScreen';
-import { AnimatedPressable, FadeInSlide } from './src/components/common/MotionPrimitives';
+import { AnimatedPressable } from './src/components/common/MotionPrimitives';
+import { TabScene } from './src/components/common/TabScene';
 import { JellyRadio } from './src/components/common/JellyRadio';
 import { ExpenseCategory, Friend, Transaction } from './src/types';
 
@@ -109,7 +109,16 @@ function MainAppContent({
   } = useSplitTrack();
 
   const isDark = themeMode === 'dark';
+  const rootBg = palette.background;
   const [currentTab, setCurrentTab] = useState<TabKey>('home');
+  const [visitedTabs, setVisitedTabs] = useState<Record<TabKey, boolean>>({
+    home: true,
+    expenses: false,
+    split: false,
+    trips: false,
+    analytics: false,
+  });
+
   const [expenseFilter, setExpenseFilter] = useState<ExpenseFilter>('All');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
   const [selectedExpenseDate, setSelectedExpenseDate] = useState<string | null>(null);
@@ -133,11 +142,49 @@ function MainAppContent({
   const [showAnalyticsInfo, setShowAnalyticsInfo] = useState(false);
   const [selectedFriendForSettle, setSelectedFriendForSettle] = useState<Friend | null>(null);
   const [editingFriend, setEditingFriend] = useState<Friend | null>(null);
+  const effectsActive = !(showAddExpense || showAddTrip || showAddMember || showAddCategory || showSettle || showAnalyticsInfo || showCalendarModal);
 
-  const handleSelectFriend = (friend: Friend) => {
+  const navigateTab = useCallback((tab: TabKey) => {
+    if (tab === 'split') {
+      setExpenseDefaultTripId(undefined);
+      setExpenseDefaultFriendIds(undefined);
+      setShowAddExpense(true);
+      return;
+    }
+    // Mount the destination and select it in one commit, without a blank frame.
+    startTransition(() => {
+      setVisitedTabs((prev) => prev[tab] ? prev : { ...prev, [tab]: true });
+      setCurrentTab(tab);
+    });
+  }, []);
+
+  const openQuickExpense = useCallback(() => {
+    setShowSettings(false);
+    setExpenseDefaultTripId(undefined);
+    setExpenseDefaultFriendIds(undefined);
+    setShowAddExpense(true);
+  }, []);
+
+  const closeExpense = useCallback(() => {
+    setShowAddExpense(false);
+  }, []);
+
+  const handleDockTabChange = useCallback((tab: TabKey) => {
+    setShowSettings(false);
+    if (tab !== currentTab) {
+      startTransition(() => {
+        navigateTab(tab);
+        setSelectedTripId(null);
+        setHomeView('overview');
+        setSelectedMemberId(null);
+      });
+    }
+  }, [currentTab, navigateTab]);
+
+  const handleSelectFriend = useCallback((friend: Friend) => {
     setSelectedFriendForSettle(friend);
     setShowSettle(true);
-  };
+  }, []);
 
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
@@ -173,7 +220,7 @@ function MainAppContent({
     [categories, selectedCategoryFilter, activeText, mutedText]
   );
 
-  const renderHomeTab = () => {
+  const renderHomeTab = useCallback(() => {
     const activeMember = selectedMemberId
       ? friends.find((f) => f.id === selectedMemberId)
       : undefined;
@@ -206,7 +253,7 @@ function MainAppContent({
               }}
               onOpenTrip={(tripId) => {
                 setSelectedTripId(tripId);
-                setCurrentTab('trips');
+                navigateTab('trips');
               }}
             />
           </View>
@@ -267,9 +314,9 @@ function MainAppContent({
           />
 
           <HeroBalanceCard
-            onAddExpense={() => setShowAddExpense(true)}
+            onAddExpense={openQuickExpense}
             onSettle={() => setShowSettle(true)}
-            onOpenTrips={() => setCurrentTab('trips')}
+            onOpenTrips={() => navigateTab('trips')}
           />
 
           <QuickSendTray
@@ -294,7 +341,7 @@ function MainAppContent({
               amount={totalExpenses}
               icon={<CardSendIcon size={18} color="#EF4444" />}
               iconBgColor="rgba(239, 68, 68, 0.12)"
-              onPress={() => setCurrentTab('expenses')}
+              onPress={() => navigateTab('expenses')}
             />
             <GlassMetricTile
               label="Net Friend Balance"
@@ -310,14 +357,17 @@ function MainAppContent({
 
           <RecentTransactions
             onSelectTransaction={() => setShowSettle(true)}
-            onViewAll={() => setCurrentTab('expenses')}
+            onViewAll={() => navigateTab('expenses')}
           />
         </View>
       </ScrollView>
     );
-  };
+  }, [dynamicScrollContent, formatAmount, friends, handleSelectFriend, hideHeaderLogo,
+    homeView, isDark, navigateTab, onHeaderLogoLayout, onHeaderLogoNode, openQuickExpense,
+    selectedMemberId, textColor, totalExpenses, totalIncome, totalOwedToYou,
+    totalYouOwe, userDisplayName]);
 
-  const renderExpensesTab = () => {
+  const renderExpensesTab = useCallback(() => {
     const filteredTransactions = transactions.filter((tx) => {
       if (selectedExpenseDate && tx.date !== selectedExpenseDate) return false;
       if (
@@ -365,7 +415,7 @@ function MainAppContent({
                   icon={<AddCircleIcon size={15} color={activeText} />}
                   variant="accent"
                   size="sm"
-                  onPress={() => setShowAddExpense(true)}
+                  onPress={openQuickExpense}
                 />
               </View>
             </GlassCard>
@@ -376,7 +426,6 @@ function MainAppContent({
                 <JellyRadio
                   scrollable
                   fadeColor={rootBg}
-                  blurWidth={0}
                   items={['All', 'Expenses', 'Splits', 'Income']}
                   value={expenseFilter}
                   onChange={(val) => setExpenseFilter(val as ExpenseFilter)}
@@ -422,7 +471,6 @@ function MainAppContent({
                 <JellyRadio
                   scrollable
                   fadeColor={rootBg}
-                  blurWidth={0}
                   items={categoryFilterItems}
                   value={selectedCategoryFilter}
                   onChange={(val) => setSelectedCategoryFilter(val)}
@@ -587,9 +635,11 @@ function MainAppContent({
         </View>
       </ScrollView>
     );
-  };
+  }, [activeBg, activeText, categories, categoryFilterItems, chipBg, dividerColor,
+    dynamicScrollContent, expenseFilter, formatAmount, isDark, mutedText, openQuickExpense, rootBg,
+    selectedCategoryFilter, selectedExpenseDate, textColor, totalExpenses, transactions]);
 
-  const renderTripsTab = () => {
+  const renderTripsTab = useCallback(() => {
     const activeTrip = selectedTripId ? trips.find((t) => t.id === selectedTripId) : undefined;
     if (activeTrip) {
       return (
@@ -609,6 +659,7 @@ function MainAppContent({
               onBack={() => setSelectedTripId(null)}
               onAddTripExpense={(tId) => {
                 setExpenseDefaultTripId(tId);
+                setExpenseDefaultFriendIds(undefined);
                 setShowAddExpense(true);
               }}
               onOpenSettle={() => setShowSettle(true)}
@@ -881,9 +932,11 @@ function MainAppContent({
         </View>
       </ScrollView>
     );
-  };
+  }, [categories, dividerColor, dynamicScrollContent, formatAmount, friends,
+    getSimplifiedDebts, isDark, mutedText, selectedTripId, textColor,
+    totalOwedToYou, totalYouOwe, transactions, trips]);
 
-  const renderAnalyticsTab = () => (
+  const renderAnalyticsTab = useCallback(() => (
     <ScrollView
       key="analytics-tab-scroll"
       style={styles.scrollView}
@@ -926,10 +979,7 @@ function MainAppContent({
         </View>
       </View>
     </ScrollView>
-  );
-
-  // In both Liquid Glass and Matte modes, app background is strictly solid black (OLED) in dark mode
-  const rootBg = palette.background;
+  ), [chipBg, dynamicScrollContent, textColor]);
 
   return (
     <View style={[styles.container, { backgroundColor: rootBg, paddingTop: 0 }]}>
@@ -945,12 +995,9 @@ function MainAppContent({
               userHandle={userHandle}
               onNavigateTab={(tab) => {
                 setShowSettings(false);
-                setCurrentTab(tab);
+                navigateTab(tab);
               }}
-              onOpenAddExpense={() => {
-                setShowSettings(false);
-                setShowAddExpense(true);
-              }}
+              onOpenAddExpense={openQuickExpense}
               onOpenAddTrip={() => {
                 setShowSettings(false);
                 setShowAddTrip(true);
@@ -961,16 +1008,25 @@ function MainAppContent({
               }}
               onManageCards={() => {
                 setShowSettings(false);
-                setCurrentTab('expenses');
+                navigateTab('expenses');
               }}
             />
           </View>
         ) : (
           <View style={styles.tabPagesContainer}>
-            {currentTab === 'home' && renderHomeTab()}
-            {currentTab === 'expenses' && renderExpensesTab()}
-            {currentTab === 'trips' && renderTripsTab()}
-            {currentTab === 'analytics' && renderAnalyticsTab()}
+            <TabScene active={currentTab === 'home'} effectsActive={effectsActive} render={renderHomeTab} />
+
+            {visitedTabs.expenses && (
+              <TabScene active={currentTab === 'expenses'} effectsActive={effectsActive} render={renderExpensesTab} />
+            )}
+
+            {visitedTabs.trips && (
+              <TabScene active={currentTab === 'trips'} effectsActive={effectsActive} render={renderTripsTab} />
+            )}
+
+            {visitedTabs.analytics && (
+              <TabScene active={currentTab === 'analytics'} effectsActive={effectsActive} render={renderAnalyticsTab} />
+            )}
           </View>
         )}
 
@@ -1014,25 +1070,12 @@ function MainAppContent({
 
       <View
         pointerEvents={showAddExpense || showAddTrip || showAddMember ? 'none' : 'box-none'}
-        style={showAddExpense || showAddTrip || showAddMember ? { opacity: 0 } : undefined}
+        style={showAddExpense || showAddTrip || showAddMember ? { display: 'none' } : undefined}
       >
         <GlassDock
           currentTab={currentTab}
-          onTabChange={(tab) => {
-            setShowSettings(false);
-            if (tab !== currentTab) {
-              setCurrentTab(tab);
-              setSelectedTripId(null);
-              setHomeView('overview');
-              setSelectedMemberId(null);
-            }
-          }}
-          onQuickAdd={() => {
-            setShowSettings(false);
-            setExpenseDefaultTripId(undefined);
-            setExpenseDefaultFriendIds(undefined);
-            setShowAddExpense(true);
-          }}
+          onTabChange={handleDockTabChange}
+          onQuickAdd={openQuickExpense}
         />
       </View>
 
@@ -1041,11 +1084,7 @@ function MainAppContent({
         visible={showAddExpense}
         defaultTripId={expenseDefaultTripId}
         defaultFriendIds={expenseDefaultFriendIds}
-        onClose={() => {
-          setShowAddExpense(false);
-          setExpenseDefaultTripId(undefined);
-          setExpenseDefaultFriendIds(undefined);
-        }}
+        onClose={closeExpense}
       />
 
       <AddTripModal
@@ -1054,7 +1093,6 @@ function MainAppContent({
       />
 
       <AddMemberModal
-        key={editingFriend ? `${editingFriend.id}-${editingFriend.name}-${editingFriend.avatar || ''}` : 'new-member'}
         visible={showAddMember}
         editingFriend={editingFriend}
         onClose={() => {
@@ -1064,7 +1102,6 @@ function MainAppContent({
       />
 
       <AddCategoryModal
-        key={categoryToEdit ? `edit-${categoryToEdit.id}-${categoryToEdit.name}` : 'new-category'}
         visible={showAddCategory}
         categoryToEdit={categoryToEdit}
         onClose={() => {
@@ -1113,6 +1150,9 @@ export default function App() {
   const [hideHeaderLogo, setHideHeaderLogo] = useState(true);
   const [headerLogoRect, setHeaderLogoRect] = useState<HeaderLogoRect | null>(null);
   const headerLogoNodeRef = useRef<ViewRefNode | null>(null);
+  const handleHeaderLogoNode = useCallback((node: ViewRefNode | null) => {
+    headerLogoNodeRef.current = node;
+  }, []);
   const [hideOnboardingLogo, setHideOnboardingLogo] = useState(true);
   const [onboardingLogoRect, setOnboardingLogoRect] = useState<AuthLogoRect | null>(null);
   const onboardingLogoNodeRef = useRef<ViewRefNode | null>(null);
@@ -1217,10 +1257,8 @@ export default function App() {
                   userHandle={userHandle}
                   onSignOut={handleSignOut}
                   hideHeaderLogo={hideHeaderLogo}
-                  onHeaderLogoLayout={setHeaderLogoRect}
-                  onHeaderLogoNode={(node) => {
-                    headerLogoNodeRef.current = node;
-                  }}
+                  onHeaderLogoLayout={showPreloader ? setHeaderLogoRect : undefined}
+                  onHeaderLogoNode={handleHeaderLogoNode}
                 />
               ) : onboardingStage === 'username' ? (
                 <OnboardingUsernameScreen
@@ -1281,11 +1319,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   tabPagesContainer: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  tabPage: {
     flex: 1,
     width: '100%',
     height: '100%',

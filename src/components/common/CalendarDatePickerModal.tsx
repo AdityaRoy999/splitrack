@@ -1,10 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Easing,
-  Modal,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -22,6 +19,9 @@ import { triggerSelection } from '../../utils/haptics';
 import { AnimatedPressable } from './MotionPrimitives';
 import { JellyRadio } from './JellyRadio';
 import { AppleGraphicalCalendar } from './AppleNativeControls';
+import { SheetModal } from './SheetModal';
+import { ModalBackdrop } from './ModalBackdrop';
+import { usePopupMotion } from './usePopupMotion';
 
 interface CalendarDatePickerModalProps {
   visible: boolean;
@@ -101,41 +101,27 @@ const toISODate = (year: number, monthIndex: number, day: number): string => {
   return `${year}-${m}-${d}`;
 };
 
-const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-
 export const CalendarDatePickerModal: React.FC<CalendarDatePickerModalProps> = (props) => {
-  const { visible, selectedDate, onClose } = props;
+  return (
+    <SheetModal visible={props.visible} statusBarTranslucent presentationStyle="overFullScreen" onRequestClose={props.onClose}>
+      {props.visible ? <CalendarPresentation {...props} /> : null}
+    </SheetModal>
+  );
+};
+
+function CalendarPresentation(props: CalendarDatePickerModalProps) {
+  const { selectedDate } = props;
+  const { progress: cardAnim, close: onClose } = usePopupMotion();
   const { themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
-
-  const [cardAnim] = useState(() => new Animated.Value(visible ? 1 : 0));
-
-  useEffect(() => {
-    if (!visible) return;
-    cardAnim.setValue(0);
-    Animated.timing(cardAnim, {
-      toValue: 1,
-      duration: 180,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-  }, [cardAnim, visible]);
-
-  if (!visible) return null;
 
   const cardScale = cardAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0.94, 1],
+    extrapolate: 'clamp',
   });
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      statusBarTranslucent
-      onRequestClose={onClose}
-    >
       <View style={styles.overlay}>
         {Platform.OS === 'web' ? (
           <View
@@ -143,9 +129,6 @@ export const CalendarDatePickerModal: React.FC<CalendarDatePickerModalProps> = (
             style={[
               styles.backdropFill,
               {
-                backgroundColor: isDark
-                  ? 'rgba(6, 7, 11, 0.56)'
-                  : 'rgba(15, 23, 42, 0.34)',
                 backdropFilter: 'blur(18px) saturate(145%)',
                 WebkitBackdropFilter: 'blur(18px) saturate(145%)',
               } as unknown as ViewStyle,
@@ -158,40 +141,24 @@ export const CalendarDatePickerModal: React.FC<CalendarDatePickerModalProps> = (
               tint={isDark ? 'dark' : 'light'}
               style={styles.backdropFill}
             />
-            <View
-              style={[
-                styles.backdropFill,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(6, 7, 11, 0.44)'
-                    : 'rgba(15, 23, 42, 0.24)',
-                },
-              ]}
-            />
           </View>
         )}
 
-        <Pressable
-          accessibilityLabel="Close calendar backdrop"
-          onPress={onClose}
-          style={styles.backdropFill}
-        />
+        <ModalBackdrop label="Close calendar backdrop" onClose={onClose} shadeColor={isDark ? 'rgba(6, 7, 11, 0.44)' : 'rgba(15, 23, 42, 0.24)'} />
 
         <Animated.View
           style={[
             styles.modalWrap,
             {
-              opacity: cardAnim,
-              transform: [{ scale: cardScale }],
+              transform: [{ scale: cardScale }, { translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
             },
           ]}
         >
-          <CalendarDialogBody key={selectedDate || 'today'} {...props} />
+          <CalendarDialogBody key={selectedDate || 'today'} {...props} onClose={onClose} />
         </Animated.View>
       </View>
-    </Modal>
   );
-};
+}
 
 const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
   selectedDate,

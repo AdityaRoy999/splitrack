@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import { getBrandLogoSource, needsColoredLogoBackground } from '../../constants/brandAssets';
 
 export interface BrandEmblemIconProps {
   id?: string;
@@ -103,6 +104,16 @@ export const BrandEmblemIcon: React.FC<BrandEmblemIconProps> = ({
 }) => {
   const [imageFailed, setImageFailed] = useState(false);
   const normId = (id || name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const localLogo = getBrandLogoSource(normId);
+
+  if (localLogo) {
+    return (
+      <View style={[styles.box, { width: size, height: size, borderRadius, backgroundColor: needsColoredLogoBackground(localLogo) ? accentColor : '#FFFFFF' }]}>
+        {/* Fill the tile; its rounded clipping removes square artwork corners. */}
+        <Image source={localLogo} style={{ width: size, height: size }} resizeMode="contain" />
+      </View>
+    );
+  }
 
   // 1. Resolve remote logo URL if available
   let resolvedUrl = logoUrl;

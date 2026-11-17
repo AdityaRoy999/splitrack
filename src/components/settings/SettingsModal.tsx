@@ -1,10 +1,12 @@
+import { GlassModalSheet } from '../common/GlassModalSheet';
+import { ModalBackdrop } from '../common/ModalBackdrop';
+import { SheetModal } from '../common/SheetModal';
+import { HorizontalEdgeFade, ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -300,19 +302,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   ];
 
   return (
-    <Modal
+    <SheetModal
       visible={visible}
       transparent
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityLabel="Dismiss modal backdrop"
-        />
-        <View
+        <ModalBackdrop onClose={onClose} />
+        <GlassModalSheet
           style={[
             styles.sheetContainer,
             { backgroundColor: bgSheet },
@@ -331,6 +329,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </TouchableOpacity>
           </View>
 
+          <ScrollEdgeFade tint={bgSheet}>
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {/* Theme, Surface Style (Liquid Glass vs Matte), and Currency */}
             <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
@@ -536,6 +535,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <Text style={[styles.accountPickLabel, { color: mutedText }]}>
                       LINK TO UPI / CARD PROFILE:
                     </Text>
+                    <HorizontalEdgeFade tint={cardBg}>
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
@@ -565,6 +565,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         );
                       })}
                     </ScrollView>
+                    </HorizontalEdgeFade>
 
                     {/* Preview Rows */}
                     <View style={styles.previewEntriesList}>
@@ -666,16 +667,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </TouchableOpacity>
             )}
           </ScrollView>
-        </View>
+        </ScrollEdgeFade>
+        </GlassModalSheet>
       </View>
-    </Modal>
+    </SheetModal>
   );
 };
 
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+
     justifyContent: 'flex-end',
   },
   sheetContainer: {
@@ -863,6 +865,7 @@ const styles = StyleSheet.create({
   },
   accountPickRow: {
     gap: 6,
+    paddingHorizontal: 22,
     paddingVertical: 2,
   },
   accountPickChip: {

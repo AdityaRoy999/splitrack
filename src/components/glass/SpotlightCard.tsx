@@ -236,6 +236,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   footerSlot: {
+    width: '100%',
     paddingTop: 12,
     paddingHorizontal: 6,
     paddingBottom: 2,
