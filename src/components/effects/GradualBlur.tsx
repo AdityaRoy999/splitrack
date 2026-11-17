@@ -1,69 +1,42 @@
-import React, { useMemo } from 'react';
-import type { BlurViewProps } from 'expo-blur';
-import { Platform, type StyleProp, type ViewStyle, View } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import { View, type ViewStyle } from 'react-native';
+import { Easing, ReduceMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { NativeFadeBlur } from './NativeFadeBlur';
-import { createBlurFalloff, type GradualBlurCurve } from './blurFalloff';
+import { createBlurStack, createBlurTintFalloff } from './blurFalloff';
+import type { GradualBlurProps } from './gradualBlurTypes';
 
-export type GradualBlurPosition = 'top' | 'bottom' | 'left' | 'right';
+export type { GradualBlurProps, GradualBlurPosition } from './gradualBlurTypes';
 export type { GradualBlurCurve } from './blurFalloff';
 
-export interface GradualBlurProps {
-  position?: GradualBlurPosition;
-  height?: number;
-  width?: number;
-  strength?: number;
-  layers?: number;
-  curve?: GradualBlurCurve;
-  exponential?: boolean;
-  opacity?: number;
-  saturation?: number;
-  tint?: string;
-  zIndex?: number;
-  blurTarget?: BlurViewProps['blurTarget'];
-  style?: StyleProp<ViewStyle>;
-}
-
-const CSS_DIRECTIONS: Record<GradualBlurPosition, string> = {
-  top: 'to bottom', bottom: 'to top', left: 'to right', right: 'to left',
-};
 const GRADIENT_AXIS = {
-  top: { start: { x: 0.5, y: 0 }, end: { x: 0.5, y: 1 } },
-  bottom: { start: { x: 0.5, y: 1 }, end: { x: 0.5, y: 0 } },
-  left: { start: { x: 0, y: 0.5 }, end: { x: 1, y: 0.5 } },
-  right: { start: { x: 1, y: 0.5 }, end: { x: 0, y: 0.5 } },
+  top: { start: { x: 0.5, y: 1 }, end: { x: 0.5, y: 0 } },
+  bottom: { start: { x: 0.5, y: 0 }, end: { x: 0.5, y: 1 } },
+  left: { start: { x: 1, y: 0.5 }, end: { x: 0, y: 0.5 } },
+  right: { start: { x: 0, y: 0.5 }, end: { x: 1, y: 0.5 } },
 };
 
-// One blurred surface per edge, with the same smooth alpha falloff on each platform.
+// Metro uses GradualBlur.web.tsx for the original browser component. Native
+// views use the same stack and put each mask directly on its blur surface.
 export const GradualBlur = React.memo(function GradualBlur({
-  position = 'bottom',
-  height = 48,
-  width,
-  strength = 1.6,
-  layers = 8,
-  curve = 'bezier',
-  exponential = true,
-  opacity = 1,
-  saturation = 1,
-  tint = 'transparent',
-  zIndex = 20,
-  blurTarget,
-  style,
+  position = 'bottom', height = 48, width, strength = 1.6, layers = 8,
+  curve = 'bezier', exponential = true, opacity = 1, tint = 'transparent',
+  zIndex = 20, active = true, blurTarget, style,
 }: GradualBlurProps) {
   const { themeMode } = useLiquidGlass();
+  const reveal = useSharedValue(active ? 1 : 0);
+  useEffect(() => {
+    reveal.value = withTiming(active ? 1 : 0, {
+      duration: 180, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System,
+    });
+  }, [active, reveal]);
   const vertical = position === 'top' || position === 'bottom';
-  const depth = vertical ? height : (width ?? 28);
+  const depth = vertical ? height : (width ?? 24);
   const alpha = Math.min(1, Math.max(0, opacity));
-  const falloff = useMemo(() => createBlurFalloff(layers, curve, exponential), [layers, curve, exponential]);
-  const mask = useMemo(() => {
-    const stops = falloff.map((stop) => `rgba(0,0,0,${stop.alpha.toFixed(4)}) ${(stop.position * 100).toFixed(2)}%`);
-    return `linear-gradient(${CSS_DIRECTIONS[position]}, ${stops.join(', ')})`;
-  }, [falloff, position]);
-  const maskColors = useMemo(() => falloff.map((stop) => `rgba(0,0,0,${(stop.alpha * alpha).toFixed(4)})`) as [string, string, ...string[]], [alpha, falloff]);
-  const locations = useMemo(() => falloff.map((stop) => stop.position) as [number, number, ...number[]], [falloff]);
-
-  if (depth <= 0 || strength <= 0 || alpha <= 0) return null;
-
+  const stack = useMemo(() => createBlurStack(layers, curve, strength, exponential), [curve, exponential, layers, strength]);
+  const falloff = useMemo(() => createBlurTintFalloff(curve), [curve]);
+  const locations = useMemo(() => falloff.map(stop => stop.position) as [number, number, ...number[]], [falloff]);
+  const alphas = useMemo(() => falloff.map(stop => stop.alpha * alpha), [alpha, falloff]);
   const edgeStyle: ViewStyle = {
     position: 'absolute', zIndex,
     top: position === 'bottom' ? undefined : 0,
@@ -74,31 +47,15 @@ export const GradualBlur = React.memo(function GradualBlur({
     width: vertical ? undefined : depth,
     overflow: 'hidden',
   };
-  const blurFilter = `blur(${Math.round(strength * 20)}px) saturate(${saturation})`;
-  const webStyle = {
-    backdropFilter: blurFilter,
-    WebkitBackdropFilter: blurFilter,
-    maskImage: mask,
-    WebkitMaskImage: mask,
-    backgroundColor: tint,
-    opacity: alpha,
-  } as unknown as ViewStyle;
 
+  if (depth <= 0 || strength <= 0 || alpha <= 0) return null;
   return (
-    <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[edgeStyle, Platform.OS === 'web' ? webStyle : undefined, style]}>
-      {Platform.OS !== 'web' ? (
-        <NativeFadeBlur
-          position={position}
-          falloff={falloff.map((stop) => stop.alpha * alpha)}
-          colors={maskColors}
-          locations={locations}
-          axis={GRADIENT_AXIS[position]}
-          intensity={Math.min(95, Math.max(1, Math.round(strength * 45)))}
-          dark={themeMode === 'dark'}
-          tint={tint}
-          blurTarget={blurTarget}
-        />
-      ) : null}
+    <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[edgeStyle, style]}>
+      <NativeFadeBlur
+        position={position} stack={stack} falloff={alphas} locations={locations}
+        axis={GRADIENT_AXIS[position]} opacity={alpha} reveal={reveal}
+        dark={themeMode === 'dark'} tint={tint} blurTarget={blurTarget}
+      />
     </View>
   );
 });

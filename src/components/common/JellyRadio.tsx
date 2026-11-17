@@ -354,7 +354,7 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   disabled = false,
   scrollable = false,
   fadeColor,
-  blurWidth = 18,
+  blurWidth = 24,
   style,
 }) => {
   const scrollEdges = useHorizontalScrollEdges();

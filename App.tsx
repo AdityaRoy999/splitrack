@@ -1,5 +1,6 @@
-import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BlurTargetView } from 'expo-blur';
 import {
   ScrollView,
   StatusBar,
@@ -95,6 +96,7 @@ function MainAppContent({
   onHeaderLogoNode?: (node: ViewRefNode | null) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const screenBlurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   const { palette, themeMode, formatAmount, isLiquidGlassEnabled } = useLiquidGlass();
   const {
     totalIncome,
@@ -986,84 +988,70 @@ function MainAppContent({
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <View style={styles.mainViewport}>
-        {showSettings ? (
-          <View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
-            <SettingsPage
-              onBack={() => setShowSettings(false)}
-              onSignOut={onSignOut}
-              userName={userDisplayName}
-              userHandle={userHandle}
-              onNavigateTab={(tab) => {
-                setShowSettings(false);
-                navigateTab(tab);
-              }}
-              onOpenAddExpense={openQuickExpense}
-              onOpenAddTrip={() => {
-                setShowSettings(false);
-                setShowAddTrip(true);
-              }}
-              onOpenAddMember={() => {
-                setShowSettings(false);
-                setShowAddMember(true);
-              }}
-              onManageCards={() => {
-                setShowSettings(false);
-                navigateTab('expenses');
-              }}
-            />
-          </View>
-        ) : (
-          <View style={styles.tabPagesContainer}>
-            <TabScene active={currentTab === 'home'} effectsActive={effectsActive} render={renderHomeTab} />
+        <BlurTargetView ref={screenBlurTarget} style={styles.tabPagesContainer}>
+          {showSettings ? (
+            <View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
+              <SettingsPage
+                onBack={() => setShowSettings(false)}
+                onSignOut={onSignOut}
+                userName={userDisplayName}
+                userHandle={userHandle}
+                onNavigateTab={(tab) => {
+                  setShowSettings(false);
+                  navigateTab(tab);
+                }}
+                onOpenAddExpense={openQuickExpense}
+                onOpenAddTrip={() => {
+                  setShowSettings(false);
+                  setShowAddTrip(true);
+                }}
+                onOpenAddMember={() => {
+                  setShowSettings(false);
+                  setShowAddMember(true);
+                }}
+                onManageCards={() => {
+                  setShowSettings(false);
+                  navigateTab('expenses');
+                }}
+              />
+            </View>
+          ) : (
+            <View style={styles.tabPagesContainer}>
+              <TabScene active={currentTab === 'home'} effectsActive={effectsActive} render={renderHomeTab} />
 
-            {visitedTabs.expenses && (
-              <TabScene active={currentTab === 'expenses'} effectsActive={effectsActive} render={renderExpensesTab} />
-            )}
+              {visitedTabs.expenses && (
+                <TabScene active={currentTab === 'expenses'} effectsActive={effectsActive} render={renderExpensesTab} />
+              )}
 
-            {visitedTabs.trips && (
-              <TabScene active={currentTab === 'trips'} effectsActive={effectsActive} render={renderTripsTab} />
-            )}
+              {visitedTabs.trips && (
+                <TabScene active={currentTab === 'trips'} effectsActive={effectsActive} render={renderTripsTab} />
+              )}
 
-            {visitedTabs.analytics && (
-              <TabScene active={currentTab === 'analytics'} effectsActive={effectsActive} render={renderAnalyticsTab} />
-            )}
-          </View>
-        )}
+              {visitedTabs.analytics && (
+                <TabScene active={currentTab === 'analytics'} effectsActive={effectsActive} render={renderAnalyticsTab} />
+              )}
+            </View>
+          )}
 
+        </BlurTargetView>
         {!showSettings && (
           <GradualBlur
             position="top"
-            height={Math.max(38, insets.top + 24)}
-            strength={1.6}
-            layers={8}
+            height={Math.max(48, insets.top + 32)}
+            strength={0.85}
+            layers={6}
             curve="bezier"
-            tint={
-              isLiquidGlassEnabled
-                ? isDark
-                  ? 'rgba(5, 5, 10, 0.7)'
-                  : 'rgba(232, 237, 246, 0.7)'
-                : isDark
-                  ? 'rgba(9, 9, 11, 0.88)'
-                  : 'rgba(242, 242, 247, 0.88)'
-            }
+            blurTarget={screenBlurTarget}
             zIndex={45}
           />
         )}
         <GradualBlur
           position="bottom"
-          height={56}
-          strength={1.5}
-          layers={8}
+          height={Math.max(56, insets.bottom + 56)}
+          strength={0.85}
+          layers={6}
           curve="bezier"
-          tint={
-            isLiquidGlassEnabled
-              ? isDark
-                ? 'rgba(5, 5, 10, 0.65)'
-                : 'rgba(232, 237, 246, 0.65)'
-              : isDark
-                ? 'rgba(9, 9, 11, 0.88)'
-                : 'rgba(242, 242, 247, 0.88)'
-          }
+          blurTarget={screenBlurTarget}
           zIndex={45}
         />
       </View>

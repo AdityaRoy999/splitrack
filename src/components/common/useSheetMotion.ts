@@ -1,64 +1,63 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, PanResponder, Platform, type GestureResponderEvent, type PanResponderGestureState } from 'react-native';
+import { useEffect } from 'react';
+import { usePanGesture } from 'react-native-gesture-handler';
+import { cancelAnimation, Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useSheetModal } from './SheetModal';
 
-const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+const SHEET_SPRING = {
+  stiffness: 420, damping: 36, mass: 0.65,
+  overshootClamping: true, reduceMotion: ReduceMotion.System,
+};
 
+// Translation and finger tracking both run on the UI thread. React only handles
+// the completed dismissal, so rendering the form cannot stall a sheet's motion.
 export function useSheetMotion(distance: number) {
-  const { open, close, finishExit } = useSheetModal();
-  const [translateY] = useState(() => new Animated.Value(distance));
-  const openRef = useRef(open);
-  const closeRef = useRef(close);
-  const dragStart = useRef(0);
-  useLayoutEffect(() => { openRef.current = open; closeRef.current = close; }, [close, open]);
-
-  const restore = useCallback(() => {
-    Animated.spring(translateY, {
-      toValue: 0, stiffness: 420, damping: 34, mass: 0.65,
-      useNativeDriver: USE_NATIVE_DRIVER, isInteraction: false,
-    }).start();
-  }, [translateY]);
+  const { open, ready, close, finishExit } = useSheetModal();
+  const translateY = useSharedValue(distance);
+  const dragStart = useSharedValue(0);
+  const closing = useSharedValue(false);
 
   useEffect(() => {
-    const animation = open
-      ? Animated.spring(translateY, {
-          toValue: 0, stiffness: 420, damping: 34, mass: 0.65,
-          useNativeDriver: USE_NATIVE_DRIVER, isInteraction: false,
-        })
-      : Animated.timing(translateY, {
-          toValue: distance, duration: 220, easing: Easing.in(Easing.cubic),
-          useNativeDriver: USE_NATIVE_DRIVER, isInteraction: false,
-        });
-    animation.start(({ finished }) => { if (finished && !open) finishExit(); });
-    return () => animation.stop();
-  }, [distance, finishExit, open, translateY]);
+    closing.set(!open);
+    if (!ready) {
+      translateY.set(distance);
+      if (!open) finishExit();
+      return;
+    }
+    translateY.set(open
+      ? withSpring(0, SHEET_SPRING)
+      : withTiming(distance, {
+          duration: 210, easing: Easing.in(Easing.cubic), reduceMotion: ReduceMotion.System,
+        }, (finished) => { if (finished) scheduleOnRN(finishExit); }));
+    return () => cancelAnimation(translateY);
+  }, [closing, distance, finishExit, open, ready, translateY]);
 
-  const shouldDrag = useCallback((_: GestureResponderEvent, gesture: PanResponderGestureState) =>
-    openRef.current && gesture.dy > 6 && gesture.dy > Math.abs(gesture.dx), []);
-  const startDrag = useCallback(() => {
-    translateY.stopAnimation((value) => { dragStart.current = value; });
-  }, [translateY]);
-  const moveDrag = useCallback((_: GestureResponderEvent, gesture: PanResponderGestureState) => {
-    translateY.setValue(Math.max(0, dragStart.current + gesture.dy));
-  }, [translateY]);
-  const endDrag = useCallback((_: GestureResponderEvent, gesture: PanResponderGestureState) => {
-    if (gesture.dy > 90 || (gesture.dy > 20 && gesture.vy > 0.7)) closeRef.current();
-    else restore();
-  }, [restore]);
+  const gesture = usePanGesture({
+    enabled: open && ready,
+    activeOffsetY: 6,
+    failOffsetX: [-24, 24],
+    onBegin: () => {
+      'worklet';
+      cancelAnimation(translateY);
+      dragStart.set(translateY.get());
+    },
+    onUpdate: (event) => {
+      'worklet';
+      translateY.set(Math.max(0, dragStart.get() + event.translationY));
+    },
+    onDeactivate: (event) => {
+      'worklet';
+      if (!event.canceled && (event.translationY > 100 || (event.translationY > 20 && event.velocityY > 700))) {
+        closing.set(true);
+        scheduleOnRN(close);
+      }
+    },
+    onFinalize: () => {
+      'worklet';
+      if (!closing.get()) translateY.set(withSpring(0, SHEET_SPRING));
+    },
+  });
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.get() }] }));
 
-  // PanResponder stores these callbacks; it invokes them only for gesture events.
-  // eslint-disable-next-line react-hooks/refs
-  const responder = useMemo(() => PanResponder.create({
-    // This responder is attached only to the dedicated drag handle. Claim the
-    // start so its first movement cannot be taken by the sheet's scroll view.
-    onStartShouldSetPanResponder: () => openRef.current,
-    onMoveShouldSetPanResponder: shouldDrag,
-    onPanResponderGrant: startDrag,
-    onPanResponderMove: moveDrag,
-    onPanResponderRelease: endDrag,
-    onPanResponderTerminationRequest: () => false,
-    onPanResponderTerminate: restore,
-  }), [endDrag, moveDrag, restore, shouldDrag, startDrag]);
-
-  return { translateY, panHandlers: responder.panHandlers, close };
+  return { animatedStyle, gesture, close };
 }

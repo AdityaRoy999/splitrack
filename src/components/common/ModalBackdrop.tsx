@@ -3,11 +3,12 @@ import { Animated, Platform, Pressable, StyleSheet } from 'react-native';
 import { useSheetModal } from './SheetModal';
 
 export function ModalBackdrop({ onClose, label = 'Dismiss modal backdrop', shadeColor = 'rgba(0, 0, 0, 0.72)' }: { onClose: () => void; label?: string; shadeColor?: string }) {
-  const { open } = useSheetModal();
+  const { open, ready } = useSheetModal();
   const pressStartedHere = useRef(false);
   const [opacity] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
+    if (!ready) return;
     const animation = Animated.timing(opacity, {
       toValue: open ? 1 : 0,
       duration: 180,
@@ -16,7 +17,7 @@ export function ModalBackdrop({ onClose, label = 'Dismiss modal backdrop', shade
     });
     animation.start();
     return () => animation.stop();
-  }, [opacity, open]);
+  }, [opacity, open, ready]);
 
   return (
     <Pressable

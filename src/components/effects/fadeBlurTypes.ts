@@ -1,12 +1,16 @@
 import type { BlurViewProps } from 'expo-blur';
+import type { SharedValue } from 'react-native-reanimated';
+import type { GradualBlurLayer } from './blurFalloff';
+import type { GradualBlurPosition } from './gradualBlurTypes';
 
 export interface NativeFadeBlurProps {
-  position: 'top' | 'bottom' | 'left' | 'right';
+  position: GradualBlurPosition;
+  stack: GradualBlurLayer[];
   falloff: number[];
-  colors: [string, string, ...string[]];
   locations: [number, number, ...number[]];
   axis: { start: { x: number; y: number }; end: { x: number; y: number } };
-  intensity: number;
+  opacity: number;
+  reveal: SharedValue<number>;
   dark: boolean;
   tint: string;
   blurTarget?: BlurViewProps['blurTarget'];

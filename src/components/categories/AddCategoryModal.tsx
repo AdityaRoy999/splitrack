@@ -140,17 +140,8 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View
-        style={[
-          styles.backdrop,
-          {
-            backgroundColor: isDark
-              ? 'rgba(0,0,0,0.72)'
-              : 'rgba(15,23,42,0.35)',
-          },
-        ]}
-      >
-        <ModalBackdrop onClose={onClose} />
+      <View style={styles.backdrop}>
+        <ModalBackdrop onClose={onClose} shadeColor={isDark ? 'rgba(0,0,0,0.72)' : 'rgba(15,23,42,0.35)'} />
         <GlassModalSheet style={styles.sheet}>
           <View style={styles.dragHandleWrap}>
             <View
