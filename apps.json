@@ -11,12 +11,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.25",
-      "versionDate": "2026-11-17T20:22:07Z",
-      "versionDescription": "fix: smooth mobile motion and complete UPI and member updates",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-25/Splittrack-unsigned.ipa",
-      "size": 24114037,
+      "version": "1.0.27",
+      "versionDate": "2026-11-17T21:52:42Z",
+      "versionDescription": "fix: let sheet form viewports shrink above the keyboard",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-27/Splittrack-unsigned.ipa",
+      "size": 25660720,
       "versions": [
+        {
+          "version": "1.0.27",
+          "buildVersion": "27",
+          "date": "2026-11-17T21:52:42Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-27/Splittrack-unsigned.ipa",
+          "size": 25660720,
+          "localizedDescription": "fix: let sheet form viewports shrink above the keyboard"
+        },
         {
           "version": "1.0.25",
           "buildVersion": "25",
