@@ -302,6 +302,8 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
       visible={visible}
       transparent
       animationType="fade"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>

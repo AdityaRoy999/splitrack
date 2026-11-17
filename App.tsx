@@ -1012,24 +1012,29 @@ function MainAppContent({
         />
       </View>
 
-      <GlassDock
-        currentTab={currentTab}
-        onTabChange={(tab) => {
-          setShowSettings(false);
-          if (tab !== currentTab) {
-            setCurrentTab(tab);
-            setSelectedTripId(null);
-            setHomeView('overview');
-            setSelectedMemberId(null);
-          }
-        }}
-        onQuickAdd={() => {
-          setShowSettings(false);
-          setExpenseDefaultTripId(undefined);
-          setExpenseDefaultFriendIds(undefined);
-          setShowAddExpense(true);
-        }}
-      />
+      <View
+        pointerEvents={showAddExpense || showAddTrip || showAddMember ? 'none' : 'box-none'}
+        style={showAddExpense || showAddTrip || showAddMember ? { opacity: 0 } : undefined}
+      >
+        <GlassDock
+          currentTab={currentTab}
+          onTabChange={(tab) => {
+            setShowSettings(false);
+            if (tab !== currentTab) {
+              setCurrentTab(tab);
+              setSelectedTripId(null);
+              setHomeView('overview');
+              setSelectedMemberId(null);
+            }
+          }}
+          onQuickAdd={() => {
+            setShowSettings(false);
+            setExpenseDefaultTripId(undefined);
+            setExpenseDefaultFriendIds(undefined);
+            setShowAddExpense(true);
+          }}
+        />
+      </View>
 
       <AddExpenseModal
         key={`${expenseDefaultTripId || 'general'}-${expenseDefaultFriendIds?.join(',') || 'all'}`}

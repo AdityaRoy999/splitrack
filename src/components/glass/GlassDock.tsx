@@ -147,7 +147,7 @@ export const GlassDock: React.FC<GlassDockProps> = ({
   const isDraggingRef = useRef<boolean>(false);
   const lastTouchXRef = useRef<number>(0);
 
-  // Sync position with currentTab when not actively dragging
+  // Sync position with currentTab when not actively dragging with instant, snappy native spring
   useEffect(() => {
     if (isDraggingRef.current) return;
     setHoverSlot(activeIndex);
@@ -156,39 +156,23 @@ export const GlassDock: React.FC<GlassDockProps> = ({
     Animated.parallel([
       Animated.spring(slideX, {
         toValue: targetX,
-        stiffness: 420,
-        damping: 26,
-        mass: 0.8,
+        stiffness: 580,
+        damping: 34,
+        mass: 0.6,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(stretchX, {
-            toValue: 1.08,
-            duration: 80,
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }),
-          Animated.timing(squishY, {
-            toValue: 0.94,
-            duration: 80,
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }),
-        ]),
-        Animated.parallel([
-          Animated.spring(stretchX, {
-            toValue: 1,
-            stiffness: 420,
-            damping: 20,
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }),
-          Animated.spring(squishY, {
-            toValue: 1,
-            stiffness: 420,
-            damping: 20,
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }),
-        ]),
-      ]),
+      Animated.spring(stretchX, {
+        toValue: 1,
+        stiffness: 600,
+        damping: 32,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.spring(squishY, {
+        toValue: 1,
+        stiffness: 600,
+        damping: 32,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
     ]).start();
   }, [activeIndex, slotWidth, slideX, stretchX, squishY]);
 
@@ -236,18 +220,18 @@ export const GlassDock: React.FC<GlassDockProps> = ({
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
 
-    // Initial jelly stretch
+    // Subtle holding feedback
     Animated.parallel([
       Animated.spring(stretchX, {
-        toValue: 1.12,
-        stiffness: 450,
-        damping: 20,
+        toValue: 1.04,
+        stiffness: 550,
+        damping: 28,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
       Animated.spring(squishY, {
-        toValue: 0.92,
-        stiffness: 450,
-        damping: 20,
+        toValue: 0.97,
+        stiffness: 550,
+        damping: 28,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
@@ -272,19 +256,19 @@ export const GlassDock: React.FC<GlassDockProps> = ({
     }).start();
 
     // Dynamic jelly stretch based on movement
-    const dynamicStretch = Math.min(1.22, 1.10 + deltaX * 0.015);
-    const dynamicSquish = Math.max(0.88, 0.94 - deltaX * 0.012);
+    const dynamicStretch = Math.min(1.08, 1.02 + deltaX * 0.005);
+    const dynamicSquish = Math.max(0.95, 0.98 - deltaX * 0.004);
     Animated.parallel([
       Animated.spring(stretchX, {
         toValue: dynamicStretch,
-        stiffness: 500,
-        damping: 24,
+        stiffness: 550,
+        damping: 28,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
       Animated.spring(squishY, {
         toValue: dynamicSquish,
-        stiffness: 500,
-        damping: 24,
+        stiffness: 550,
+        damping: 28,
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
@@ -310,51 +294,33 @@ export const GlassDock: React.FC<GlassDockProps> = ({
     // Release capsule scale back to normal
     Animated.spring(capsuleScale, {
       toValue: 1,
-      stiffness: 380,
-      damping: 24,
+      stiffness: 480,
+      damping: 28,
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
 
-    // Snap slider to the center of final slot
+    // Snap slider instantly to final target slot with zero lag
     const finalTargetX = finalSlot * slotWidth;
-    Animated.spring(slideX, {
-      toValue: finalTargetX,
-      stiffness: 440,
-      damping: 22,
-      mass: 0.8,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-
-    // Jelly snap bounce: squish overshoot then settle
-    Animated.sequence([
-      Animated.parallel([
-        Animated.spring(stretchX, {
-          toValue: 0.92,
-          stiffness: 480,
-          damping: 18,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.spring(squishY, {
-          toValue: 1.08,
-          stiffness: 480,
-          damping: 18,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-      ]),
-      Animated.parallel([
-        Animated.spring(stretchX, {
-          toValue: 1,
-          stiffness: 380,
-          damping: 20,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.spring(squishY, {
-          toValue: 1,
-          stiffness: 380,
-          damping: 20,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-      ]),
+    Animated.parallel([
+      Animated.spring(slideX, {
+        toValue: finalTargetX,
+        stiffness: 580,
+        damping: 34,
+        mass: 0.6,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.spring(stretchX, {
+        toValue: 1,
+        stiffness: 600,
+        damping: 30,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.spring(squishY, {
+        toValue: 1,
+        stiffness: 600,
+        damping: 30,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
     ]).start();
 
     triggerImpact(ImpactStyle.Light);

@@ -22,14 +22,6 @@ export interface GradualBlurProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const CURVES: Record<GradualBlurCurve, (t: number) => number> = {
-  linear: (t) => t,
-  bezier: (t) => t * t * (3 - 2 * t),
-  'ease-in': (t) => t * t,
-  'ease-out': (t) => 1 - (1 - t) * (1 - t),
-  'ease-in-out': (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
-};
-
 const CSS_DIRECTIONS: Record<GradualBlurPosition, string> = {
   top: 'to top',
   bottom: 'to bottom',
@@ -102,89 +94,48 @@ export const GradualBlur: React.FC<GradualBlurProps> = React.memo(({
   const vertical = position === 'top' || position === 'bottom';
   const depth = vertical ? height : (width ?? 28);
 
-  const webStack = useMemo(() => {
+  const webContinuousBlur = useMemo(() => {
     if (Platform.OS !== 'web') return null;
 
-    const count = Math.min(Math.max(Math.round(layers) || 1, 1), 12);
-    const shape = CURVES[curve] || CURVES.bezier;
-    const maxBlur = Math.max(strength, 0) * 10;
-    const level = (u: number) => {
-      const t = shape(clamp01(u));
-      return maxBlur * (exponential ? (Math.pow(2, 4 * t) - 1) / 15 : t);
-    };
-    const boost = Math.pow(Math.max(saturation, 0), 1 / count);
+    const blurPx = Math.max(12, Math.round(strength * 20));
     const direction = CSS_DIRECTIONS[position];
+    const mask = `linear-gradient(${direction}, #000 0%, rgba(0,0,0,0.88) 25%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.25) 75%, transparent 100%)`;
 
-    const steps = Array.from({ length: count }, (_, i) => {
-      const from = level(i / count);
-      const to = level((i + 1) / count);
-      const radius = Math.sqrt(Math.max(to * to - from * from, 0));
-      const filterParts = [`blur(${radius.toFixed(2)}px)`];
-      if (Math.abs(boost - 1) > 0.001) {
-        filterParts.push(`saturate(${boost.toFixed(3)})`);
-      }
-      const filter = filterParts.join(' ');
-      const mask = `linear-gradient(${direction}, transparent ${((i / count) * 100).toFixed(1)}%, #000 ${(((i + 1) / count) * 100).toFixed(1)}%)`;
+    const filter = `blur(${blurPx}px)${saturation !== 1 ? ` saturate(${saturation})` : ''}`;
 
-      return {
-        position: 'absolute' as const,
-        inset: 0,
-        backdropFilter: filter,
-        WebkitBackdropFilter: filter,
-        maskImage: mask,
-        WebkitMaskImage: mask,
-        opacity,
-      };
-    });
+    const blurLayer: ViewStyle = {
+      position: 'absolute' as const,
+      inset: 0,
+      backdropFilter: filter,
+      WebkitBackdropFilter: filter,
+      maskImage: mask,
+      WebkitMaskImage: mask,
+      opacity,
+    } as any;
 
-    const stops = Array.from({ length: 7 }, (_, k) => {
-      const u = k / 6;
-      const t = shape(u);
-      const alpha = t * t * t * (t * (t * 6 - 15) + 10);
-      return `rgba(0, 0, 0, ${alpha.toFixed(3)}) ${(u * 100).toFixed(1)}%`;
-    }).join(', ');
-
-    const wash =
+    const washLayer: ViewStyle | null =
       tint && tint !== 'transparent'
-        ? {
+        ? ({
             position: 'absolute' as const,
             inset: 0,
-            background: tint,
-            maskImage: `linear-gradient(${direction}, ${stops})`,
-            WebkitMaskImage: `linear-gradient(${direction}, ${stops})`,
-          }
+            background: `linear-gradient(${direction}, ${tint} 0%, ${toRgbaWithAlpha(tint, 0.7)} 35%, ${toRgbaWithAlpha(tint, 0.3)} 70%, transparent 100%)`,
+          } as any)
         : null;
 
-    return { steps, wash };
-  }, [curve, exponential, layers, opacity, position, saturation, strength, tint]);
-
-  const nativeSlices = useMemo(() => {
-    if (Platform.OS === 'web') return [];
-    const bandCount = 4;
-    const shape = CURVES[curve] || CURVES.bezier;
-    const maxIntensity = Math.min(80, Math.max(16, strength * 24));
-    return Array.from({ length: bandCount }, (_, idx) => {
-      const fraction = 1 - idx / bandCount;
-      const t = shape((idx + 1) / bandCount);
-      return {
-        key: idx,
-        coveragePct: `${Math.round(fraction * 100)}%` as `${number}%`,
-        intensity: Math.max(6, Math.round((maxIntensity / bandCount) * (0.65 + t * 0.65))),
-      };
-    });
-  }, [curve, strength]);
+    return { blurLayer, washLayer };
+  }, [opacity, position, saturation, strength, tint]);
 
   const nativeGradient = useMemo(() => {
-    if (Platform.OS === 'web' || !tint || tint === 'transparent') return null;
-    const shape = CURVES[curve] || CURVES.bezier;
-    const stops = [0, 0.25, 0.55, 0.8, 1];
-    const colors = stops.map((u) => {
-      const t = shape(u);
-      const smooth = t * t * t * (t * (t * 6 - 15) + 10);
-      return toRgbaWithAlpha(tint, smooth * opacity);
-    }) as [string, string, ...string[]];
+    if (Platform.OS === 'web') return null;
+    const baseColor = tint && tint !== 'transparent' ? tint : isDark ? '#000000' : '#FFFFFF';
+    const stops = [1, 0.9, 0.7, 0.45, 0.22, 0.08, 0];
+    const colors = stops.map((alpha) => toRgbaWithAlpha(baseColor, alpha * opacity)) as [
+      string,
+      string,
+      ...string[],
+    ];
     return { colors, axis: GRADIENT_AXIS[position] };
-  }, [curve, opacity, position, tint]);
+  }, [isDark, opacity, position, tint]);
 
   const edgePositionStyle: ViewStyle = {
     position: 'absolute',
@@ -196,41 +147,28 @@ export const GradualBlur: React.FC<GradualBlurProps> = React.memo(({
     height: vertical ? depth : undefined,
     width: vertical ? undefined : depth,
     overflow: 'hidden',
+    pointerEvents: 'none',
   };
 
-  if (Platform.OS === 'web' && webStack) {
+  if (Platform.OS === 'web' && webContinuousBlur) {
     return (
       <View pointerEvents="none" style={[edgePositionStyle, style]}>
-        {webStack.steps.map((layerStyle, idx) => (
-          <View key={idx} style={layerStyle as unknown as ViewStyle} />
-        ))}
-        {webStack.wash ? <View style={webStack.wash as unknown as ViewStyle} /> : null}
+        <View style={webContinuousBlur.blurLayer} />
+        {webContinuousBlur.washLayer ? <View style={webContinuousBlur.washLayer} /> : null}
       </View>
     );
   }
 
+  const nativeBlurIntensity = Math.min(95, Math.max(40, Math.round(strength * 45)));
+
   return (
     <View pointerEvents="none" style={[edgePositionStyle, style]}>
-      {nativeSlices.map((slice) => {
-        const sliceStyle: ViewStyle = {
-          position: 'absolute',
-          top: position === 'bottom' ? undefined : 0,
-          bottom: position === 'top' ? undefined : 0,
-          left: position === 'right' ? undefined : 0,
-          right: position === 'left' ? undefined : 0,
-          height: vertical ? slice.coveragePct : undefined,
-          width: vertical ? undefined : slice.coveragePct,
-          opacity,
-        };
-        return (
-          <BlurView
-            key={slice.key}
-            intensity={slice.intensity}
-            tint={isDark ? 'dark' : 'light'}
-            style={sliceStyle}
-          />
-        );
-      })}
+      {/* Single seamless Gaussian BlurView with ZERO stepped slice lines */}
+      <BlurView
+        intensity={nativeBlurIntensity}
+        tint={isDark ? 'dark' : 'light'}
+        style={StyleSheet.absoluteFill}
+      />
       {nativeGradient && (
         <LinearGradient
           colors={nativeGradient.colors}

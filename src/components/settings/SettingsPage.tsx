@@ -12,7 +12,6 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -34,6 +33,7 @@ import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { DangerCircleIcon } from '@solar-icons/react-native/bold/danger-circle';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { UserAvatar } from '../common/UserAvatar';
+import { GradualBlur } from '../effects/GradualBlur';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { JellyRadio } from '../common/JellyRadio';
@@ -278,7 +278,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: insets.top + 54 + 14,
+            paddingTop: insets.top + 52,
             paddingBottom: Math.max(128, insets.bottom + 88),
           },
         ]}
@@ -811,7 +811,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </View>
       </ScrollView>
 
-      {/* Sticky Gaussian Blur Header Bar with Back Button extending behind status bar */}
+      {/* Top Seamless Gaussian Blur Header Bar with Back Button extending behind status bar */}
       <View
         style={[
           styles.stickyHeaderWrap,
@@ -822,28 +822,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         ]}
         pointerEvents="box-none"
       >
-        <BlurView
-          intensity={isDark ? 85 : 95}
-          tint={isDark ? 'dark' : 'light'}
-          style={StyleSheet.absoluteFill}
+        <GradualBlur
+          position="top"
+          height={insets.top + 64}
+          strength={1.8}
+          tint={isDark ? 'rgba(0, 0, 0, 0.85)' : 'rgba(248, 249, 253, 0.88)'}
+          zIndex={1}
         />
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor: isDark
-                ? 'rgba(0, 0, 0, 0.72)'
-                : 'rgba(248, 249, 253, 0.78)',
-            },
-            Platform.OS === 'web'
-              ? ({
-                  backdropFilter: 'blur(24px)',
-                  WebkitBackdropFilter: 'blur(24px)',
-                } as any)
-              : undefined,
-          ]}
-        />
-        <View style={styles.headerRow}>
+        <View style={styles.headerRow} pointerEvents="box-none">
           <AnimatedPressable
             scaleTo={0.92}
             onPress={() => {

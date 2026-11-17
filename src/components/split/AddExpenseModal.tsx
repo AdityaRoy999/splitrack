@@ -811,6 +811,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       visible={visible}
       transparent
       animationType="fade"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
@@ -1493,6 +1495,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.72)',
     justifyContent: 'flex-end',
+    marginBottom: 0,
+    paddingBottom: 0,
   },
   sheetContainer: {
     width: '100%',
@@ -1500,11 +1504,13 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     paddingTop: 10,
     paddingHorizontal: 16,
-    paddingBottom: 28,
-    maxHeight: '90%',
+    maxHeight: '92%',
     borderWidth: 0,
+    marginBottom: 0,
   },
   dragHandleWrap: {
     alignItems: 'center',

@@ -183,6 +183,8 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
       visible={visible}
       transparent
       animationType="fade"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>

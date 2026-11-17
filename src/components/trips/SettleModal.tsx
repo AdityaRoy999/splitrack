@@ -240,6 +240,8 @@ export const SettleModal: React.FC<SettleModalProps> = ({
       visible={visible}
       transparent
       animationType="fade"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>

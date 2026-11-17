@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -70,6 +71,22 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
   const [selectedCartoonId, setSelectedCartoonId] = useState<string>('cyber_boy');
   const [customPhotoUri, setCustomPhotoUri] = useState<string>('');
   const [showAvatarPickerModal, setShowAvatarPickerModal] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const cleanHandle = cleanHandleText(handle);
 
@@ -203,7 +220,13 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
         </View>
 
         {/* Content Area */}
-        <View style={styles.contentFlex}>
+        <ScrollView
+          style={styles.contentScroll}
+          contentContainerStyle={styles.contentFlex}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
           {/* ===================== SCREEN 1: Claim Your Unique Handle ===================== */}
           {activeStep === 0 && (
             <View style={styles.screenContainer}>
@@ -247,10 +270,10 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
 
               {/* Title & Subtitle */}
               <View style={styles.textCenterBlock}>
-                <Text style={styles.mainTitle}>Claim Your</Text>
-                <Text style={styles.mainTitle}>Unique Handle</Text>
+                <Text style={styles.mainTitle}>What&apos;s Your</Text>
+                <Text style={styles.mainTitle}>Full Name</Text>
                 <Text style={styles.mainSubtitle}>
-                  Find and secure your unique handle to make it yours.
+                  Choose a 3D avatar persona and enter your full name.
                 </Text>
               </View>
 
@@ -263,32 +286,6 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
                   value={displayName}
                   onChangeText={setDisplayName}
                 />
-              </View>
-
-              {/* Recommendations Chips */}
-              <View style={styles.sugPillRow}>
-                {handleSuggestions.slice(0, 3).map((sug) => (
-                  <TouchableOpacity
-                    key={sug}
-                    onPress={() => {
-                      triggerImpact(ImpactStyle.Light);
-                      setHandle(sug.slice(1));
-                    }}
-                    style={[
-                      styles.sugChip,
-                      `@${cleanHandle}` === sug && styles.sugChipActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.sugChipText,
-                        `@${cleanHandle}` === sug && styles.sugChipTextActive,
-                      ]}
-                    >
-                      {sug}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
               </View>
             </View>
           )}
@@ -423,32 +420,45 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
               </View>
             </View>
           )}
-        </View>
+        </ScrollView>
 
         {/* Bottom Bar: 3-Dot Pagination Indicator + Continue Button */}
-        <View style={[styles.bottomBar, { paddingBottom: Math.max(28, insets.bottom + 12) }]}>
-          {/* 3-Dot Pagination */}
-          <View style={styles.paginationDotsRow}>
-            {[0, 1, 2].map((stepIdx) => (
-              <TouchableOpacity
-                key={stepIdx}
-                onPress={() => {
-                  triggerImpact(ImpactStyle.Light);
-                  setActiveStep(stepIdx as any);
-                }}
-                style={[
-                  styles.dot,
-                  activeStep === stepIdx ? styles.dotActive : styles.dotInactive,
-                ]}
-              />
-            ))}
-          </View>
+        <View
+          style={[
+            styles.bottomBar,
+            {
+              paddingBottom: isKeyboardVisible
+                ? Math.max(12, insets.bottom + 4)
+                : Math.max(28, insets.bottom + 12),
+              gap: isKeyboardVisible ? 10 : 20,
+            },
+          ]}
+        >
+          {/* 3-Dot Pagination (hidden when keyboard is open to give comfortable breathing room) */}
+          {!isKeyboardVisible && (
+            <View style={styles.paginationDotsRow}>
+              {[0, 1, 2].map((stepIdx) => (
+                <TouchableOpacity
+                  key={stepIdx}
+                  onPress={() => {
+                    triggerImpact(ImpactStyle.Light);
+                    setActiveStep(stepIdx as any);
+                  }}
+                  style={[
+                    styles.dot,
+                    activeStep === stepIdx ? styles.dotActive : styles.dotInactive,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
 
           {/* Continue Pill Button */}
           <AnimatedPressable
             scaleTo={0.96}
             onPress={handleNextStep}
             style={styles.continueButton}
+            contentStyle={styles.continueButtonContent}
             accessibilityLabel="Continue to next step"
           >
             <Text style={styles.continueButtonText}>
@@ -573,11 +583,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
-  contentFlex: {
+  contentScroll: {
     flex: 1,
+    width: '100%',
+  },
+  contentFlex: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
+    paddingVertical: 12,
   },
   screenContainer: {
     width: '100%',
@@ -848,6 +863,12 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  continueButtonContent: {
+    width: '100%',
+    height: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
