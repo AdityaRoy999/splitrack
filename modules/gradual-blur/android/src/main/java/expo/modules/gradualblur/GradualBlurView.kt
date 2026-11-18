@@ -100,6 +100,7 @@ class GradualBlurView(context: Context, appContext: AppContext) : ExpoView(conte
     if (configuredTarget !== target) {
       surfaces.forEach {
         it.blur.setupWith(target, 1f, false)
+          .setFrameClearDrawable(frameClearDrawable)
           .setOverlayColor(Color.TRANSPARENT)
         it.resetConfiguration()
       }
@@ -111,8 +112,9 @@ class GradualBlurView(context: Context, appContext: AppContext) : ExpoView(conte
     val clearColor = findBackgroundColor(target)
     frameClearDrawable.setBounds(0, 0, target.width, target.height)
     if (configuredBackground != clearColor) {
+      // The facade installed this shared drawable during setup. Mutating its
+      // colour updates every surface without rebuilding their controllers.
       frameClearDrawable.color = clearColor
-      surfaces.forEach { it.blur.setFrameClearDrawable(frameClearDrawable) }
       configuredBackground = clearColor
     }
     val amount = reveal.coerceIn(0f, 1f)
