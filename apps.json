@@ -179,12 +179,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.29",
-      "versionDate": "2026-11-18T18:26:47Z",
-      "versionDescription": "fix: mobile blur, profile photos, trip removal and Google sign-in",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-29/Splittrack-unsigned.ipa",
+      "version": "1.0.30",
+      "versionDate": "2026-11-18T19:02:30Z",
+      "versionDescription": "fix: Android gradual blur release dependencies",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-30/Splittrack-unsigned.ipa",
       "size": 27049173,
       "versions": [
+        {
+          "version": "1.0.30",
+          "buildVersion": "30",
+          "date": "2026-11-18T19:02:30Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-30/Splittrack-unsigned.ipa",
+          "size": 27049173,
+          "localizedDescription": "fix: Android gradual blur release dependencies"
+        },
         {
           "version": "1.0.29",
           "buildVersion": "29",
