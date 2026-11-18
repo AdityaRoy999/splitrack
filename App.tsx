@@ -1079,6 +1079,7 @@ function MainAppContent({
         </BlurTargetView>
         <GradualBlur
           position="top"
+          renderMode="page"
           height={Math.max(32, insets.top + 12)}
           strength={0.6}
           layers={6}
@@ -1249,6 +1250,7 @@ function AppContent() {
               {sessionError ? <Text accessibilityLiveRegion="polite" style={{ color: '#F87171', padding: 12 }}>{sessionError}</Text> : null}
               {showPreloader ? (
                 <PreloaderSplash
+                  ready={!loading}
                   targetLogoRect={activeTargetRect}
                   targetLogoNodeRef={activeTargetNodeRef}
                   onRevealHeaderLogo={() => {

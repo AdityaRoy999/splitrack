@@ -3,6 +3,7 @@ import type { ViewProps } from 'react-native';
 
 export interface NativeGradualBlurProps extends ViewProps {
   position: 'top' | 'bottom' | 'left' | 'right';
+  renderMode?: 'edge' | 'page';
   stack: { from: number; to: number; radius: number; level: number }[];
   falloff?: number[];
   locations?: number[];

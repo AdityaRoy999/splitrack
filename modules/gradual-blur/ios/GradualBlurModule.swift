@@ -7,6 +7,7 @@ public final class GradualBlurModule: Module {
 
     View(GradualBlurView.self) {
       Prop("position") { (view, position: String) in view.position = position }
+      Prop("renderMode") { (view, renderMode: String) in view.renderMode = renderMode }
       Prop("stack") { (view, stack: [[String: Double]]) in view.stack = stack }
       Prop("falloff") { (view, falloff: [Double]) in view.falloff = falloff }
       Prop("locations") { (view, locations: [Double]) in view.locations = locations }

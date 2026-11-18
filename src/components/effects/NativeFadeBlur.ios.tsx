@@ -6,7 +6,7 @@ import type { NativeFadeBlurProps } from './fadeBlurTypes';
 
 const AnimatedNativeBlur = NativeGradualBlurView ? Animated.createAnimatedComponent(NativeGradualBlurView) : null;
 
-export const NativeFadeBlur = ({ position, stack, falloff, locations, opacity, reveal, dark, tint }: NativeFadeBlurProps) => {
+export const NativeFadeBlur = ({ position, renderMode, stack, falloff, locations, opacity, reveal, dark, tint }: NativeFadeBlurProps) => {
   const washColor = useMemo(() => {
     const color = processColor(tint);
     const value = typeof color === 'number' ? color >>> 0 : 0;
@@ -20,7 +20,7 @@ export const NativeFadeBlur = ({ position, stack, falloff, locations, opacity, r
   if (!AnimatedNativeBlur) return null;
   return (
     <AnimatedNativeBlur
-      pointerEvents="none" position={position} stack={stack}
+      pointerEvents="none" position={position} renderMode={renderMode} stack={stack}
       falloff={falloff} locations={locations} opacity={opacity} dark={dark}
       washColor={washColor} animatedProps={animatedProps} style={StyleSheet.absoluteFill}
     />

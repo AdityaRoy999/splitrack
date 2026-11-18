@@ -3,6 +3,7 @@ import UIKit
 
 final class GradualBlurView: ExpoView {
   var position = "bottom"
+  var renderMode = "edge"
   var stack: [[String: Double]] = []
   var falloff: [Double] = [0, 1]
   var locations: [Double] = [0, 1]
@@ -12,6 +13,7 @@ final class GradualBlurView: ExpoView {
   var washColor = UIColor.clear
 
   private var surfaces: [EdgeBlurEffectView] = []
+  private var pageSurface: PageBlurEffectView?
   private let washLayer = CAGradientLayer()
   private var washConfiguration: WashConfiguration?
 
@@ -29,6 +31,25 @@ final class GradualBlurView: ExpoView {
   }
 
   func updateAppearance() {
+    if renderMode == "page" {
+      if pageSurface == nil {
+        let surface = PageBlurEffectView()
+        pageSurface = surface
+        addSubview(surface)
+      }
+      surfaces.forEach { $0.isHidden = true }
+      washLayer.isHidden = true
+      CATransaction.begin()
+      CATransaction.setDisableActions(true)
+      pageSurface?.frame = bounds
+      pageSurface?.configure(
+        position: position, stack: stack, falloff: falloff, locations: locations,
+        opacity: maskOpacity, reveal: reveal, dark: dark
+      )
+      CATransaction.commit()
+      return
+    }
+    pageSurface?.isHidden = true
     let levels = Array(stack.prefix(16))
     if surfaces.count != levels.count {
       surfaces.forEach { $0.removeFromSuperview() }

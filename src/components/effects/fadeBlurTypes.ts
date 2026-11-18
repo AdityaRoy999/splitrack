@@ -5,6 +5,7 @@ import type { GradualBlurPosition } from './gradualBlurTypes';
 
 export interface NativeFadeBlurProps {
   position: GradualBlurPosition;
+  renderMode: 'edge' | 'page';
   stack: GradualBlurLayer[];
   falloff: number[];
   locations: [number, number, ...number[]];

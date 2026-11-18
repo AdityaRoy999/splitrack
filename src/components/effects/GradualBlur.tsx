@@ -20,7 +20,7 @@ const GRADIENT_AXIS = {
 // Metro selects React Bits on web, the native radius stack on iOS, and the
 // expo-progressive-blur gradient-mask approach on Android.
 export const GradualBlur = React.memo(function GradualBlur({
-  position = 'bottom', height = 48, width, strength = 1.6, layers = 8,
+  position = 'bottom', renderMode = 'edge', height = 48, width, strength = 1.6, layers = 8,
   curve = 'bezier', exponential = true, opacity = 1, tint = 'transparent',
   zIndex = 20, active = true, blurTarget, style,
 }: GradualBlurProps) {
@@ -55,7 +55,7 @@ export const GradualBlur = React.memo(function GradualBlur({
   return (
     <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[edgeStyle, style]}>
       <NativeFadeBlur
-        position={position} stack={stack} falloff={alphas} locations={locations}
+        position={position} renderMode={renderMode} stack={stack} falloff={alphas} locations={locations}
         axis={GRADIENT_AXIS[position]} opacity={alpha} reveal={reveal}
         dark={themeMode === 'dark'} tint={tint} blurTarget={blurTarget}
       />

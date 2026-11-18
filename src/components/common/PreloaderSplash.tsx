@@ -15,6 +15,7 @@ import { measureNodeInWindow, type ViewRefNode } from '../../utils/measureWindow
 import type { HeaderLogoRect } from '../home/HeaderBar';
 
 interface PreloaderSplashProps {
+  ready?: boolean;
   targetLogoRect?: HeaderLogoRect | null;
   targetLogoNodeRef?: React.RefObject<ViewRefNode | null>;
   onRevealHeaderLogo?: () => void;
@@ -38,6 +39,7 @@ const ICON_TEXT_GAP = 14;
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
+  ready = true,
   targetLogoRect,
   targetLogoNodeRef,
   onRevealHeaderLogo,
@@ -74,8 +76,11 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
   });
   const textWidthRef = useRef(textWidth);
   const targetLogoRectRef = useRef(targetLogoRect);
+  const targetLogoNodeRefRef = useRef(targetLogoNodeRef);
   const lockupShiftStartedRef = useRef(false);
   const exitedRef = useRef(false);
+  const readyRef = useRef(ready);
+  const exitRequestedRef = useRef(false);
   const flightStartedRef = useRef(false);
   const revealRef = useRef(onRevealHeaderLogo);
   const finishRef = useRef(onFinish);
@@ -97,7 +102,8 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
 
   useEffect(() => {
     targetLogoRectRef.current = targetLogoRect;
-  }, [targetLogoRect]);
+    targetLogoNodeRefRef.current = targetLogoNodeRef;
+  }, [targetLogoRect, targetLogoNodeRef]);
 
   const measureOverlay = useCallback(() => {
     requestAnimationFrame(() => {
@@ -228,6 +234,10 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
 
   const triggerExit = useCallback(() => {
     if (exitedRef.current) return;
+    if (!readyRef.current) {
+      exitRequestedRef.current = true;
+      return;
+    }
     exitedRef.current = true;
     setIsFadingOut(true);
 
@@ -259,7 +269,9 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
     };
 
     const cachedOverlay = overlayRectRef.current;
-    const targetNode = targetLogoNodeRef?.current ?? null;
+    // Account hydration may switch the destination from onboarding to home.
+    // Read the latest node without restarting the intro effect and its timers.
+    const targetNode = targetLogoNodeRefRef.current?.current ?? null;
     const slotNode = iconSlotRef.current;
 
     measureSafe(overlayRef.current, cachedOverlay, (measuredOverlay) => {
@@ -284,7 +296,16 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
         });
       });
     });
-  }, [iconScale, iconTranslateX, prepareTargetAnchoredFlight, targetLogoNodeRef]);
+  }, [iconScale, iconTranslateX, prepareTargetAnchoredFlight]);
+
+  useEffect(() => {
+    readyRef.current = ready;
+    if (!ready || !exitRequestedRef.current) return;
+    // Keep the finished lockup visible while the account hydrates, then fly to
+    // its mounted destination rather than revealing a second loading screen.
+    const frame = requestAnimationFrame(triggerExit);
+    return () => cancelAnimationFrame(frame);
+  }, [ready, triggerExit]);
 
   useEffect(() => {
     // Stage 1: Pop hero app icon into screen center

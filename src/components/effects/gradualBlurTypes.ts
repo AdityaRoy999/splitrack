@@ -6,6 +6,7 @@ export type GradualBlurPosition = 'top' | 'bottom' | 'left' | 'right';
 
 export interface GradualBlurProps {
   position?: GradualBlurPosition;
+  renderMode?: 'edge' | 'page';
   height?: number;
   width?: number;
   strength?: number;

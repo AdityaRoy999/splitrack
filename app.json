@@ -57,7 +57,7 @@
         "expo-build-properties",
         {
           "android": {
-            "extraProguardRules": "# Expo creates GLView via reflection; preserve its constructor and surface callbacks in release APKs.\n-keep class expo.modules.gl.GLView { *; }"
+            "extraProguardRules": "# Expo creates GLView via reflection and C++ resolves GLContext.flush() and EXGL native bindings by name.\n-keep class expo.modules.gl.GLView { *; }\n-keep class expo.modules.gl.GLContext { *; }\n-keep class expo.modules.gl.cpp.EXGL { *; }"
           }
         }
       ]
