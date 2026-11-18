@@ -58,8 +58,7 @@ export function useHorizontalScrollEdges() {
   return useScrollEdges(true);
 }
 
-// Keep blur at the clipping edge. Animate its radius instead of moving a
-// tinted rectangle into view; there is no colour wash over the scroll content.
+// Keep the gradient mask at the clipping edge and animate the blur's reveal.
 export function HorizontalEdgeFade({ children, style, width = 24, left = true, right = true }: HorizontalEdgeFadeProps) {
   const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   return (

@@ -10,7 +10,6 @@ export interface NativeGradualBlurProps extends ViewProps {
   reveal?: number;
   dark?: boolean;
   washColor?: string;
-  blurTargetId?: number | null;
 }
 
 export const NativeGradualBlurView = requireOptionalNativeModule('SplittrackGradualBlur')

@@ -52,6 +52,14 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.828945864022-hg0dlg1ghp116ft9j3dg96a2r1jn9aih"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraProguardRules": "# Expo creates GLView via reflection; preserve its constructor and surface callbacks in release APKs.\n-keep class expo.modules.gl.GLView { *; }"
+          }
+        }
       ]
     ]
   }

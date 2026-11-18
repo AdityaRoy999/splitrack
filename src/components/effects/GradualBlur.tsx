@@ -17,8 +17,8 @@ const GRADIENT_AXIS = {
   right: { start: { x: 0, y: 0.5 }, end: { x: 1, y: 0.5 } },
 };
 
-// Metro uses GradualBlur.web.tsx for the original browser component. Native
-// views use the same stack and put each mask directly on its blur surface.
+// Metro selects React Bits on web, the native radius stack on iOS, and the
+// expo-progressive-blur gradient-mask approach on Android.
 export const GradualBlur = React.memo(function GradualBlur({
   position = 'bottom', height = 48, width, strength = 1.6, layers = 8,
   curve = 'bezier', exponential = true, opacity = 1, tint = 'transparent',

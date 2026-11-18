@@ -1031,7 +1031,7 @@ function MainAppContent({
       <CloudStatus />
 
       <View style={styles.mainViewport}>
-        <BlurTargetView ref={screenBlurTarget} style={styles.tabPagesContainer}>
+        <BlurTargetView ref={screenBlurTarget} style={[styles.tabPagesContainer, { backgroundColor: rootBg }]}>
           {showSettings ? (
             <View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
               <SettingsPage

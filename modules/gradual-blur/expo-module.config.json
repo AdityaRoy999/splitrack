@@ -1,9 +1,6 @@
 {
-  "platforms": ["apple", "android"],
+  "platforms": ["apple"],
   "apple": {
     "modules": ["GradualBlurModule"]
-  },
-  "android": {
-    "modules": ["expo.modules.gradualblur.GradualBlurModule"]
   }
 }
