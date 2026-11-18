@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, LayoutAnimation, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, LayoutAnimation, Platform, StyleSheet, Text } from 'react-native';
 import type { Friend } from '../../types';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { UserAvatar } from '../common/UserAvatar';
 
 interface TripMemberPillProps {
   member: Friend;
@@ -47,11 +48,7 @@ export function TripMemberPill({ member, removalMode, onRemove }: TripMemberPill
       { backgroundColor: isDark ? '#18181D' : '#EFEFF4', opacity: progress,
         transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] },
     ]}>
-      {member.avatar ? <Image source={{ uri: member.avatar }} style={styles.avatar} /> : (
-        <View style={[styles.avatar, styles.initialCircle, { backgroundColor: isDark ? '#27272F' : '#D4D4D8' }]}>
-          <Text style={[styles.initial, { color: textColor }]}>{member.name.charAt(0).toUpperCase()}</Text>
-        </View>
-      )}
+      <UserAvatar avatarUri={member.avatar} name={member.name} size={20} borderRadius={10} isDark={isDark} />
       <Text style={[styles.name, { color: textColor }]}>{member.name}</Text>
       {removalMode ? (
         <AnimatedPressable

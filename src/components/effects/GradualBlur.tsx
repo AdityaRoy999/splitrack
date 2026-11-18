@@ -5,6 +5,7 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { NativeFadeBlur } from './NativeFadeBlur';
 import { createBlurStack, createBlurTintFalloff } from './blurFalloff';
 import type { GradualBlurProps } from './gradualBlurTypes';
+import { useSceneActive } from '../common/SceneActivityContext';
 
 export type { GradualBlurProps, GradualBlurPosition } from './gradualBlurTypes';
 export type { GradualBlurCurve } from './blurFalloff';
@@ -24,12 +25,14 @@ export const GradualBlur = React.memo(function GradualBlur({
   zIndex = 20, active = true, blurTarget, style,
 }: GradualBlurProps) {
   const { themeMode } = useLiquidGlass();
-  const reveal = useSharedValue(active ? 1 : 0);
+  const sceneActive = useSceneActive();
+  const enabled = active && sceneActive;
+  const reveal = useSharedValue(enabled ? 1 : 0);
   useEffect(() => {
-    reveal.value = withTiming(active ? 1 : 0, {
+    reveal.value = withTiming(enabled ? 1 : 0, {
       duration: 180, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System,
     });
-  }, [active, reveal]);
+  }, [enabled, reveal]);
   const vertical = position === 'top' || position === 'bottom';
   const depth = vertical ? height : (width ?? 24);
   const alpha = Math.min(1, Math.max(0, opacity));

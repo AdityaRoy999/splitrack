@@ -160,7 +160,10 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
     return result.state.friends.find(item => item.id === result.result.id)!;
   }, [mutate]);
   const updateFriend = useCallback(async (id: string, updates: Partial<MemberProfile>) => {
-    const avatarRef = updates.avatar !== undefined ? await uploadImage(updates.avatar) : undefined;
+    const existing = stateRef.current.friends.find(friend => friend.id === id);
+    // Saving a nickname must not persist an expiring S3 download URL as a photo.
+    const avatarRef = updates.avatar !== undefined && updates.avatar !== existing?.avatar
+      ? await uploadImage(updates.avatar) : undefined;
     const result = await mutate(entityPath('friends', id), 'PUT', { userId: id, nickname: updates.name, phone: updates.phone, avatarRef });
     return result.state.friends.find(item => item.id === id) ?? null;
   }, [mutate]);

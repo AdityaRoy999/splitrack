@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { ArrowRightUpIcon } from '@solar-icons/react-native/bold/arrow-right-up';
 import { Pen2Icon } from '@solar-icons/react-native/bold/pen-2';
 import { ImpactStyle, triggerImpact } from '../../utils/haptics';
@@ -7,6 +7,7 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { Friend } from '../../types';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { SpotlightCard } from '../glass/SpotlightCard';
+import { isPhotoUri, UserAvatar } from '../common/UserAvatar';
 
 interface MemberCardProps {
   friend: Friend;
@@ -61,28 +62,14 @@ export const MemberCard: React.FC<MemberCardProps> = ({
     <View style={styles.cardWrap}>
       <SpotlightCard
         onPress={onPress}
-        coverImageUri={friend.avatar || undefined}
+        coverImageUri={isPhotoUri(friend.avatar) ? friend.avatar : undefined}
         highlightableCover={false}
         panelStyle={styles.innerShowcasePanel}
         footer={footerContent}
         borderRadius={24}
       >
         <View style={styles.panelTopRow}>
-          {friend.avatar ? (
-            <Image
-              source={{ uri: friend.avatar }}
-              style={[
-                styles.avatarChip,
-                { backgroundColor: isDark ? '#1E1E24' : '#E5E7EB' },
-              ]}
-            />
-          ) : (
-            <View style={[styles.avatarChip, styles.avatarFallback, { backgroundColor: subtleChipBg }]}>
-              <Text style={[styles.avatarInitial, { color: textColor }]}>
-                {friend.name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
+          <UserAvatar avatarUri={friend.avatar} name={friend.name} size={38} borderRadius={12} isDark={isDark} />
         </View>
 
         <View style={styles.identityBlock}>

@@ -8,7 +8,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.adityaroy999.splittrack",
+      "bundleIdentifier": "com.AdiSai.fintrack",
       "infoPlist": {
         "CADisableMinimumFrameDurationOnPhone": true
       },
@@ -19,7 +19,7 @@
       }
     },
     "android": {
-      "package": "com.adityaroy999.splittrack",
+      "package": "com.AdiSai.fintrack",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
@@ -46,7 +46,13 @@
           "locationWhenInUsePermission": "Allow Splittrack to access your location to automatically tag expenses."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.828945864022-hg0dlg1ghp116ft9j3dg96a2r1jn9aih"
+        }
+      ]
     ]
   }
 }

@@ -35,7 +35,6 @@ import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { DangerCircleIcon } from '@solar-icons/react-native/bold/danger-circle';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { UserAvatar } from '../common/UserAvatar';
-import { GradualBlur } from '../effects/GradualBlur';
 import { HorizontalEdgeFade } from '../common/ScrollEdgeFade';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { useSplitTrack } from '../../store/SplitTrackStore';
@@ -134,12 +133,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.85,
-        base64: true,
       });
 
       if (!res.canceled && res.assets && res.assets.length > 0) {
         const asset = res.assets[0];
-        const pickedUri = pickedImageUri(asset);
+        const pickedUri = await pickedImageUri(asset);
         if (profile) await completeProfile({ displayName: profile.displayName, username: profile.username, avatar: pickedUri });
         triggerNotification(NotificationType.Success);
       }
@@ -258,24 +256,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   return (
     <View style={[styles.pageContainer, { backgroundColor: rootBg }]}>
-      <GradualBlur
-        position="top"
-        height={Math.max(44, insets.top + 24)}
-        strength={1.6}
-        layers={8}
-        curve="bezier"
-        tint={
-          isLiquidGlassEnabled
-            ? isDark
-              ? 'rgba(5, 5, 10, 0.7)'
-              : 'rgba(232, 237, 246, 0.7)'
-            : isDark
-              ? 'rgba(9, 9, 11, 0.88)'
-              : 'rgba(242, 242, 247, 0.88)'
-        }
-        zIndex={10}
-      />
-
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}

@@ -64,10 +64,10 @@ export function HorizontalEdgeFade({ children, style, width = 24, left = true, r
   const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   return (
     <View style={[styles.horizontal, style]}>
-      {Platform.OS === 'android' ? <BlurTargetView ref={blurTarget}>{children}</BlurTargetView> : children}
+      {Platform.OS === 'android' ? <BlurTargetView ref={blurTarget} style={styles.horizontalTarget}>{children}</BlurTargetView> : children}
       {width > 0 ? <>
-        <GradualBlur position="left" active={left} width={width} strength={0.65} curve="bezier" layers={4} blurTarget={blurTarget} />
-        <GradualBlur position="right" active={right} width={width} strength={0.65} curve="bezier" layers={4} blurTarget={blurTarget} />
+        <GradualBlur position="left" active={left} width={width} strength={0.5} curve="bezier" layers={6} blurTarget={blurTarget} />
+        <GradualBlur position="right" active={right} width={width} strength={0.5} curve="bezier" layers={6} blurTarget={blurTarget} />
       </> : null}
     </View>
   );
@@ -92,8 +92,8 @@ export function ScrollEdgeFade({ children, style, top = 24, bottom = 28 }: Scrol
   return (
     <View style={[styles.viewport, style]}>
       {Platform.OS === 'android' ? <BlurTargetView ref={blurTarget} style={styles.content}>{scroller}</BlurTargetView> : scroller}
-      {top > 0 ? <GradualBlur position="top" active={edges.left} height={top} strength={0.65} curve="bezier" layers={4} blurTarget={blurTarget} /> : null}
-      {bottom > 0 ? <GradualBlur position="bottom" active={edges.right} height={bottom} strength={0.65} curve="bezier" layers={4} blurTarget={blurTarget} /> : null}
+      {top > 0 ? <GradualBlur position="top" active={edges.left} height={top} strength={0.5} curve="bezier" layers={6} blurTarget={blurTarget} /> : null}
+      {bottom > 0 ? <GradualBlur position="bottom" active={edges.right} height={bottom} strength={0.5} curve="bezier" layers={6} blurTarget={blurTarget} /> : null}
     </View>
   );
 }
@@ -102,4 +102,5 @@ const styles = StyleSheet.create({
   viewport: { position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' },
   content: { flex: 1, minHeight: 0 },
   horizontal: { position: 'relative', overflow: 'hidden' },
+  horizontalTarget: { flexShrink: 1, minWidth: 0, width: '100%' },
 });

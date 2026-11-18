@@ -43,8 +43,7 @@ final class GradualBlurView: ExpoView {
     for (surface, level) in zip(surfaces, levels) {
       surface.frame = bounds
       surface.configure(
-        radius: max(0, level["radius"] ?? 0) * max(0, min(1, reveal)),
-        dark: dark
+        radius: max(0, level["radius"] ?? 0) * max(0, min(1, reveal))
       )
       surface.updateMask(
         position: position, from: level["from"] ?? 0,
@@ -105,8 +104,6 @@ private final class EdgeBlurEffectView: UIVisualEffectView {
   private let fadeMask = BlurMaskView()
   private var maskConfiguration: MaskConfiguration?
   private var desiredFraction: CGFloat = 0
-  private var desiredDark = true
-  private var appliedDark: Bool?
   private var animator: UIViewPropertyAnimator?
 
   init() {
@@ -125,40 +122,55 @@ private final class EdgeBlurEffectView: UIVisualEffectView {
       animator?.stopAnimation(true)
       animator = nil
       effect = nil
-      appliedDark = nil
     } else {
       applyIntensity()
     }
   }
 
-  func configure(radius: Double, dark: Bool) {
-    // UIKit exposes effect intensity rather than CSS pixel radii. The stack's
-    // incremental radii still control the progression; keep the material light.
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    removeMaterialFill()
+  }
+
+  func configure(radius: Double) {
+    // Keep one fixed material and clear its separate fill surfaces. Adaptive
+    // .regular changes its tint with the theme and darkens overlapping layers.
     let fraction = CGFloat(max(0, min(1, radius / 30)))
-    isHidden = fraction <= 0.0001
-    guard fraction != desiredFraction || dark != desiredDark || animator == nil else { return }
+    isHidden = fraction <= 0.0001 || UIAccessibility.isReduceTransparencyEnabled
+    guard fraction != desiredFraction || animator == nil else { return }
     desiredFraction = fraction
-    desiredDark = dark
     applyIntensity()
   }
 
   private func applyIntensity() {
     guard window != nil else { return }
-    if animator == nil || appliedDark != desiredDark {
+    if animator == nil {
       animator?.stopAnimation(true)
       effect = nil
-      overrideUserInterfaceStyle = desiredDark ? .dark : .light
-      let blurEffect = UIBlurEffect(style: .regular)
+      overrideUserInterfaceStyle = .light
+      let blurEffect = UIBlurEffect(style: .light)
       let nextAnimator = UIViewPropertyAnimator(duration: 1, curve: .linear) { [weak self] in
         self?.effect = blurEffect
       }
       nextAnimator.pausesOnCompletion = true
       animator = nextAnimator
-      appliedDark = desiredDark
     }
     // Reuse the animator. Recreating it in draw/layout resets the backdrop and
     // causes flicker; UI-thread reveal updates only change this fraction.
     animator?.fractionComplete = desiredFraction
+    removeMaterialFill()
+  }
+
+  private func removeMaterialFill() {
+    // UIKit can rebuild its fill surfaces on layout/appearance changes. Clear
+    // their public background colours without private filters, KVC or selectors.
+    // Keep the live backdrop effect and the content view intact.
+    func clearFill(in view: UIView) {
+      guard view !== contentView else { return }
+      view.backgroundColor = .clear
+      view.subviews.forEach { clearFill(in: $0) }
+    }
+    subviews.forEach { clearFill(in: $0) }
   }
 
   func updateMask(position: String, from: Double, to: Double, opacity: Double) {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { UsersGroupTwoRoundedIcon } from '@solar-icons/react-native/bold/users-group-two-rounded';
@@ -8,6 +8,7 @@ import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassCard } from '../glass/GlassCard';
+import { UserAvatar } from '../common/UserAvatar';
 
 interface ManageMembersSectionProps {
   onOpenMembersPage: () => void;
@@ -83,27 +84,7 @@ export const ManageMembersSection: React.FC<ManageMembersSectionProps> = ({
                   <React.Fragment key={friend.id}>
                     <View style={styles.memberRow}>
                       <View style={styles.leftCol}>
-                        {friend.avatar ? (
-                          <Image
-                            source={{ uri: friend.avatar }}
-                            style={[
-                              styles.avatar,
-                              { backgroundColor: isDark ? '#1E1E24' : '#E5E7EB' },
-                            ]}
-                          />
-                        ) : (
-                          <View
-                            style={[
-                              styles.avatar,
-                              styles.avatarFallback,
-                              { backgroundColor: isDark ? '#1E1E24' : '#E5E7EB' },
-                            ]}
-                          >
-                            <Text style={[styles.avatarInitial, { color: textColor }]}>
-                              {friend.name.charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
+                        <UserAvatar avatarUri={friend.avatar} name={friend.name} size={40} borderRadius={20} isDark={isDark} />
 
                         <View style={styles.infoCol}>
                           <Text style={[styles.memberName, { color: textColor }]} numberOfLines={1}>

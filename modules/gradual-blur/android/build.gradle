@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.gradualblur'
+version = '1.0.0'
+
+android {
+  namespace 'expo.modules.gradualblur'
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  // Reuse the same rendering library/version as Expo SDK 58's expo-blur.
+  implementation 'com.github.Dimezis:BlurView:version-3.1.0'
+}

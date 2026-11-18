@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { MinusCircleIcon } from '@solar-icons/react-native/bold/minus-circle';
@@ -20,6 +20,7 @@ import { SpotlightCard } from '../glass/SpotlightCard';
 import { GlassPill } from '../glass/GlassPill';
 import { AddMemberModal } from './AddMemberModal';
 import { TripMemberPill } from './TripMemberPill';
+import { UserAvatar } from '../common/UserAvatar';
 
 interface TripDetailViewProps {
   trip: Trip;
@@ -37,7 +38,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
   onSelectTransaction,
 }) => {
   const { friends, transactions, categories, removeMemberFromTrip, getTripTransactions, revision } = useSplitTrack();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const canManageMembers = trip.ownerId === user?.uid;
   const [memberError, setMemberError] = useState('');
   const [history, setHistory] = useState<Transaction[] | null>(null);
@@ -171,7 +172,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
         <GlassCard borderRadius={22} style={styles.membersCard}>
           <View style={styles.membersWrap}>
             <View style={[styles.memberPill, { backgroundColor: pillSurface }]}>
-              <View style={[styles.userDot, { backgroundColor: isDark ? '#FFFFFF' : '#18181B' }]} />
+              <UserAvatar avatarUri={profile?.avatar} name={profile?.displayName ?? 'You'} size={20} borderRadius={10} isDark={isDark} />
               <Text style={[styles.memberName, { color: textColor }]}>You</Text>
             </View>
 
@@ -247,21 +248,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
                       </Text>
                     </View>
                     <View style={[styles.payerBadge, { backgroundColor: pillSurface }]}>
-                      {tx.paidBy === 'user' ? (
-                        <View
-                          style={[
-                            styles.payerDot,
-                            { backgroundColor: isDark ? '#F4F4F5' : '#18181B' },
-                          ]}
-                        />
-                      ) : payerFriend?.avatar ? (
-                        <Image
-                          source={{ uri: payerFriend.avatar }}
-                          style={styles.payerAvatar}
-                        />
-                      ) : (
-                        <View style={[styles.payerDot, { backgroundColor: '#10B981' }]} />
-                      )}
+                      <UserAvatar avatarUri={tx.paidBy === 'user' ? profile?.avatar : payerFriend?.avatar} name={payerName} size={16} borderRadius={8} isDark={isDark} />
                       <Text style={[styles.payerText, { color: textColor }]} numberOfLines={1}>
                         Paid by {payerFirstName}
                       </Text>

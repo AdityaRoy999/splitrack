@@ -1,15 +1,18 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState } from 'react-native';
 import { createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateProfile, type User } from 'firebase/auth';
 import { getFirebaseAuth } from '../services/firebase';
 import { api, errorMessage } from '../services/api';
 import { uploadImage } from '../services/media';
+import { clearGoogleSession, signInWithGoogle } from '../services/googleAuth';
 
 export interface UserProfile { id: string; name: string; displayName: string; username: string; handle: string; email: string; avatar: string; avatarRef: string; upiId?: string }
 export interface EmailCredentials { mode: 'signin' | 'signup'; name?: string; email: string; password: string }
 type AuthValue = {
   user: User | null; profile: UserProfile | null; loading: boolean; profileError: string;
   authenticate(payload: EmailCredentials): Promise<void>;
+  authenticateWithGoogle(): Promise<boolean>;
   completeProfile(data: { displayName: string; username: string; avatar?: string }): Promise<void>;
   refreshProfile(): Promise<void>; logout(): Promise<void>; resetPassword(email: string): Promise<void>;
 };
@@ -46,6 +49,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { active = false; unsubscribe(); };
   }, [refreshProfile]);
 
+  useEffect(() => {
+    if (!user) return;
+    const refreshPhoto = () => { void refreshProfile().catch(() => {}); };
+    const listener = AppState.addEventListener('change', state => { if (state === 'active') refreshPhoto(); });
+    // AWS caches signed URLs for 45 minutes and they expire after an hour.
+    // A short refresh interval renews the photo before that remaining window ends.
+    const timer = setInterval(() => { if (AppState.currentState === 'active') refreshPhoto(); }, 10 * 60 * 1000);
+    return () => { listener.remove(); clearInterval(timer); };
+  }, [user, refreshProfile]);
+
   const authenticate = useCallback(async ({ mode, name, email, password }: EmailCredentials) => {
     const auth = getFirebaseAuth();
     if (mode === 'signup') {
@@ -53,14 +66,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (name?.trim()) await updateProfile(credential.user, { displayName: name.trim() });
     } else await signInWithEmailAndPassword(auth, email.trim(), password);
   }, []);
+  const authenticateWithGoogle = useCallback(() => signInWithGoogle(), []);
   const completeProfile = useCallback(async (data: { displayName: string; username: string; avatar?: string }) => {
-    const avatarRef = await uploadImage(data.avatar ?? '');
+    const avatarRef = data.avatar !== undefined && data.avatar !== profile?.avatar
+      ? await uploadImage(data.avatar) : profile?.avatarRef ?? '';
     await api('/api/profile', { method: 'PUT', body: { displayName: data.displayName, username: data.username, avatarRef } });
     await refreshProfile();
-  }, [refreshProfile]);
-  const logout = useCallback(async () => { await signOut(getFirebaseAuth()); }, []);
+  }, [profile?.avatar, profile?.avatarRef, refreshProfile]);
+  const logout = useCallback(async () => {
+    const auth = getFirebaseAuth();
+    const usedGoogle = auth.currentUser?.providerData.some(provider => provider.providerId === 'google.com');
+    await signOut(auth);
+    if (usedGoogle) await clearGoogleSession().catch(() => {});
+  }, []);
   const resetPassword = useCallback(async (email: string) => { await sendPasswordResetEmail(getFirebaseAuth(), email.trim()); }, []);
-  const value = useMemo(() => ({ user, profile, loading, profileError, authenticate, completeProfile, refreshProfile, logout, resetPassword }), [user, profile, loading, profileError, authenticate, completeProfile, refreshProfile, logout, resetPassword]);
+  const value = useMemo(() => ({ user, profile, loading, profileError, authenticate, authenticateWithGoogle, completeProfile, refreshProfile, logout, resetPassword }), [user, profile, loading, profileError, authenticate, authenticateWithGoogle, completeProfile, refreshProfile, logout, resetPassword]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export function useAuth() { const value = useContext(Context); if (!value) throw new Error('AuthProvider is missing.'); return value; }

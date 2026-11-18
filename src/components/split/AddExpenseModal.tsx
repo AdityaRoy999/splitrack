@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -50,6 +49,8 @@ import {
 } from '../common/CalendarDatePickerModal';
 import { ExpenseCategory, SplitMemberShare, SplitType } from '../../types';
 import { allocateSplitAmounts } from '../../utils/splitAmounts';
+import { useAuth } from '../../auth/AuthContext';
+import { UserAvatar } from '../common/UserAvatar';
 
 interface AddExpenseModalProps {
   visible: boolean;
@@ -67,6 +68,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
   const { accounts, friends, trips, transactions, categories, addTransaction, selectedAccountId } =
     useSplitTrack();
   const { runWithIntent, pending, error } = useAsyncAction();
+  const { profile } = useAuth();
   const { currency, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
@@ -576,7 +578,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
 
   const paidByItems = useMemo(
     () => [
-      ...(showUserInScope ? [{ value: 'user', label: 'You', handle: '@you', avatar: '' }] : []),
+      ...(showUserInScope ? [{ value: 'user', label: 'You', handle: profile?.handle ?? '@you', avatar: profile?.avatar ?? '' }] : []),
       ...tripScopedFriends.map((f) => ({
         value: f.id,
         label: f.name,
@@ -584,7 +586,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
         avatar: f.avatar,
       })),
     ],
-    [showUserInScope, tripScopedFriends]
+    [showUserInScope, tripScopedFriends, profile?.handle, profile?.avatar]
   );
 
   const normalizedPaidByQuery = paidBySearchQuery.trim().toLowerCase().replace(/^@/, '');
@@ -1178,15 +1180,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                             },
                           ]}
                         >
-                          {item.avatar ? (
-                            <Image source={{ uri: item.avatar }} style={styles.payerAvatar} />
-                          ) : (
-                            <View style={[styles.payerAvatarFallback, { backgroundColor: chipBg }]}>
-                              <Text style={[styles.payerAvatarText, { color: textColor }]}>
-                                {item.label.slice(0, 2).toUpperCase()}
-                              </Text>
-                            </View>
-                          )}
+                          <UserAvatar avatarUri={item.avatar} name={item.label} size={32} borderRadius={16} isDark={isDark} />
                           <View style={styles.payerTextCol}>
                             <Text style={[styles.payerNameText, { color: textColor }]}>{item.label}</Text>
                             <Text style={[styles.payerHandleText, { color: '#10B981' }]}>

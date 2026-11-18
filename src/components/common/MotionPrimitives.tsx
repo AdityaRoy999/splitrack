@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, Platform, TouchableOpacity, ViewStyle, StyleProp } from 'react-native';
+import { Animated, Platform, TouchableOpacity, ViewStyle, StyleProp, type AccessibilityState } from 'react-native';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 
 interface AnimatedPressableProps {
@@ -13,6 +13,7 @@ interface AnimatedPressableProps {
   contentStyle?: StyleProp<ViewStyle>;
   hitSlop?: { top?: number; bottom?: number; left?: number; right?: number };
   accessibilityLabel?: string;
+  accessibilityState?: AccessibilityState;
 }
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -31,6 +32,7 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   contentStyle,
   hitSlop,
   accessibilityLabel,
+  accessibilityState,
 }) => {
   const [scaleAnim] = useState(() => new Animated.Value(1));
 
@@ -58,6 +60,8 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
         onPressOut={() => animateTo(1)}
         hitSlop={hitSlop}
         accessibilityLabel={accessibilityLabel}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: disabled || !onPress, ...accessibilityState }}
         style={contentStyle}
       >
         {children}

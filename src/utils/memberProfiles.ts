@@ -16,6 +16,7 @@ export function buildMemberDirectory(friends: Friend[], profiles: MemberProfile[
       name: profile.name,
       handle: `@${username}`,
       avatar: profile.avatar,
+      avatarRef: profile.avatarRef,
       upiId: profile.upiId,
       phone: profile.phone,
       friendId: 'id' in profile && typeof profile.id === 'string' ? profile.id : undefined,

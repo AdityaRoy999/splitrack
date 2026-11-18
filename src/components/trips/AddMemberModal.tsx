@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  FlatList, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
+  FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View, type ViewStyle,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -62,6 +62,7 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
   const upiId = editingFriend?.upiId ?? '';
   const [phone, setPhone] = useState(editingFriend?.phone ?? '');
   const [photoUri, setPhotoUri] = useState(editingFriend?.avatar ?? '');
+  const originalPhoto = useRef(editingFriend?.avatar ?? '');
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState<BubbleNotice | null>(null);
@@ -125,11 +126,10 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7,
-        base64: true,
       });
       const asset = !result.canceled ? result.assets[0] : undefined;
       if (asset) {
-        setPhotoUri(pickedImageUri(asset));
+        setPhotoUri(await pickedImageUri(asset));
         setError('');
       }
     } catch {
@@ -144,7 +144,7 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
     const cleanName = name.trim();
     if (!cleanName) { setError('Enter a full name.'); return; }
     const details = {
-      name: cleanName, avatar: photoUri, phone: phone.trim() || undefined,
+      name: cleanName, ...(photoUri !== originalPhoto.current ? { avatar: photoUri } : {}), phone: phone.trim() || undefined,
     };
     if (!editingFriend) return;
     setPendingMember(editingFriend.id);
@@ -192,7 +192,7 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
                 const added = addedHandles.has(normalizeUsername(item.handle));
                 return (
                   <View style={styles.personRow}>
-                    <UserAvatar avatarUri={item.avatar} size={48} borderRadius={24} isDark={isDark} />
+                    <UserAvatar avatarUri={item.avatar} name={item.name} size={48} borderRadius={24} isDark={isDark} />
                     <View style={styles.personInfo}>
                       <Text numberOfLines={1} style={[styles.personName, { color: textColor }]}>{item.name}</Text>
                       <Text numberOfLines={1} style={[styles.personHandle, { color: mutedText }]}>{item.handle}</Text>
@@ -211,7 +211,7 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
         <ScrollEdgeFade tint={bg}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.formContent}>
             <AnimatedPressable disabled={picking} onPress={pickPhoto} accessibilityLabel="Upload member photo" contentStyle={[styles.photoPicker, { backgroundColor: surface }]}>
-              {photoUri ? <Image source={{ uri: photoUri }} style={styles.photo} /> : <UserRoundedIcon size={40} color={mutedText} />}
+              {photoUri ? <UserAvatar avatarUri={photoUri} name={name} size={92} borderRadius={46} isDark={isDark} /> : <UserRoundedIcon size={40} color={mutedText} />}
               <View style={[styles.cameraBadge, { backgroundColor: accent }]}><CameraIcon size={15} color="#FFFFFF" /></View>
             </AnimatedPressable>
             <View style={styles.photoActions}>

@@ -39,6 +39,7 @@ yarn-error.*
 *service-account*.json
 GoogleService-Info.plist
 google-services.json
+/sign in with google services/
 
 # typescript
 *.tsbuildinfo

@@ -114,7 +114,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        const nextUri = pickedImageUri(asset);
+        const nextUri = await pickedImageUri(asset, 1600);
         setCustomCoverUri(nextUri);
         setSelectedCover(nextUri);
       }

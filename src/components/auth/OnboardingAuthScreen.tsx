@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
   Animated,
+  ActivityIndicator,
   Easing,
   Image,
   KeyboardAvoidingView,
@@ -13,7 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth, type EmailCredentials } from '../../auth/AuthContext';
-import { errorMessage } from '../../services/api';
+import { authenticationError } from '../../auth/authErrors';
 import { Sun2Icon } from '@solar-icons/react-native/bold/sun-2';
 import { MoonIcon } from '@solar-icons/react-native/bold/moon';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
@@ -47,7 +48,7 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { themeMode, toggleTheme } = useLiquidGlass();
-  const { resetPassword } = useAuth();
+  const { resetPassword, authenticateWithGoogle } = useAuth();
   const isDark = themeMode === 'dark';
 
   const [authMode, setAuthMode] = useState<'signup' | 'signin'>('signup');
@@ -55,7 +56,9 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'email' | 'google' | 'reset' | null>(null);
+  const busy = useRef(false);
+  const pending = pendingAction !== null;
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [focusedField, setFocusedField] = useState<'name' | 'email' | 'password' | null>(null);
@@ -115,26 +118,34 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
       : undefined;
 
   const handlePrimarySubmit = async () => {
-    if (pending) return;
+    if (busy.current) return;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('Enter a valid email address.'); return; }
     if (!password || (isSignUp && password.length < 6)) { setError(isSignUp ? 'Use a password with at least 6 characters.' : 'Enter your password.'); return; }
     if (isSignUp && !fullName.trim()) { setError('Enter your name.'); return; }
-    setPending(true); setError(''); setNotice('');
+    busy.current = true; setPendingAction('email'); setError(''); setNotice('');
     try {
       await onAuthenticate({ mode: authMode, name: fullName.trim() || undefined, email: email.trim(), password });
       triggerNotification(NotificationType.Success);
     } catch (failure) {
-      const code = (failure as { code?: string }).code;
-      setError(code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found' ? 'The email or password is incorrect.' : code === 'auth/email-already-in-use' ? 'This email already has an account. Sign in instead.' : code === 'auth/too-many-requests' ? 'Too many attempts. Please try again later.' : errorMessage(failure));
-    } finally { setPending(false); }
+      setError(authenticationError(failure));
+    } finally { busy.current = false; setPendingAction(null); }
+  };
+  const handleGoogleSubmit = async () => {
+    if (busy.current) return;
+    busy.current = true; setPendingAction('google'); setError(''); setNotice('');
+    try {
+      if (await authenticateWithGoogle()) triggerNotification(NotificationType.Success);
+    } catch (failure) {
+      setError(authenticationError(failure));
+    } finally { busy.current = false; setPendingAction(null); }
   };
   const handlePasswordReset = async () => {
-    if (pending) return;
+    if (busy.current) return;
     if (!email.trim()) { setError('Enter your email address first.'); return; }
-    setPending(true); setError('');
+    busy.current = true; setPendingAction('reset'); setError(''); setNotice('');
     try { await resetPassword(email); setNotice('If this email has an account, a reset link has been sent.'); }
-    catch (failure) { setError(errorMessage(failure)); }
-    finally { setPending(false); }
+    catch (failure) { setError(authenticationError(failure)); }
+    finally { busy.current = false; setPendingAction(null); }
   };
 
   return (
@@ -205,6 +216,29 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
                   ? 'Effortless bill splitting, smart debt minimization, and instant UPI QR payouts.'
                   : 'Sign in to track trips, balances, and instant UPI settlements.'}
               </Text>
+            </View>
+
+            <AnimatedPressable
+              disabled={pending}
+              onPress={handleGoogleSubmit}
+              accessibilityLabel="Continue with Google"
+              accessibilityState={{ busy: pendingAction === 'google', disabled: pending }}
+              contentStyle={[styles.googlePillBtn, { backgroundColor: surfaceCardBg }]}
+            >
+              <View style={styles.googleLeftSlot}>
+                <Image source={require('../../../assets/auth/google-g.png')} style={{ width: 20, height: 20 }} resizeMode="contain" />
+              </View>
+              <Text style={[styles.googlePillText, { color: textColor }]}>Continue with Google</Text>
+              <View style={styles.googleRightSlot}>
+                {pendingAction === 'google'
+                  ? <ActivityIndicator size="small" color={textColor} />
+                  : <AltArrowRightIcon size={17} color={textColor} />}
+              </View>
+            </AnimatedPressable>
+            <View style={styles.orRow}>
+              <View style={[styles.orLine, { backgroundColor: inputIdleBg }]} />
+              <Text style={[styles.orText, { color: mutedText }]}>OR</Text>
+              <View style={[styles.orLine, { backgroundColor: inputIdleBg }]} />
             </View>
 
             {/* Completely Borderless Form Surface */}
@@ -326,7 +360,7 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
               >
                 <View style={styles.ctaSpacer} />
                 <Text style={[styles.primaryPillText, { color: ctaText }]}>
-                  {pending ? 'Please wait…' : isSignUp ? 'Create Account' : 'Sign In'}
+                  {pendingAction === 'email' ? 'Please wait…' : isSignUp ? 'Create Account' : 'Sign In'}
                 </Text>
                 <View style={styles.ctaRightArrow}>
                   <AltArrowRightIcon size={17} color={ctaText} />

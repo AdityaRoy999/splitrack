@@ -119,12 +119,11 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.7,
-        base64: true,
       });
 
       if (!result.canceled && result.assets?.[0]) {
         const asset = result.assets[0];
-        setCustomPhotoUri(pickedImageUri(asset));
+        setCustomPhotoUri(await pickedImageUri(asset));
         setSelectedAvatarType('custom');
         setShowAvatarPickerModal(false);
         triggerNotification(NotificationType.Success);

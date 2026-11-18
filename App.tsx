@@ -20,6 +20,7 @@ import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { BillListIcon } from '@solar-icons/react-native/bold/bill-list';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
+import { MinusCircleIcon } from '@solar-icons/react-native/bold/minus-circle';
 import { UsersGroupTwoRoundedIcon } from '@solar-icons/react-native/bold/users-group-two-rounded';
 import { Pen2Icon } from '@solar-icons/react-native/bold/pen-2';
 import { InfoCircleIcon } from '@solar-icons/react-native/linear/info-circle';
@@ -59,6 +60,8 @@ import { AddCategoryModal } from './src/components/categories/AddCategoryModal';
 import { SettleModal } from './src/components/trips/SettleModal';
 import { SettingsPage } from './src/components/settings/SettingsPage';
 import { CalendarDatePickerModal, formatDisplayDate } from './src/components/common/CalendarDatePickerModal';
+import { BottomBubble, type BubbleNotice } from './src/components/common/BottomBubble';
+import { FormError } from './src/hooks/useAsyncAction';
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 import { PreloaderSplash } from './src/components/common/PreloaderSplash';
 import { OnboardingAuthScreen, type AuthLogoRect } from './src/components/auth/OnboardingAuthScreen';
@@ -99,6 +102,7 @@ function MainAppContent({
   onHeaderLogoNode?: (node: ViewRefNode | null) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const screenBlurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   const { palette, themeMode, formatAmount, isLiquidGlassEnabled } = useLiquidGlass();
   const {
@@ -113,6 +117,7 @@ function MainAppContent({
     getSimplifiedDebts,
     hasMoreTransactions,
     loadMoreTransactions,
+    deleteTrip,
   } = useSplitTrack();
 
   const isDark = themeMode === 'dark';
@@ -133,6 +138,22 @@ function MainAppContent({
 
   // Separate Trip Page, Member Pages & Modals
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [removingTrips, setRemovingTrips] = useState(false);
+  const [tripRemovalError, setTripRemovalError] = useState('');
+  const [tripNotice, setTripNotice] = useState<BubbleNotice | null>(null);
+  const dismissTripNotice = useCallback(() => setTripNotice(null), []);
+  const removableTrips = trips.filter(trip => trip.ownerId === user?.uid);
+  const removalMode = removingTrips && removableTrips.length > 0;
+  const removeTrip = useCallback(async (id: string, name: string) => {
+    try {
+      await deleteTrip(id);
+      setTripRemovalError('');
+      setTripNotice({ id: Date.now(), message: `${name} removed` });
+    } catch (failure) {
+      setTripRemovalError(errorMessage(failure));
+      throw failure;
+    }
+  }, [deleteTrip]);
   const [homeView, setHomeView] = useState<'overview' | 'members' | 'member-detail'>('overview');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [expenseDefaultTripId, setExpenseDefaultTripId] = useState<string | undefined>(undefined);
@@ -749,14 +770,27 @@ function MainAppContent({
                   Track who paid for what on trips
                 </Text>
               </View>
-              <GlassPill
-                label="New Trip"
-                icon={<AddCircleIcon size={16} color={textColor} />}
-                variant="dark"
-                size="sm"
-                onPress={() => setShowAddTrip(true)}
-              />
+              <View style={styles.tripActions}>
+                {removableTrips.length > 0 ? <AnimatedPressable
+                  onPress={() => { setRemovingTrips(!removalMode); setTripRemovalError(''); }}
+                  accessibilityLabel={removalMode ? 'Finish removing trips' : 'Remove trips'}
+                  accessibilityState={{ selected: removalMode }}
+                  contentStyle={[styles.tripRemoveToggle, { backgroundColor: isDark ? '#18181D' : '#EFEFF4' }]}
+                >
+                  {removalMode ? <CheckCircleIcon size={20} color="#10B981" /> : <MinusCircleIcon size={20} color={textColor} />}
+                </AnimatedPressable> : null}
+                <GlassPill
+                  label="New Trip"
+                  icon={<AddCircleIcon size={16} color={textColor} />}
+                  variant="dark"
+                  size="sm"
+                  onPress={() => { setRemovingTrips(false); setShowAddTrip(true); }}
+                />
+              </View>
             </View>
+
+            {removalMode ? <Text style={[styles.tripRemovalHint, { color: mutedText }]}>Tap a minus to remove a trip. Its expenses and balances stay in your ledger.</Text> : null}
+            <FormError message={tripRemovalError} />
 
             {/* Clean Double-Surface Album Cover Trip Cards (tap to open dedicated Trip Page) */}
             {trips.map((trip) => (
@@ -764,6 +798,7 @@ function MainAppContent({
                 key={trip.id}
                 trip={trip}
                 onPress={() => setSelectedTripId(trip.id)}
+                onRemove={removalMode && trip.ownerId === user?.uid ? () => removeTrip(trip.id, trip.name) : undefined}
               />
             ))}
 
@@ -942,7 +977,8 @@ function MainAppContent({
     );
   }, [categories, dividerColor, dynamicScrollContent, formatAmount, friends,
     getSimplifiedDebts, isDark, mutedText, selectedTripId, textColor,
-    totalOwedToYou, totalYouOwe, transactions, trips]);
+    totalOwedToYou, totalYouOwe, transactions, trips, removalMode, removableTrips.length,
+    removeTrip, tripRemovalError, user?.uid]);
 
   const renderAnalyticsTab = useCallback(() => (
     <ScrollView
@@ -1041,27 +1077,27 @@ function MainAppContent({
           )}
 
         </BlurTargetView>
-        {!showSettings && (
-          <GradualBlur
-            position="top"
-            height={Math.max(48, insets.top + 32)}
-            strength={0.85}
-            layers={6}
-            curve="bezier"
-            blurTarget={screenBlurTarget}
-            zIndex={45}
-          />
-        )}
+        <GradualBlur
+          position="top"
+          height={Math.max(32, insets.top + 12)}
+          strength={0.6}
+          layers={6}
+          curve="bezier"
+          blurTarget={screenBlurTarget}
+          zIndex={45}
+        />
         <GradualBlur
           position="bottom"
-          height={Math.max(56, insets.bottom + 56)}
-          strength={0.85}
+          height={Math.max(48, insets.bottom + 32)}
+          strength={0.6}
           layers={6}
           curve="bezier"
           blurTarget={screenBlurTarget}
           zIndex={45}
         />
       </View>
+
+      <BottomBubble notice={tripNotice} onDismiss={dismissTripNotice} />
 
       <View
         pointerEvents={showAddExpense || showAddTrip || showAddMember ? 'none' : 'box-none'}
@@ -1234,6 +1270,9 @@ function AppContent() {
 }
 
 const styles = StyleSheet.create({
+  tripActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tripRemoveToggle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  tripRemovalHint: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
   appRoot: {
     flex: 1,
     position: 'relative',

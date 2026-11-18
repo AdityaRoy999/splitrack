@@ -17,6 +17,7 @@ import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { GlassCard } from '../glass/GlassCard';
 import { SpotlightCard } from '../glass/SpotlightCard';
+import { isPhotoUri, UserAvatar } from '../common/UserAvatar';
 import { GlassPill } from '../glass/GlassPill';
 
 type MemberTxFilter = 'All' | 'Splits' | 'Paid by Them' | 'Settlements';
@@ -152,8 +153,8 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
       <View style={styles.heroWrap}>
         <SpotlightCard
           borderRadius={24}
-          coverImageUri={friend.avatar || undefined}
-          highlightableCover={Boolean(friend.avatar)}
+          coverImageUri={isPhotoUri(friend.avatar) ? friend.avatar : undefined}
+          highlightableCover={isPhotoUri(friend.avatar)}
           panelStyle={styles.heroShowcasePanel}
           footer={
             <View style={styles.balanceFooterRow}>
@@ -199,27 +200,7 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
           }
         >
           <View style={styles.profileTop}>
-            {friend.avatar ? (
-              <Image
-                source={{ uri: friend.avatar }}
-                style={[
-                  styles.heroAvatar,
-                  { backgroundColor: isDark ? '#1E1E24' : '#E5E7EB' },
-                ]}
-              />
-            ) : (
-              <View
-                style={[
-                  styles.heroAvatar,
-                  styles.avatarFallback,
-                  { backgroundColor: isDark ? '#1E1E24' : '#E5E7EB' },
-                ]}
-              >
-                <Text style={[styles.heroAvatarInitial, { color: textColor }]}>
-                  {friend.name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
+            <UserAvatar avatarUri={friend.avatar} name={friend.name} size={52} borderRadius={16} isDark={isDark} />
 
             <View style={styles.profileTextCol}>
               <Text style={[styles.heroName, { color: textColor }]} numberOfLines={1}>
