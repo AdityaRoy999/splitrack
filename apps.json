@@ -179,12 +179,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.31",
-      "versionDate": "2026-11-18T20:56:37Z",
-      "versionDescription": "fix: Android startup crash and progressive edge blur",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-31/Splittrack-unsigned.ipa",
-      "size": 27051096,
+      "version": "1.0.32",
+      "versionDate": "2026-11-18T21:51:53Z",
+      "versionDescription": "fix: preserve Android GL JNI and smooth iOS status blur",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-32/Splittrack-unsigned.ipa",
+      "size": 27061643,
       "versions": [
+        {
+          "version": "1.0.32",
+          "buildVersion": "32",
+          "date": "2026-11-18T21:51:53Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-32/Splittrack-unsigned.ipa",
+          "size": 27061643,
+          "localizedDescription": "fix: preserve Android GL JNI and smooth iOS status blur"
+        },
         {
           "version": "1.0.31",
           "buildVersion": "31",
