@@ -1,9 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View, type ViewStyle,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { pickedImageUri } from '../../utils/pickedImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraIcon } from '@solar-icons/react-native/bold/camera';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
@@ -14,8 +15,9 @@ import { NotificationType, triggerNotification } from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import type { Friend } from '../../types';
-import { MEMBER_DIRECTORY } from '../../data/memberDirectory';
-import { availableUsername, buildMemberDirectory, normalizeUsername, searchMembers, type DirectoryMember } from '../../utils/memberProfiles';
+import { buildMemberDirectory, normalizeUsername, searchMembers, type DirectoryMember, type MemberProfile } from '../../utils/memberProfiles';
+import { api, errorMessage } from '../../services/api';
+import { UserAvatar } from '../common/UserAvatar';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassPill } from '../glass/GlassPill';
 import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
@@ -56,8 +58,8 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
   const isEditing = Boolean(editingFriend);
   const [query, setQuery] = useState('');
   const [name, setName] = useState(editingFriend?.name ?? '');
-  const [handle, setHandle] = useState(editingFriend?.handle ?? '');
-  const [upiId, setUpiId] = useState(editingFriend?.upiId ?? '');
+  const handle = editingFriend?.handle ?? '';
+  const upiId = editingFriend?.upiId ?? '';
   const [phone, setPhone] = useState(editingFriend?.phone ?? '');
   const [photoUri, setPhotoUri] = useState(editingFriend?.avatar ?? '');
   const [picking, setPicking] = useState(false);
@@ -65,26 +67,42 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
   const [notice, setNotice] = useState<BubbleNotice | null>(null);
   const dismissNotice = useCallback(() => setNotice(null), []);
   const adding = useRef(new Set<string>());
+  const [searchResult, setSearchResult] = useState<{ query: string; items: (MemberProfile & { id: string })[] }>({ query: '', items: [] });
+  const remoteProfiles = useMemo(() => searchResult.query === query ? searchResult.items : [], [searchResult, query]);
+  const searching = Boolean(query.trim()) && searchResult.query !== query;
+  const [pendingMember, setPendingMember] = useState('');
+
+  useEffect(() => {
+    if (!query.trim() || isEditing) return;
+    let active = true;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      void api<{ items: (MemberProfile & { id: string })[] }>(`/api/users/search?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal }).then(result => { if (active) { setSearchResult({ query, items: result.items }); setError(''); } }).catch(failure => { if (active) { setSearchResult({ query, items: [] }); setError(errorMessage(failure)); } });
+    }, 300);
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
+  }, [query, isEditing]);
 
   const bg = isDark ? '#09090B' : '#F4F4F8';
   const surface = isDark ? '#1C1C22' : '#EFEFF4';
   const textColor = isDark ? '#F4F4F5' : '#18181B';
   const mutedText = isDark ? '#A1A1AA' : '#71717A';
   const accent = isDark ? '#34D399' : '#047857';
-  const directory = useMemo(() => buildMemberDirectory(friends, MEMBER_DIRECTORY), [friends]);
+  const directory = useMemo(() => buildMemberDirectory(friends, remoteProfiles), [friends, remoteProfiles]);
   const results = useMemo(() => searchMembers(directory, query), [directory, query]);
   const trip = tripId ? trips.find((item) => item.id === tripId) : undefined;
   const addedHandles = useMemo(() => new Set(
     friends.filter((friend) => !tripId || trip?.members.includes(friend.id)).map((friend) => normalizeUsername(friend.handle))
   ), [friends, trip, tripId]);
 
-  const addProfile = (profile: DirectoryMember) => {
+  const addProfile = async (profile: DirectoryMember) => {
     const username = normalizeUsername(profile.handle);
     if (addedHandles.has(username) || adding.current.has(username)) return;
     adding.current.add(username);
+    setPendingMember(username);
+    try {
     const member = tripId
-      ? addMemberToTrip(tripId, profile.friendId ?? profile)
-      : addFriend(profile);
+      ? await addMemberToTrip(tripId, profile.friendId ?? profile)
+      : await addFriend(profile);
     if (member) {
       setNotice((previous) => ({ id: (previous?.id ?? 0) + 1, message: `${member.name} added${tripId ? ' to the trip' : ''}` }));
       setError('');
@@ -92,7 +110,8 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
     } else {
       setError('This trip is no longer available. Reopen it to add members.');
     }
-    adding.current.delete(username);
+    } catch (failure) { setError(errorMessage(failure)); }
+    finally { adding.current.delete(username); setPendingMember(''); }
   };
 
   const pickPhoto = async () => {
@@ -106,11 +125,11 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7,
-        base64: Platform.OS === 'web',
+        base64: true,
       });
       const asset = !result.canceled ? result.assets[0] : undefined;
       if (asset) {
-        setPhotoUri(asset.base64 ? `data:${asset.mimeType ?? 'image/jpeg'};base64,${asset.base64}` : asset.uri);
+        setPhotoUri(pickedImageUri(asset));
         setError('');
       }
     } catch {
@@ -120,29 +139,21 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
     }
   };
 
-  const saveDetails = () => {
+  const saveDetails = async () => {
+    if (pendingMember) return;
     const cleanName = name.trim();
     if (!cleanName) { setError('Enter a full name.'); return; }
-    const username = normalizeUsername(handle);
-    if (username && !/^[a-z0-9._]+$/.test(username)) {
-      setError('Use letters, numbers, dots, or underscores in the username.');
-      return;
-    }
-    const collision = username ? directory.find((profile) =>
-      normalizeUsername(profile.handle) === username && (!editingFriend || profile.friendId !== editingFriend.id)
-    ) : undefined;
-    if (collision) {
-      setError(`That username belongs to ${collision.name}. ${isEditing ? 'Choose a different username.' : 'Add their profile from search.'}`);
-      return;
-    }
     const details = {
-      name: cleanName, handle: username ? `@${username}` : availableUsername(cleanName, directory),
-      avatar: photoUri, upiId: upiId.trim() || undefined, phone: phone.trim() || undefined,
+      name: cleanName, avatar: photoUri, phone: phone.trim() || undefined,
     };
     if (!editingFriend) return;
-    const member = updateFriend(editingFriend.id, details);
+    setPendingMember(editingFriend.id);
+    try {
+    const member = await updateFriend(editingFriend.id, details);
     if (!member) { setError('The member could not be saved. Check the username and try again.'); return; }
     onClose();
+    } catch (failure) { setError(errorMessage(failure)); }
+    finally { setPendingMember(''); }
   };
 
   return (
@@ -167,7 +178,7 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
             />
             {query ? <TouchableOpacity accessibilityLabel="Clear member search" onPress={() => setQuery('')} style={styles.clearButton}><CloseCircleIcon size={20} color={mutedText} /></TouchableOpacity> : null}
           </View>
-        ) : <Text style={[styles.subtitle, { color: mutedText }]}>Update their photo and payment details</Text>}
+        ) : <Text style={[styles.subtitle, { color: mutedText }]}>Customize their nickname and photo for your account</Text>}
       </View>
 
       {!isEditing ? (
@@ -181,19 +192,19 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
                 const added = addedHandles.has(normalizeUsername(item.handle));
                 return (
                   <View style={styles.personRow}>
-                    {item.avatar ? <Image source={{ uri: item.avatar }} style={styles.personAvatar} /> : <View style={[styles.personAvatar, styles.avatarFallback, { backgroundColor: surface }]}><UserRoundedIcon size={26} color={mutedText} /></View>}
+                    <UserAvatar avatarUri={item.avatar} size={48} borderRadius={24} isDark={isDark} />
                     <View style={styles.personInfo}>
                       <Text numberOfLines={1} style={[styles.personName, { color: textColor }]}>{item.name}</Text>
                       <Text numberOfLines={1} style={[styles.personHandle, { color: mutedText }]}>{item.handle}</Text>
                     </View>
-                    <AnimatedPressable disabled={added} onPress={() => addProfile(item)} accessibilityLabel={`${added ? 'Added' : 'Add'} ${item.name} ${item.handle}`} contentStyle={[styles.addButton, { backgroundColor: surface }]}>
+                    <AnimatedPressable disabled={added || Boolean(pendingMember)} onPress={() => { void addProfile(item); }} accessibilityLabel={`${added ? 'Added' : 'Add'} ${item.name} ${item.handle}`} contentStyle={[styles.addButton, { backgroundColor: surface }]}>
                       {added ? <CheckCircleIcon size={15} color="#10B981" /> : null}
-                      <Text style={[styles.addButtonText, { color: textColor }]}>{added ? 'Added' : 'Add'}</Text>
+                      <Text style={[styles.addButtonText, { color: textColor }]}>{added ? 'Added' : pendingMember === normalizeUsername(item.handle) ? 'Adding…' : 'Add'}</Text>
                     </AnimatedPressable>
                   </View>
                 );
               }}
-              ListEmptyComponent={<View style={styles.empty}><UserRoundedIcon size={38} color={mutedText} /><Text style={[styles.emptyTitle, { color: textColor }]}>No members found</Text><Text style={[styles.emptyText, { color: mutedText }]}>Try another name or @username.</Text></View>}
+              ListEmptyComponent={<View style={styles.empty}><UserRoundedIcon size={38} color={mutedText} /><Text style={[styles.emptyTitle, { color: textColor }]}>{searching ? 'Searching…' : query.trim() ? 'No members found' : 'Find your friends'}</Text><Text style={[styles.emptyText, { color: mutedText }]}>Search their name or @username.</Text></View>}
             />
           </ScrollEdgeFade>
       ) : (
@@ -207,12 +218,12 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
               <TouchableOpacity onPress={pickPhoto}><Text style={{ color: mutedText }}>{picking ? 'Opening photos…' : photoUri ? 'Change photo' : 'Upload photo'}</Text></TouchableOpacity>
               {photoUri ? <TouchableOpacity onPress={() => setPhotoUri('')}><Text style={{ color: mutedText }}>Remove</Text></TouchableOpacity> : null}
             </View>
-            <Text style={[styles.fieldLabel, { color: mutedText }]}>FULL NAME</Text>
+            <Text style={[styles.fieldLabel, { color: mutedText }]}>NICKNAME</Text>
             <TextInput accessibilityLabel="Member full name" placeholder="e.g. Aditya Roy" placeholderTextColor={mutedText} value={name} onChangeText={setName} style={[styles.input, { backgroundColor: surface, color: textColor }, WEB_INPUT_RESET]} />
             <Text style={[styles.fieldLabel, { color: mutedText }]}>USERNAME</Text>
-            <TextInput accessibilityLabel="Member username" placeholder="@username" placeholderTextColor={mutedText} value={handle} onChangeText={setHandle} autoCapitalize="none" autoCorrect={false} style={[styles.input, { backgroundColor: surface, color: textColor }, WEB_INPUT_RESET]} />
+            <Text style={[styles.input, { backgroundColor: surface, color: mutedText }]}>{handle}</Text>
             <Text style={[styles.fieldLabel, { color: mutedText }]}>UPI ID (OPTIONAL)</Text>
-            <TextInput accessibilityLabel="Member UPI ID" placeholder="name@okaxis" placeholderTextColor={mutedText} value={upiId} onChangeText={setUpiId} autoCapitalize="none" autoCorrect={false} style={[styles.input, { backgroundColor: surface, color: textColor }, WEB_INPUT_RESET]} />
+            <Text style={[styles.input, { backgroundColor: surface, color: mutedText }]}>{upiId || 'No receiving UPI profile yet'}</Text>
             <Text style={[styles.fieldLabel, { color: mutedText }]}>PHONE (OPTIONAL)</Text>
             <TextInput accessibilityLabel="Member phone" placeholder="+91 98765 43210" placeholderTextColor={mutedText} value={phone} onChangeText={setPhone} keyboardType="phone-pad" returnKeyType="done" onSubmitEditing={saveDetails} style={[styles.input, { backgroundColor: surface, color: textColor }, WEB_INPUT_RESET]} />
           </ScrollView>
@@ -222,7 +233,7 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
       {isEditing || error ? (
         <View style={[styles.footer, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
           {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
-          {isEditing ? <GlassPill label="Save Changes" variant="accent" size="lg" onPress={saveDetails} /> : null}
+          {isEditing ? <GlassPill label={pendingMember ? 'Saving…' : 'Save Changes'} disabled={Boolean(pendingMember)} variant="accent" size="lg" onPress={() => { void saveDetails(); }} /> : null}
         </View>
       ) : null}
       <BottomBubble notice={notice} onDismiss={dismissNotice} />

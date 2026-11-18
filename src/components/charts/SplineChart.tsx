@@ -27,6 +27,8 @@ import {
   useDateMonthSwipeGesture,
 } from '../../hooks/useDateMonthSwipeGesture';
 import { useChartTransition } from '../../hooks/useChartTransition';
+import { useAnalytics } from '../../hooks/useAnalytics';
+import { FormError } from '../../hooks/useAsyncAction';
 
 
 type CashFlowGranularity = 'Date' | 'Month' | 'Year';
@@ -98,7 +100,8 @@ export const SplineChart: React.FC = () => {
   const [plotBoxWidth, setPlotBoxWidth] = useState<number>(() =>
     Math.max(240, Math.min(windowWidth - 64, 416))
   );
-  const { runChartTransition, opacity: swipeOpacity, translateX: swipeX, revision } = useChartTransition();
+  const analytics = useAnalytics('Date', selectedYear, selectedMonth, selectedDate, granularity === 'Date');
+  const { runChartTransition, opacity: swipeOpacity, translateX: swipeX, revision } = useChartTransition(!analytics.loading);
 
   const isDark = themeMode === 'dark';
   const width = plotBoxWidth;
@@ -163,146 +166,23 @@ export const SplineChart: React.FC = () => {
   );
 
   const pointsData = useMemo<TrajectoryPoint[]>(() => {
-    if (granularity === 'Date') {
-      if (selectedDate) {
-        const dayTx = transactions
-          .filter((tx) => tx.date === selectedDate)
-          .sort((a, b) => a.time.localeCompare(b.time));
-
-        if (dayTx.length === 0) return [];
-        if (dayTx.length === 1) {
-          const single = dayTx[0];
-          const inc = single.amount > 0 ? single.amount : 0;
-          const exp = single.amount < 0 ? Math.abs(single.amount) : 0;
-          return [
-            {
-              key: 'start',
-              label: 'Start',
-              fullLabel: formatDisplayDate(selectedDate, true),
-              income: 0,
-              expense: 0,
-            },
-            {
-              key: single.id,
-              label: single.time || 'Recorded',
-              fullLabel: `${single.title} • ${formatDisplayDate(selectedDate, true)}`,
-              income: inc,
-              expense: exp,
-            },
-          ];
-        }
-
-        let runIncome = 0;
-        let runExpense = 0;
-        return dayTx.map((tx) => {
-          if (tx.amount > 0) runIncome += tx.amount;
-          else runExpense += Math.abs(tx.amount);
-          return {
-            key: tx.id,
-            label: tx.time || tx.title.slice(0, 6),
-            fullLabel: `${tx.title} • ${tx.time}`,
-            income: runIncome,
-            expense: runExpense,
-          };
-        });
-      }
-
-      // Daily trajectory across unique recorded dates
-      const byDate = new Map<string, { income: number; expense: number }>();
-      transactions.forEach((tx) => {
-        const entry = byDate.get(tx.date) || { income: 0, expense: 0 };
-        if (tx.amount > 0) entry.income += tx.amount;
-        else entry.expense += Math.abs(tx.amount);
-        byDate.set(tx.date, entry);
-      });
-
-      return Array.from(byDate.entries())
-        .sort(([dA], [dB]) => dA.localeCompare(dB))
-        .slice(-7)
-        .map(([iso, vals]) => {
-          const [, m, d] = iso.split('-');
-          const mLabel = MONTH_SHORT[(Number(m) || 1) - 1] || m;
-          return {
-            key: iso,
-            label: `${Number(d)} ${mLabel}`,
-            fullLabel: formatDisplayDate(iso, true),
-            income: vals.income,
-            expense: vals.expense,
-          };
-        });
-    }
-
+    if (granularity === 'Date') return selectedDate ? analytics.data?.points ?? [] : (analytics.data?.points ?? []).slice(-7);
     if (granularity === 'Year') {
-      const yearsMap = new Map<number, { income: number; expense: number }>([
-        [2024, { income: 3420, expense: 2180 }],
-        [2025, { income: 4860, expense: 2940 }],
-        [2026, { income: 0, expense: 0 }],
-      ]);
-
-      chartData.forEach((pt) => {
-        const y = Number(pt.date.split('-')[0]) || 2026;
-        const curr = yearsMap.get(y) || { income: 0, expense: 0 };
-        curr.income += pt.income;
-        curr.expense += pt.expense;
-        yearsMap.set(y, curr);
-      });
-
-      transactions.forEach((tx) => {
-        const y = Number(tx.date.split('-')[0]) || 2026;
-        const curr = yearsMap.get(y) || { income: 0, expense: 0 };
-        if (tx.amount > 0) curr.income += tx.amount;
-        else curr.expense += Math.abs(tx.amount);
-        yearsMap.set(y, curr);
-      });
-
-      return Array.from(yearsMap.entries())
-        .sort(([a], [b]) => a - b)
-        .map(([yr, vals]) => ({
-          key: String(yr),
-          label: String(yr),
-          fullLabel: `Year ${yr}`,
-          income: vals.income,
-          expense: vals.expense,
-        }));
+      const years = new Map<string, { income: number; expense: number }>();
+      for (const point of chartData) {
+        const year = point.date.slice(0, 4), total = years.get(year) ?? { income: 0, expense: 0 };
+        total.income += point.income; total.expense += point.expense; years.set(year, total);
+      }
+      return [...years].sort(([a], [b]) => a.localeCompare(b)).map(([year, total]) => ({ key: year, label: year, fullLabel: 'Year ' + year, ...total }));
     }
-
-    // 6-month sliding trajectory ending at (selectedYear, selectedMonth)
-    const totalsByYm = new Map<string, { income: number; expense: number }>();
-    chartData.forEach((pt) => {
-      const [yStr, mStr] = pt.date.split('-');
-      const key = `${Number(yStr)}-${(Number(mStr) || 1) - 1}`;
-      totalsByYm.set(key, { income: pt.income, expense: pt.expense });
+    const months = new Map(chartData.map(point => [point.date.slice(0, 7), point]));
+    return Array.from({ length: 6 }, (_, i) => {
+      const date = new Date(selectedYear, selectedMonth - 5 + i, 1);
+      const key = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
+      const total = months.get(key);
+      return { key, label: MONTH_SHORT[date.getMonth()], fullLabel: MONTH_SHORT[date.getMonth()] + ' ' + date.getFullYear(), income: total?.income ?? 0, expense: total?.expense ?? 0 };
     });
-
-    transactions.forEach((tx) => {
-      const [yStr, mStr] = tx.date.split('-');
-      const y = Number(yStr);
-      const mIdx = (Number(mStr) || 1) - 1;
-      if (isNaN(y) || mIdx < 0 || mIdx > 11) return;
-      const key = `${y}-${mIdx}`;
-      const existing = totalsByYm.get(key) || { income: 0, expense: 0 };
-      if (tx.amount > 0) existing.income += tx.amount;
-      else existing.expense += Math.abs(tx.amount);
-      totalsByYm.set(key, existing);
-    });
-
-    const windowPoints: TrajectoryPoint[] = [];
-    for (let offset = 5; offset >= 0; offset--) {
-      const dt = new Date(selectedYear, selectedMonth - offset, 1);
-      const y = dt.getFullYear();
-      const mIdx = dt.getMonth();
-      const key = `${y}-${mIdx}`;
-      const vals = totalsByYm.get(key) || { income: 0, expense: 0 };
-      windowPoints.push({
-        key,
-        label: MONTH_SHORT[mIdx],
-        fullLabel: `${MONTH_SHORT[mIdx]} ${y}`,
-        income: vals.income,
-        expense: vals.expense,
-      });
-    }
-    return windowPoints;
-  }, [granularity, selectedDate, selectedMonth, selectedYear, chartData, transactions]);
+  }, [granularity, selectedDate, selectedMonth, selectedYear, chartData, analytics.data]);
 
   const defaultIndex = Math.max(0, pointsData.length - 1);
   const safeIndex =
@@ -415,6 +295,8 @@ export const SplineChart: React.FC = () => {
   return (
     <GlassCard borderRadius={24} intensity={20} style={styles.card}>
       <View {...gestureHandlers}>
+      <FormError message={analytics.error} />
+      {analytics.loading ? <Text style={{ color: '#A1A1AA', fontSize: 12, textAlign: 'center' }}>Loading cash flow…</Text> : null}
         {/* Header with Stats on left + Calendar Button & Date/Month/Year Selector on right */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>

@@ -1,10 +1,31 @@
 name: Build Android APK
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+  EXPO_PUBLIC_FIREBASE_API_KEY: ${{ vars.EXPO_PUBLIC_FIREBASE_API_KEY }}
+  EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+  EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
+  EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ vars.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+  EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+  EXPO_PUBLIC_FIREBASE_APP_ID: ${{ vars.EXPO_PUBLIC_FIREBASE_APP_ID }}
+  EXPO_PUBLIC_GOOGLE_PLACES_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY }}
+
+concurrency:
+  group: splittrack-android-release
+  cancel-in-progress: false
 
 jobs:
   build-apk:
+    if: github.actor != 'github-actions[bot]'
     name: Build Release Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -18,6 +39,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: Validate cloud app configuration
+        run: node scripts/validate-build-env.mjs
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -38,6 +62,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Stamp Android build version
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          const build = Number(process.env.GITHUB_RUN_NUMBER);
+          if (!Number.isSafeInteger(build) || build < 1) throw new Error('Invalid Android build number');
+          config.expo.android.versionCode = (config.expo.android.versionCode || 1) + build;
+          const [major, minor] = config.expo.version.split('.');
+          config.expo.version = `${major}.${minor}.${build}`;
+          fs.writeFileSync('app.json', JSON.stringify(config, null, 2) + '\n');
+          console.log(`Android version ${config.expo.version}, versionCode ${config.expo.android.versionCode}`);
+          NODE
+
       - name: Prebuild Android native project
         run: CI=1 npx expo prebuild --platform android --no-install
 
@@ -47,7 +85,7 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon -x lint -x test
 
-      - name: Generate CI signing keystore and sign APK
+      - name: Package and verify Android APK
         run: |
           RAW_APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
           if [ -z "$RAW_APK" ]; then
@@ -55,28 +93,19 @@ jobs:
             exit 1
           fi
           mkdir -p artifacts
+          ZIPALIGN=$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -name "zipalign" | sort -V | tail -n 1)
+          APKSIGNER=$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -name "apksigner" | sort -V | tail -n 1)
 
-          # Sign using a deterministic CI keystore if unsigned
+          # Reuse Expo's generated testing key so successive APKs can update in place.
           if echo "$RAW_APK" | grep -q "unsigned"; then
-            keytool -genkeypair -v \
-              -keystore ci-release.keystore \
-              -alias splittrack \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -storepass splittrackci \
-              -keypass splittrackci \
-              -dname "CN=Splittrack, OU=Mobile, O=Splittrack, L=Remote, S=Remote, C=US"
-
-            ZIPALIGN=$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -name "zipalign" | sort -V | tail -n 1)
-            APKSIGNER=$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -name "apksigner" | sort -V | tail -n 1)
+            test -f android/app/debug.keystore
 
             "$ZIPALIGN" -f -v -p 4 "$RAW_APK" artifacts/Splittrack-aligned.apk
             "$APKSIGNER" sign \
-              --ks ci-release.keystore \
-              --ks-key-alias splittrack \
-              --ks-pass pass:splittrackci \
-              --key-pass pass:splittrackci \
+              --ks android/app/debug.keystore \
+              --ks-key-alias androiddebugkey \
+              --ks-pass pass:android \
+              --key-pass pass:android \
               --out artifacts/Splittrack-release.apk \
               artifacts/Splittrack-aligned.apk
             rm -f artifacts/Splittrack-aligned.apk
@@ -84,7 +113,9 @@ jobs:
             cp "$RAW_APK" artifacts/Splittrack-release.apk
           fi
 
+          "$APKSIGNER" verify artifacts/Splittrack-release.apk
           ls -lh artifacts/Splittrack-release.apk
+          sha256sum artifacts/Splittrack-release.apk >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
@@ -92,3 +123,17 @@ jobs:
           name: Splittrack-android-apk
           path: artifacts/Splittrack-release.apk
           if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish APK as a GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: splittrack-android-${{ github.run_number }}
+          name: Splittrack Android (build ${{ github.run_number }})
+          body: |
+            Automated Android APK build from commit ${{ github.sha }}.
+          files: artifacts/Splittrack-release.apk
+          fail_on_unmatched_files: true
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,7 +2,8 @@ import { GlassModalSheet } from '../common/GlassModalSheet';
 import { SheetModal } from '../common/SheetModal';
 import { ModalBackdrop } from '../common/ModalBackdrop';
 import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { api, errorMessage } from '../../services/api';
 import {
   Image,
   Keyboard,
@@ -16,6 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { pickedImageUri } from '../../utils/pickedImage';
 import { CameraIcon } from '@solar-icons/react-native/bold/camera';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
@@ -33,7 +35,8 @@ import { CARTOON_AVATARS } from './CartoonAvatars';
 interface OnboardingUsernameScreenProps {
   initialDisplayName?: string;
   initialEmail?: string;
-  onComplete: (data: { displayName: string; username: string; avatar?: string }) => void;
+  onComplete: (data: { displayName: string; username: string; avatar?: string }) => Promise<void>;
+  onSignOut: () => void;
 }
 
 const RESERVED_HANDLES = new Set([
@@ -54,35 +57,46 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
   initialDisplayName = '',
   initialEmail = '',
   onComplete,
+  onSignOut,
 }) => {
   const insets = useSafeAreaInsets();
 
   const defaultBaseName =
     initialDisplayName.trim() ||
-    (initialEmail ? initialEmail.split('@')[0].replace(/[^a-zA-Z0-9 ]/g, ' ') : 'Aditya Roy');
+    (initialEmail ? initialEmail.split('@')[0].replace(/[^a-zA-Z0-9 ]/g, ' ') : '');
 
   const [activeStep, setActiveStep] = useState<0 | 1 | 2>(0);
   const [displayName, setDisplayName] = useState(defaultBaseName);
   const [handle, setHandle] = useState(() => {
     const slug = defaultBaseName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-    return slug || 'aditya_roy';
+    return slug;
   });
 
   const [selectedAvatarType, setSelectedAvatarType] = useState<'custom' | 'cartoon' | 'default'>('cartoon');
   const [selectedCartoonId, setSelectedCartoonId] = useState<string>('cyber_boy');
   const [customPhotoUri, setCustomPhotoUri] = useState<string>('');
   const [showAvatarPickerModal, setShowAvatarPickerModal] = useState(false);
+  const [availability, setAvailability] = useState<{ value: string; available: boolean }>({ value: '', available: false });
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
 
   const cleanHandle = cleanHandleText(handle);
+  const validHandle = cleanHandle.length >= 3 && !RESERVED_HANDLES.has(cleanHandle);
+  const isAvailable = validHandle && availability.value === cleanHandle && availability.available;
+  const checking = validHandle && availability.value !== cleanHandle;
 
-  const isAvailable = useMemo(() => {
-    if (cleanHandle.length < 3) return false;
-    if (RESERVED_HANDLES.has(cleanHandle)) return false;
-    return true;
-  }, [cleanHandle]);
+  useEffect(() => {
+    if (!validHandle) return;
+    let active = true;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      void api<{ available: boolean }>(`/api/users/username?value=${encodeURIComponent(cleanHandle)}`, { signal: controller.signal }).then(result => { if (active) setAvailability({ value: cleanHandle, available: result.available }); }).catch(failure => { if (active) { setAvailability({ value: cleanHandle, available: false }); setError(errorMessage(failure)); } });
+    }, 350);
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
+  }, [cleanHandle, validHandle]);
 
   const handleSuggestions = useMemo(() => {
-    const base = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'aditya';
+    const base = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'member';
     const cleanBase = base.slice(0, 14);
     return [
       `@${cleanBase}`,
@@ -105,17 +119,12 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.7,
-        base64: Platform.OS === 'web',
+        base64: true,
       });
 
       if (!result.canceled && result.assets?.[0]) {
         const asset = result.assets[0];
-        if (asset.base64) {
-          const mime = asset.mimeType || 'image/jpeg';
-          setCustomPhotoUri(`data:${mime};base64,${asset.base64}`);
-        } else if (asset.uri) {
-          setCustomPhotoUri(asset.uri);
-        }
+        setCustomPhotoUri(pickedImageUri(asset));
         setSelectedAvatarType('custom');
         setShowAvatarPickerModal(false);
         triggerNotification(NotificationType.Success);
@@ -133,19 +142,23 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
   };
 
   const handleNextStep = () => {
+    if (pending) return;
+    if (!displayName.trim()) { setError('Enter your display name.'); return; }
+    if (activeStep > 0 && !isAvailable) { setError(checking ? 'Checking the username…' : 'Choose an available username.'); return; }
+    setError('');
     triggerImpact(ImpactStyle.Light);
     Keyboard.dismiss();
     if (activeStep === 0) {
       // Sync handle suggestion from displayName if user hasn't explicitly customized it yet
       const slug = cleanHandleText(displayName);
-      if (slug && (!handle || handle === 'aditya_roy')) {
+      if (slug && !handle) {
         setHandle(slug);
       }
       setActiveStep(1);
     } else if (activeStep === 1) {
       setActiveStep(2);
     } else {
-      handleFinalFinish();
+      void handleFinalFinish();
     }
   };
 
@@ -157,10 +170,11 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
     }
   };
 
-  const handleFinalFinish = () => {
+  const handleFinalFinish = async () => {
+    if (pending) return;
     Keyboard.dismiss();
-    const finalName = displayName.trim() || 'Aditya Roy';
-    const finalHandle = cleanHandle.length >= 3 ? `@${cleanHandle}` : `@${cleanHandleText(finalName) || 'aditya'}`;
+    const finalName = displayName.trim();
+    const finalHandle = `@${cleanHandle}`;
     const avatarPayload =
       selectedAvatarType === 'custom' && customPhotoUri
         ? customPhotoUri
@@ -168,12 +182,10 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
         ? `cartoon:${selectedCartoonId}`
         : undefined;
 
-    triggerNotification(NotificationType.Success);
-    onComplete({
-      displayName: finalName,
-      username: finalHandle,
-      avatar: avatarPayload,
-    });
+    setPending(true); setError('');
+    try { await onComplete({ displayName: finalName, username: finalHandle, avatar: avatarPayload }); triggerNotification(NotificationType.Success); }
+    catch (failure) { setError(errorMessage(failure)); }
+    finally { setPending(false); }
   };
 
   const currentCartoon = CARTOON_AVATARS.find((a) => a.id === selectedCartoonId) || CARTOON_AVATARS[0];
@@ -204,7 +216,7 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
               <AltArrowLeftIcon size={20} color="#FFFFFF" />
             </AnimatedPressable>
           ) : (
-            <View style={{ width: 40 }} />
+            <AnimatedPressable onPress={onSignOut} accessibilityLabel="Return to sign in" style={styles.topBackBtn}><AltArrowLeftIcon size={20} color="#FFFFFF" /></AnimatedPressable>
           )}
           <View style={{ flex: 1 }} />
         </View>
@@ -337,6 +349,7 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
               </View>
 
               {/* Recommendations Chips */}
+              <Text accessibilityLiveRegion="polite" style={{ color: isAvailable ? '#10B981' : '#94A3B8', textAlign: 'center', marginBottom: 12 }}>{checking ? 'Checking availability…' : isAvailable ? 'Username available' : 'Choose an available username'}</Text>
               <View style={styles.sugPillRow}>
                 {handleSuggestions.map((sug) => (
                   <TouchableOpacity
@@ -452,7 +465,9 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
           </View>
 
           {/* Continue / Get Started Pill Button */}
+          {error ? <Text accessibilityLiveRegion="polite" style={{ color: '#F87171', textAlign: 'center', marginBottom: 12 }}>{error}</Text> : null}
           <AnimatedPressable
+            disabled={pending || (activeStep > 0 && !isAvailable)}
             scaleTo={0.96}
             onPress={handleNextStep}
             style={styles.continueButton}
@@ -460,7 +475,7 @@ export const OnboardingUsernameScreen: React.FC<OnboardingUsernameScreenProps> =
             accessibilityLabel="Continue to next step"
           >
             <Text style={styles.continueButtonText}>
-              {activeStep === 2 ? 'Get Started' : 'Continue'}
+              {pending ? 'Saving…' : activeStep === 2 ? 'Get Started' : 'Continue'}
             </Text>
             <AltArrowRightIcon size={18} color="#000000" />
           </AnimatedPressable>

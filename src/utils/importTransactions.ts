@@ -139,7 +139,7 @@ export const inferCategory = (title: string, rawNarration = ''): { category: str
 export const parseJsonTransactions = (
   jsonText: string,
   fileName = 'data.json',
-  targetAccountId = 'acc-1'
+  targetAccountId = ''
 ): ImportParseResult => {
   try {
     const parsed = JSON.parse(jsonText);
@@ -220,7 +220,7 @@ export const parseJsonTransactions = (
 export const parseSpreadsheetTransactions = (
   fileData: ArrayBuffer | Uint8Array | string,
   fileName = 'transactions.xlsx',
-  targetAccountId = 'acc-1'
+  targetAccountId = ''
 ): ImportParseResult => {
   try {
     let readType: 'array' | 'string' | 'binary' = 'array';
@@ -427,7 +427,7 @@ export const parseSpreadsheetTransactions = (
 export const parseAnyTextTransactions = (
   text: string,
   fileName = 'pasted_data.txt',
-  targetAccountId = 'acc-1'
+  targetAccountId = ''
 ): ImportParseResult => {
   const trimmed = text.trim();
   if (!trimmed) {

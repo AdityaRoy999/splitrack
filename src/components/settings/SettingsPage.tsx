@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -14,7 +14,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { pickedImageUri } from '../../utils/pickedImage';
+import { File as ExpoFile } from 'expo-file-system';
+import { useAuth } from '../../auth/AuthContext';
+import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
 import { CardSendIcon } from '@solar-icons/react-native/bold/card-send';
@@ -23,7 +26,6 @@ import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { PieChart2Icon } from '@solar-icons/react-native/bold/pie-chart-2';
 import { MoonIcon } from '@solar-icons/react-native/bold/moon';
 import { Sun2Icon } from '@solar-icons/react-native/bold/sun-2';
-import { RefreshCircleIcon } from '@solar-icons/react-native/bold/refresh-circle';
 import { Logout2Icon } from '@solar-icons/react-native/bold/logout-2';
 import { SparklesIcon } from '@solar-icons/react-native/bold/sparkles';
 import { BoxIcon } from '@solar-icons/react-native/bold/box';
@@ -66,8 +68,8 @@ interface SettingsPageProps {
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   onBack,
   onSignOut,
-  userName = 'Jfiqw Alex',
-  userHandle = '@alex',
+  userName = '',
+  userHandle = '',
   onNavigateTab,
   onOpenAddExpense,
   onOpenAddTrip,
@@ -87,7 +89,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   } = useLiquidGlass();
 
   const {
-    resetDemoData,
     eraseAllData,
     accounts,
     selectedAccountId,
@@ -95,28 +96,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     trips,
     friends,
   } = useSplitTrack();
+  const { profile, completeProfile } = useAuth();
+  const { run, pending, error } = useAsyncAction();
 
-  const [targetAccountId, setTargetAccountId] = useState<string>(
-    selectedAccountId || accounts[0]?.id || 'acc-1'
+  const [chosenAccountId, setTargetAccountId] = useState<string>(
+    selectedAccountId || accounts[0]?.id || ''
   );
+  const targetAccountId = accounts.some(account => account.id === chosenAccountId) ? chosenAccountId : selectedAccountId || accounts[0]?.id || '';
   const [importResult, setImportResult] = useState<ImportParseResult | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [showJsonPaste, setShowJsonPaste] = useState(false);
   const [jsonInputText, setJsonInputText] = useState('');
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const avatarUri = profile?.avatar ?? null;
   const [showEraseConfirm, setShowEraseConfirm] = useState(false);
   const [importStatusMsg, setImportStatusMsg] = useState<{
     type: 'success' | 'error';
     text: string;
   } | null>(null);
-
-  useEffect(() => {
-    AsyncStorage.getItem('splittrack_user_avatar_uri')
-      .then((saved) => {
-        if (saved) setAvatarUri(saved);
-      })
-      .catch(() => {});
-  }, []);
 
   const isDark = themeMode === 'dark';
   const currSym = currencies[currency]?.symbol || '₹';
@@ -131,35 +127,37 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
 
   const handlePickAvatar = async () => {
-    try {
+    void run(async () => {
       triggerImpact(ImpactStyle.Light);
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.85,
+        base64: true,
       });
 
       if (!res.canceled && res.assets && res.assets.length > 0) {
-        const pickedUri = res.assets[0].uri;
-        setAvatarUri(pickedUri);
-        await AsyncStorage.setItem('splittrack_user_avatar_uri', pickedUri);
+        const asset = res.assets[0];
+        const pickedUri = pickedImageUri(asset);
+        if (profile) await completeProfile({ displayName: profile.displayName, username: profile.username, avatar: pickedUri });
         triggerNotification(NotificationType.Success);
       }
-    } catch (err) {
-      console.warn('Failed to pick profile photo', err);
-    }
+    });
   };
 
   const performErase = () => {
-    eraseAllData();
+    void run(async () => {
+    await eraseAllData();
     setImportResult(null);
     setImportStatusMsg({
       type: 'success',
-      text: 'All transactions cleared. Fresh start ready with zeroed balances!',
+      text: 'Your fresh ledger is ready. Earlier history is hidden.',
     });
     triggerNotification(NotificationType.Success);
     triggerSmoothLayout(240);
+    setShowEraseConfirm(false);
+    });
   };
 
   const handleEraseAllData = () => {
@@ -207,29 +205,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           setImportResult(result);
         }
       } else {
-        const resp = await fetch(asset.uri);
+        const file = new ExpoFile(asset.uri);
         if (isJson) {
-          const text = await resp.text();
+          const text = await file.text();
           const result = parseJsonTransactions(text, fileName, targetAccountId);
           setImportResult(result);
         } else {
-          const blob = await resp.blob();
-          const reader = new FileReader();
-          reader.onload = () => {
-            const arrayBuffer = reader.result as ArrayBuffer;
-            const result = parseSpreadsheetTransactions(arrayBuffer, fileName, targetAccountId);
-            setImportResult(result);
-            setIsParsing(false);
-          };
-          reader.onerror = () => {
-            setIsParsing(false);
-            setImportStatusMsg({
-              type: 'error',
-              text: 'Failed to read spreadsheet file from device.',
-            });
-          };
-          reader.readAsArrayBuffer(blob);
-          return;
+          const result = parseSpreadsheetTransactions(await file.arrayBuffer(), fileName, targetAccountId);
+          setImportResult(result);
         }
       }
       setIsParsing(false);
@@ -259,7 +242,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     if (!importResult || !importResult.success || importResult.transactions.length === 0) {
       return;
     }
-    const count = importTransactions(importResult.transactions);
+    void run(async () => {
+    const count = await importTransactions(importResult.transactions.map(tx => ({ ...tx, upiAccountId: targetAccountId })));
     triggerNotification(NotificationType.Success);
     triggerSmoothLayout(260);
     setImportStatusMsg({
@@ -269,6 +253,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setImportResult(null);
     setJsonInputText('');
     setShowJsonPaste(false);
+    });
   };
 
   return (
@@ -553,9 +538,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <JellyRadio
               items={[
                 { value: 'INR', label: '₹ INR' },
-                { value: 'USD', label: '$ USD' },
-                { value: 'EUR', label: '€ EUR' },
-                { value: 'GBP', label: '£ GBP' },
               ]}
               value={currency}
               onChange={(val) => setCurrency(val as CurrencyCode)}
@@ -806,6 +788,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </SmoothCollapsible>
         </View>
 
+        <FormError message={error} />
         {/* Data Management Section */}
         <View style={styles.dataActionsSection}>
           {/* Erase All Data Button */}
@@ -819,22 +802,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               },
             ]}
             activeOpacity={0.7}
-            accessibilityLabel="Erase All Data"
+            accessibilityLabel="Start a fresh ledger"
+            disabled={pending}
           >
             <TrashBinTrashIcon size={16} color="#EF4444" />
-            <Text style={styles.eraseBtnTitle}>Erase All Data</Text>
-          </TouchableOpacity>
-
-          {/* Reset Data Button */}
-          <TouchableOpacity
-            onPress={resetDemoData}
-            style={[styles.resetBtn, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : '#E5E7EB' }]}
-            activeOpacity={0.7}
-          >
-            <RefreshCircleIcon size={16} color={mutedText} />
-            <Text style={[styles.resetBtnText, { color: mutedText }]}>
-              Restore Default Sample Expenses
-            </Text>
+            <Text style={styles.eraseBtnTitle}>Start a Fresh Ledger</Text>
           </TouchableOpacity>
 
           {onSignOut && (
@@ -884,11 +856,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               <TrashBinTrashIcon size={24} color="#EF4444" />
             </View>
             <Text style={[styles.confirmDialogTitle, { color: textColor }]}>
-              Erase All Data?
+              Start a Fresh Ledger?
             </Text>
             <Text style={[styles.confirmDialogMessage, { color: mutedText }]}>
-              This will clear all transactions and reset balances to zero for a clean start. Your cards, UPI profiles, and members will be preserved.
+              This clears current payment profiles and hides earlier history. Settle balances and archive trips first. Your registered profile stays.
             </Text>
+            <FormError message={error} />
 
             <View style={styles.confirmDialogButtons}>
               <TouchableOpacity
@@ -903,14 +876,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
               <TouchableOpacity
                 onPress={() => {
-                  setShowEraseConfirm(false);
                   performErase();
                 }}
                 style={[styles.confirmEraseBtn, { backgroundColor: '#EF4444' }]}
                 activeOpacity={0.8}
+                disabled={pending}
               >
                 <Text style={styles.confirmEraseText}>
-                  Erase All Data
+                  {pending ? 'Saving…' : 'Start Fresh'}
                 </Text>
               </TouchableOpacity>
             </View>

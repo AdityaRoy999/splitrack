@@ -25,6 +25,7 @@ import { UpiQrModal } from '../upi/UpiQrModal';
 import { BottomBubble, type BubbleNotice } from '../common/BottomBubble';
 import { buildUpiPaymentUri, formatUpiAmount, getReceivingUpiAccount, type UpiPaymentDetails } from '../../utils/upi';
 import type { UpiAccount } from '../../types';
+import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
 
 interface SettleModalProps {
   visible: boolean;
@@ -38,6 +39,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
   targetFriendId,
 }) => {
   const { accounts, friends, selectedAccountId, getSimplifiedDebts, settleWithFriend } = useSplitTrack();
+  const { runWithIntent, pending, error } = useAsyncAction();
   const { formatAmount, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const [notice, setNotice] = useState<BubbleNotice | null>(null);
   const [qrRequest, setQrRequest] = useState<({ account: UpiAccount } & UpiPaymentDetails) | null>(null);
@@ -69,12 +71,12 @@ export const SettleModal: React.FC<SettleModalProps> = ({
   };
 
   const handleSettle = (fromId: string, toId: string, amount: number) => {
-    triggerNotification(NotificationType.Success);
-
     const friendId = fromId === 'user' ? toId : fromId;
-    settleWithFriend(friendId, amount);
-
+    void runWithIntent({ friendId, amount, accountId: selectedAccountId }, async (draft, intentId) => {
+    await settleWithFriend(draft.friendId, draft.amount, draft.accountId, intentId);
+    triggerNotification(NotificationType.Success);
     setNotice((previous) => ({ id: (previous?.id ?? 0) + 1, message: `Settled ${formatAmount(amount)} successfully!` }));
+    });
   };
 
   const handleSendReminder = async (debtorName: string, amount: number) => {
@@ -179,7 +181,8 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                 <View style={styles.actionsGroup}>
                   {isUserDebtor ? (
                     <GlassPill
-                      label="Mark Settled"
+                      label={pending ? 'Saving…' : 'Mark Settled'}
+                      disabled={pending}
                       icon={<CheckCircleIcon size={14} color={isDark ? '#000000' : '#FFFFFF'} />}
                       variant="accent"
                       size="sm"
@@ -195,7 +198,8 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                         onPress={() => handleSendReminder(item.fromName, item.amount)}
                       />
                       <GlassPill
-                        label="Mark Settled"
+                        label={pending ? 'Saving…' : 'Mark Settled'}
+                        disabled={pending}
                         icon={<CheckCircleIcon size={14} color={isDark ? '#000000' : '#FFFFFF'} />}
                         variant="accent"
                         size="sm"
@@ -204,7 +208,8 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                     </View>
                   ) : (
                     <GlassPill
-                      label="Mark Settled"
+                      label={pending ? 'Saving…' : 'Mark Settled'}
+                      disabled={pending}
                       icon={<CheckCircleIcon size={14} color={textColor} />}
                       variant="dark"
                       size="sm"
@@ -333,6 +338,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
           </ScrollEdgeFade>
         </GlassModalSheet>
 
+        <FormError message={error} />
         <BottomBubble notice={notice} onDismiss={dismissNotice} />
       </View>
 

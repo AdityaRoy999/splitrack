@@ -6,6 +6,7 @@ import { QrCodeIcon } from '@solar-icons/react-native/bold/qr-code';
 import { Pen2Icon } from '@solar-icons/react-native/bold/pen-2';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { useSplitTrack } from '../../store/SplitTrackStore';
+import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { UpiAccount } from '../../types';
 import {
@@ -387,6 +388,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
 
 export const UpiProfilesSection: React.FC = () => {
   const { accounts, selectedAccountId, setSelectedAccountId, transactions, deleteUpiAccount } = useSplitTrack();
+  const { run, pending, error } = useAsyncAction();
   const { formatAmount, themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
@@ -444,8 +446,7 @@ export const UpiProfilesSection: React.FC = () => {
   };
 
   const handleMakeDefault = (acc: UpiAccount) => {
-    triggerNotification(NotificationType.Success);
-    setSelectedAccountId(acc.id);
+    void run(async () => { await setSelectedAccountId(acc.id); triggerNotification(NotificationType.Success); });
   };
 
   const handleCardPress = (acc: UpiAccount) => {
@@ -462,6 +463,7 @@ export const UpiProfilesSection: React.FC = () => {
 
   return (
     <View style={styles.sectionContainer}>
+      <FormError message={error} />
       {/* Section Header */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: textColor }]}>UPI & Card Profiles</Text>
@@ -576,17 +578,16 @@ export const UpiProfilesSection: React.FC = () => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => {
-                    const deleted = deleteUpiAccount(accountToDelete.id);
-                    if (deleted) {
-                      triggerNotification(NotificationType.Success);
-                    } else {
-                      triggerNotification(NotificationType.Warning);
-                    }
+                    void run(async () => {
+                    await deleteUpiAccount(accountToDelete.id);
+                    triggerNotification(NotificationType.Success);
                     setAccountToDelete(null);
+                    });
                   }}
+                  disabled={pending}
                   style={styles.deleteConfirmBtn}
                 >
-                  <Text style={styles.deleteConfirmText}>Remove</Text>
+                  <Text style={styles.deleteConfirmText}>{pending ? 'Removing…' : 'Remove'}</Text>
                 </TouchableOpacity>
               </View>
             </View>

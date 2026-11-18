@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
@@ -8,6 +8,10 @@ import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { UsersGroupRoundedIcon } from '@solar-icons/react-native/bold/users-group-rounded';
 import { Trip, Transaction } from '../../types';
 import { useSplitTrack } from '../../store/SplitTrackStore';
+import { useAuth } from '../../auth/AuthContext';
+import { errorMessage } from '../../services/api';
+import { FormError } from '../../hooks/useAsyncAction';
+import type { MemberProfile } from '../../utils/memberProfiles';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { renderSolarIcon } from '../../constants/solarIconsCatalog';
 import { AnimatedPressable } from '../common/MotionPrimitives';
@@ -32,7 +36,22 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
   onOpenSettle,
   onSelectTransaction,
 }) => {
-  const { friends, transactions, categories, removeMemberFromTrip } = useSplitTrack();
+  const { friends, transactions, categories, removeMemberFromTrip, getTripTransactions, revision } = useSplitTrack();
+  const { user } = useAuth();
+  const canManageMembers = trip.ownerId === user?.uid;
+  const [memberError, setMemberError] = useState('');
+  const [history, setHistory] = useState<Transaction[] | null>(null);
+  const [historyProfiles, setHistoryProfiles] = useState<(MemberProfile & { id: string })[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [loadedHistoryKey, setLoadedHistoryKey] = useState('');
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const historyKey = `${trip.id}:${revision}`;
+  const historyPending = loadingOlder || loadedHistoryKey !== historyKey;
+  useEffect(() => {
+    let active = true;
+    void getTripTransactions(trip.id).then(page => { if (active) { setHistory(page.items); setHistoryCursor(page.cursor); setHistoryProfiles(page.profiles); } }).catch(failure => { if (active) setMemberError(errorMessage(failure)); }).finally(() => { if (active) setLoadedHistoryKey(historyKey); });
+    return () => { active = false; };
+  }, [trip.id, revision, getTripTransactions, historyKey]);
   const { formatAmount, themeMode } = useLiquidGlass();
   const [showAddMember, setShowAddMember] = useState(false);
   const [removingMembers, setRemovingMembers] = useState(false);
@@ -44,8 +63,8 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
 
   const tripFriends = friends.filter((f) => trip.members.includes(f.id));
-  const removalMode = removingMembers && tripFriends.length > 0;
-  const tripTransactions = transactions.filter((tx) => tx.tripId === trip.id);
+  const removalMode = canManageMembers && removingMembers && tripFriends.length > 0;
+  const tripTransactions = history ?? transactions.filter((tx) => tx.tripId === trip.id);
 
   const getCategoryMeta = (catName: string, fallbackIcon: string) => {
     const match = categories.find((c) => c.name.toLowerCase() === catName.toLowerCase());
@@ -127,7 +146,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
           <Text style={[styles.sectionHeading, { color: textColor }]}>
             Members ({trip.members.length})
           </Text>
-          <View style={styles.memberControls}>
+          {canManageMembers ? <View style={styles.memberControls}>
             <AnimatedPressable
               scaleTo={0.9}
               disabled={tripFriends.length === 0}
@@ -147,7 +166,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
             >
               <AddCircleIcon size={18} color={textColor} />
             </AnimatedPressable>
-          </View>
+          </View> : null}
         </View>
         <GlassCard borderRadius={22} style={styles.membersCard}>
           <View style={styles.membersWrap}>
@@ -157,13 +176,17 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
             </View>
 
             {tripFriends.map((member) => (
-              <TripMemberPill key={member.id} member={member} removalMode={removalMode} onRemove={() => {
-                const removed = removeMemberFromTrip(trip.id, member.id);
+              <TripMemberPill key={member.id} member={member} removalMode={removalMode} onRemove={async (animate) => {
+                try {
+                const removed = await removeMemberFromTrip(trip.id, member.id, animate);
                 if (removed && tripFriends.length === 1) setRemovingMembers(false);
+                setMemberError('');
                 return removed;
+                } catch (failure) { setMemberError(errorMessage(failure)); return false; }
               }} />
             ))}
           </View>
+          <FormError message={memberError} />
         </GlassCard>
       </View>
 
@@ -195,7 +218,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
               const payerFriend =
                 tx.paidBy === 'user'
                   ? null
-                  : friends.find((f) => f.id === tx.paidBy);
+                  : friends.find((f) => f.id === tx.paidBy) ?? historyProfiles.find(profile => profile.id === tx.paidBy);
               const payerName =
                 tx.paidBy === 'user' ? 'You' : payerFriend?.name || 'Friend';
               const payerFirstName =
@@ -263,10 +286,15 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
       </View>
 
       <AddMemberModal
+        key={trip.id}
         visible={showAddMember}
         onClose={() => setShowAddMember(false)}
         tripId={trip.id}
       />
+      {historyCursor ? <AnimatedPressable disabled={historyPending} onPress={() => {
+        setLoadingOlder(true);
+        void getTripTransactions(trip.id, historyCursor).then(page => { setHistory(previous => [...(previous ?? []), ...page.items]); setHistoryCursor(page.cursor); setHistoryProfiles(previous => [...new Map([...previous, ...page.profiles].map(profile => [profile.id, profile])).values()]); }).catch(failure => setMemberError(errorMessage(failure))).finally(() => setLoadingOlder(false));
+      }}><Text style={{ color: mutedText, padding: 16, textAlign: 'center' }}>{historyPending ? 'Loading…' : 'Load older trip expenses'}</Text></AnimatedPressable> : null}
     </View>
   );
 };

@@ -1,8 +1,10 @@
 import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthProvider, useAuth } from './src/auth/AuthContext';
+import { errorMessage } from './src/services/api';
 import { BlurTargetView } from 'expo-blur';
 import {
   ScrollView,
+  ActivityIndicator,
   StatusBar,
   StyleSheet,
   Text,
@@ -64,6 +66,7 @@ import { OnboardingUsernameScreen } from './src/components/auth/OnboardingUserna
 import { AnimatedPressable } from './src/components/common/MotionPrimitives';
 import { TabScene } from './src/components/common/TabScene';
 import { JellyRadio } from './src/components/common/JellyRadio';
+import { CloudStatus } from './src/components/common/CloudStatus';
 import { ExpenseCategory, Friend, Transaction } from './src/types';
 
 type ExpenseFilter = 'All' | 'Expenses' | 'Splits' | 'Income';
@@ -81,8 +84,8 @@ function getLedgerIcon(
 }
 
 function MainAppContent({
-  userDisplayName = 'Jfiqw Alex',
-  userHandle = '@alex',
+  userDisplayName = '',
+  userHandle = '',
   onSignOut,
   hideHeaderLogo = false,
   onHeaderLogoLayout,
@@ -108,6 +111,8 @@ function MainAppContent({
     transactions,
     categories,
     getSimplifiedDebts,
+    hasMoreTransactions,
+    loadMoreTransactions,
   } = useSplitTrack();
 
   const isDark = themeMode === 'dark';
@@ -631,6 +636,7 @@ function MainAppContent({
               )}
             </View>
 
+            {hasMoreTransactions ? <GlassPill label="Load older transactions" onPress={() => { void loadMoreTransactions().catch(() => {}); }} /> : null}
             {/* UPI Profiles — each profile rendered as a clean borderless card */}
             <UpiProfilesSection />
           </View>
@@ -639,7 +645,7 @@ function MainAppContent({
     );
   }, [activeBg, activeText, categories, categoryFilterItems, chipBg, dividerColor,
     dynamicScrollContent, expenseFilter, formatAmount, isDark, mutedText, openQuickExpense, rootBg,
-    selectedCategoryFilter, selectedExpenseDate, textColor, totalExpenses, transactions]);
+    selectedCategoryFilter, selectedExpenseDate, textColor, totalExpenses, transactions, hasMoreTransactions, loadMoreTransactions]);
 
   const renderTripsTab = useCallback(() => {
     const activeTrip = selectedTripId ? trips.find((t) => t.id === selectedTripId) : undefined;
@@ -986,6 +992,7 @@ function MainAppContent({
   return (
     <View style={[styles.container, { backgroundColor: rootBg, paddingTop: 0 }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <CloudStatus />
 
       <View style={styles.mainViewport}>
         <BlurTargetView ref={screenBlurTarget} style={styles.tabPagesContainer}>
@@ -1128,13 +1135,27 @@ function MainAppContent({
   );
 }
 
-const AUTH_STORAGE_KEY = '@splittrack_auth_session_v1';
-
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <SplitTrackProvider>
+            <LiquidGlassProvider><AppContent /></LiquidGlassProvider>
+          </SplitTrackProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+    </SafeAreaProvider>
+  );
+}
+
+function AppContent() {
+  const { user, profile, loading, profileError, authenticate, completeProfile, refreshProfile, logout } = useAuth();
+  const isAuthenticated = Boolean(user && profile?.username);
+  const userDisplayName = profile?.displayName ?? user?.displayName ?? '';
+  const userHandle = profile?.handle ?? '';
+  const [sessionError, setSessionError] = useState('');
   const [showPreloader, setShowPreloader] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userDisplayName, setUserDisplayName] = useState('Jfiqw Alex');
-  const [userHandle, setUserHandle] = useState('@alex');
   const [hideHeaderLogo, setHideHeaderLogo] = useState(true);
   const [headerLogoRect, setHeaderLogoRect] = useState<HeaderLogoRect | null>(null);
   const headerLogoNodeRef = useRef<ViewRefNode | null>(null);
@@ -1144,103 +1165,27 @@ export default function App() {
   const [hideOnboardingLogo, setHideOnboardingLogo] = useState(true);
   const [onboardingLogoRect, setOnboardingLogoRect] = useState<AuthLogoRect | null>(null);
   const onboardingLogoNodeRef = useRef<ViewRefNode | null>(null);
-  const [onboardingStage, setOnboardingStage] = useState<'auth' | 'username'>('auth');
-  const [pendingAuthData, setPendingAuthData] = useState<{
-    provider: 'email' | 'google' | 'guest';
-    mode: 'signin' | 'signup';
-    name?: string;
-    email?: string;
-  } | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      try {
-        const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
-        if (stored && isMounted) {
-          const parsed = JSON.parse(stored);
-          if (parsed && parsed.isAuthenticated) {
-            setIsAuthenticated(true);
-            if (parsed.userDisplayName) {
-              setUserDisplayName(parsed.userDisplayName);
-            }
-            if (parsed.username) {
-              setUserHandle(parsed.username.startsWith('@') ? parsed.username : `@${parsed.username}`);
-            }
-          }
-        }
-      } catch {
-        // Fallback to default state
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const handleAuthenticate = async (payload: {
-    provider: 'email' | 'google' | 'guest';
-    mode: 'signin' | 'signup';
-    name?: string;
-    email?: string;
-  }) => {
-    setPendingAuthData(payload);
-    setOnboardingStage('username');
-  };
-
-  const handleUsernameSetupComplete = async (data: {
-    displayName: string;
-    username: string;
-    avatar?: string;
-  }) => {
-    setUserDisplayName(data.displayName);
-    setUserHandle(data.username.startsWith('@') ? data.username : `@${data.username}`);
-    setIsAuthenticated(true);
-    setOnboardingStage('auth');
-    setHideHeaderLogo(false);
-    try {
-      if (data.avatar) {
-        await AsyncStorage.setItem('splittrack_user_avatar_uri', data.avatar).catch(() => {});
-      }
-      await AsyncStorage.setItem(
-        AUTH_STORAGE_KEY,
-        JSON.stringify({
-          isAuthenticated: true,
-          userDisplayName: data.displayName,
-          username: data.username,
-          avatar: data.avatar,
-          provider: pendingAuthData?.provider || 'email',
-          email: pendingAuthData?.email,
-        })
-      );
-    } catch {
-      // storage error
-    }
-  };
-
   const handleSignOut = async () => {
-    setIsAuthenticated(false);
-    setOnboardingStage('auth');
-    setPendingAuthData(null);
-    setHideOnboardingLogo(false);
-    try {
-      await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
-    } catch {
-      // storage error
-    }
+    try { await logout(); setSessionError(''); setHideOnboardingLogo(false); }
+    catch (error) { setSessionError(errorMessage(error)); }
   };
 
   const activeTargetRect = isAuthenticated ? headerLogoRect : onboardingLogoRect;
   const activeTargetNodeRef = isAuthenticated ? headerLogoNodeRef : onboardingLogoNodeRef;
 
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <LiquidGlassProvider>
-          <SplitTrackProvider>
             <View style={styles.appRoot}>
-              {isAuthenticated ? (
+              {loading ? (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#09090B' }}><ActivityIndicator color="#FFFFFF" /><Text style={{ color: '#A1A1AA', marginTop: 16 }}>Loading your account…</Text></View>
+              ) : user && profileError ? (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 18, backgroundColor: '#09090B' }}>
+                  <Text style={{ color: '#F4F4F5', textAlign: 'center' }}>{profileError}</Text>
+                  <GlassPill label="Retry connection" onPress={() => { void refreshProfile().catch(error => setSessionError(errorMessage(error))); }} />
+                  <GlassPill label="Sign out" onPress={handleSignOut} />
+                </View>
+              ) : isAuthenticated ? (
                 <MainAppContent
+                  key={user?.uid}
                   userDisplayName={userDisplayName}
                   userHandle={userHandle}
                   onSignOut={handleSignOut}
@@ -1248,11 +1193,12 @@ export default function App() {
                   onHeaderLogoLayout={showPreloader ? setHeaderLogoRect : undefined}
                   onHeaderLogoNode={handleHeaderLogoNode}
                 />
-              ) : onboardingStage === 'username' ? (
+              ) : user ? (
                 <OnboardingUsernameScreen
-                  initialDisplayName={pendingAuthData?.name}
-                  initialEmail={pendingAuthData?.email}
-                  onComplete={handleUsernameSetupComplete}
+                  initialDisplayName={user.displayName || profile?.displayName}
+                  initialEmail={user.email ?? ''}
+                  onComplete={completeProfile}
+                  onSignOut={handleSignOut}
                 />
               ) : (
                 <OnboardingAuthScreen
@@ -1261,9 +1207,10 @@ export default function App() {
                   onLogoNode={(node) => {
                     onboardingLogoNodeRef.current = node;
                   }}
-                  onAuthenticate={handleAuthenticate}
+                  onAuthenticate={authenticate}
                 />
               )}
+              {sessionError ? <Text accessibilityLiveRegion="polite" style={{ color: '#F87171', padding: 12 }}>{sessionError}</Text> : null}
               {showPreloader ? (
                 <PreloaderSplash
                   targetLogoRect={activeTargetRect}
@@ -1283,10 +1230,6 @@ export default function App() {
                 />
               ) : null}
             </View>
-          </SplitTrackProvider>
-        </LiquidGlassProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
   );
 }
 

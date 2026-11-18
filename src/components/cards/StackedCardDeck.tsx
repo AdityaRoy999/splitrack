@@ -14,6 +14,7 @@ import { CopyIcon } from '@solar-icons/react-native/bold/copy';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { QrCodeIcon } from '@solar-icons/react-native/bold/qr-code';
 import { useSplitTrack } from '../../store/SplitTrackStore';
+import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { UpiAccount } from '../../types';
 import { AnimatedPressable } from '../common/MotionPrimitives';
@@ -26,6 +27,7 @@ export const StackedCardDeck: React.FC<{
   onOpenQr?: (acc: UpiAccount) => void;
 }> = ({ onSelectAccount, onOpenQr }) => {
   const { accounts, selectedAccountId, setSelectedAccountId } = useSplitTrack();
+  const { run, error } = useAsyncAction();
   const { formatAmount, themeMode } = useLiquidGlass();
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [copiedUpi, setCopiedUpi] = useState<string | null>(null);
@@ -60,8 +62,7 @@ export const StackedCardDeck: React.FC<{
 
   const handleSelect = (account: UpiAccount) => {
     triggerImpact(ImpactStyle.Light);
-    setSelectedAccountId(account.id);
-    if (onSelectAccount) onSelectAccount(account);
+    void run(async () => { await setSelectedAccountId(account.id); onSelectAccount?.(account); });
   };
 
   const copyUpi = (upi: string) => {
@@ -83,6 +84,7 @@ export const StackedCardDeck: React.FC<{
 
   return (
     <View style={styles.container}>
+      <FormError message={error} />
       <View style={styles.headerRow}>
         <View>
           <Text style={[styles.sectionTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>

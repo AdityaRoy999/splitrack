@@ -1,10 +1,10 @@
 import { ThemeMode } from '../types';
 
 export const currencies = {
-  INR: { code: 'INR', symbol: '₹', name: 'Indian Rupee', exchangeRate: 1 },
-  USD: { code: 'USD', symbol: '$', name: 'US Dollar', exchangeRate: 0.012 },
-  EUR: { code: 'EUR', symbol: '€', name: 'Euro', exchangeRate: 0.011 },
-  GBP: { code: 'GBP', symbol: '£', name: 'British Pound', exchangeRate: 0.0095 },
+  INR: { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  USD: { code: 'USD', symbol: '$', name: 'US Dollar' },
+  EUR: { code: 'EUR', symbol: '€', name: 'Euro' },
+  GBP: { code: 'GBP', symbol: '£', name: 'British Pound' },
 } as const;
 
 export interface ThemePalette {

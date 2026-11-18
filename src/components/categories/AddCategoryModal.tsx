@@ -31,6 +31,7 @@ import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
 import { JellyRadio } from '../common/JellyRadio';
 import { GlassPill } from '../glass/GlassPill';
+import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
 
 interface AddCategoryModalProps {
   visible: boolean;
@@ -61,6 +62,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
   onDeleted,
 }) => {
   const { addCategory, updateCategory, deleteCategory } = useSplitTrack();
+  const { run, runWithIntent, pending, error } = useAsyncAction();
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
@@ -111,26 +113,32 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
       return;
     }
     if (categoryToEdit) {
-      const updated = updateCategory(categoryToEdit.id, cleaned, selectedIconKey, selectedColor);
+      void run(async () => {
+      const updated = await updateCategory(categoryToEdit.id, cleaned, selectedIconKey, selectedColor);
       if (updated) {
         onUpdated?.(updated);
         onClose();
       }
+      });
       return;
     }
-    const created = addCategory(cleaned, selectedIconKey, selectedColor);
+    void runWithIntent({ name: cleaned, icon: selectedIconKey, color: selectedColor }, async (draft, intentId) => {
+    const created = await addCategory(draft.name, draft.icon, draft.color, intentId);
     setName('');
     setSearchQuery('');
     setSelectedGroup('All');
     onCreated?.(created);
     onClose();
+    });
   };
 
   const handleDelete = () => {
     if (!categoryToEdit) return;
-    deleteCategory(categoryToEdit.id);
+    void run(async () => {
+    await deleteCategory(categoryToEdit.id);
     onDeleted?.(categoryToEdit.id);
     onClose();
+    });
   };
 
   return (
@@ -301,8 +309,10 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
             </ScrollView>
           </ScrollEdgeFade>
 
+          <FormError message={error} />
           <GlassPill
-            label={categoryToEdit ? 'Save Changes' : 'Create Category'}
+            label={pending ? 'Saving…' : categoryToEdit ? 'Save Changes' : 'Create Category'}
+            disabled={pending}
             onPress={handleSave}
             variant="accent"
             size="lg"

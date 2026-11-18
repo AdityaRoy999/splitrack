@@ -7,7 +7,7 @@ import { AnimatedPressable } from '../common/MotionPrimitives';
 interface TripMemberPillProps {
   member: Friend;
   removalMode: boolean;
-  onRemove: () => boolean;
+  onRemove: (animate: () => Promise<void>) => Promise<boolean>;
 }
 
 export function TripMemberPill({ member, removalMode, onRemove }: TripMemberPillProps) {
@@ -19,25 +19,26 @@ export function TripMemberPill({ member, removalMode, onRemove }: TripMemberPill
 
   useEffect(() => () => { progress.stopAnimation(); }, [progress]);
 
-  const remove = () => {
+  const remove = async () => {
     if (removing.current) return;
     removing.current = true;
-    Animated.timing(progress, {
+    const animate = () => new Promise<void>(resolve => {
+      Animated.timing(progress, {
       toValue: 0, duration: 180, easing: Easing.inOut(Easing.cubic),
       useNativeDriver: Platform.OS !== 'web', isInteraction: false,
     }).start(({ finished }) => {
-      if (!finished) return;
-      if (Platform.OS !== 'web') {
+      if (finished && Platform.OS !== 'web') {
         LayoutAnimation.configureNext({ duration: 220, update: { type: LayoutAnimation.Types.easeInEaseOut } });
       }
-      if (!onRemove()) {
-        removing.current = false;
-        Animated.spring(progress, {
-          toValue: 1, friction: 10, tension: 150, useNativeDriver: Platform.OS !== 'web',
-          isInteraction: false,
-        }).start();
-      }
+      resolve();
     });
+    });
+    let removed = false;
+    try { removed = await onRemove(animate); } catch { /* The page shows the failure. */ }
+    if (!removed) {
+      removing.current = false;
+      Animated.spring(progress, { toValue: 1, friction: 10, tension: 150, useNativeDriver: Platform.OS !== 'web', isInteraction: false }).start();
+    }
   };
 
   return (

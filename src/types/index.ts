@@ -4,7 +4,6 @@ export interface CurrencyConfig {
   code: CurrencyCode;
   symbol: string;
   name: string;
-  exchangeRate: number; // relative to USD
 }
 
 export type ThemeMode = 'dark' | 'light';
@@ -45,6 +44,7 @@ export interface UpiAccount {
   balance: number;
   totalSpent: number;
   isDefault?: boolean;
+  isReceivingDefault?: boolean;
 }
 
 export interface Friend {
@@ -55,6 +55,7 @@ export interface Friend {
   upiId?: string;
   phone?: string;
   netBalance: number; // Positive = friend owes you, Negative = you owe friend
+  avatarRef?: string;
 }
 
 export type SplitType = 'equal' | 'exact' | 'percentage' | 'shares';
@@ -79,6 +80,8 @@ export interface Trip {
   totalSpend: number;
   members: string[]; // friend IDs including 'user'
   currency: CurrencyCode;
+  ownerId?: string;
+  coverImageRef?: string;
 }
 
 export interface ExpenseCategory {
@@ -118,6 +121,9 @@ export interface Transaction {
   settled: boolean;
   location?: string;
   notes?: string;
+  creatorId?: string;
+  toAccountId?: string;
+  remainingAmount?: number;
 }
 
 export interface DebtSimplification {

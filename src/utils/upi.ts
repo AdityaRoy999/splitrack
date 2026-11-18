@@ -25,6 +25,7 @@ export const getReceivingUpiAccount = (
     (!account.kind || account.kind === 'upi') && isValidUpiId(account.upiId);
 
   return accounts.find((account) => account.id === selectedAccountId && canReceive(account))
+    ?? accounts.find((account) => account.isReceivingDefault && canReceive(account))
     ?? accounts.find((account) => account.isDefault && canReceive(account))
     ?? accounts.find(canReceive)
     ?? null;

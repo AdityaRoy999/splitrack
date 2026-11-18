@@ -1,25 +1,23 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NotificationType, triggerNotification } from '../utils/haptics';
-import { normalizeUsername, resolveMember, type MemberDraft } from '../utils/memberProfiles';
+import { AppState } from 'react-native';
+import { useAuth } from '../auth/AuthContext';
+import { api, errorMessage, requestId } from '../services/api';
+import { uploadImage } from '../services/media';
+import type { UpiAccount, Friend, Trip, Transaction, CategoryMetric, ChartDataPoint, ExpenseCategory, DebtSimplification, ThemeMode } from '../types';
+import type { MemberDraft, MemberProfile } from '../utils/memberProfiles';
 import { getReceivingUpiAccount } from '../utils/upi';
-import {
-  UpiAccount,
-  Friend,
-  Trip,
-  Transaction,
-  CategoryMetric,
-  DebtSimplification,
-  ChartDataPoint,
-  ExpenseCategory,
-} from '../types';
 
-const STORE_STORAGE_KEY = '@splittrack_app_data_v4';
-const DEFAULT_ACCOUNT_STORAGE_KEY = '@splittrack_default_account_v1';
-let memberIdSequence = 0;
-const nextMemberId = () => `friend-${Date.now()}-${++memberIdSequence}`;
-
-const initialCategories: ExpenseCategory[] = [
+export interface CloudSettings { selectedAccountId: string; receivingAccountId?: string; themeMode: ThemeMode; currency: 'INR'; hideAmounts: boolean; isLiquidGlassEnabled: boolean }
+interface Snapshot {
+  schemaVersion: 2; userId: string; revision: number;
+  accounts: UpiAccount[]; friends: Friend[]; trips: Trip[]; transactions: Transaction[]; categories: ExpenseCategory[];
+  transactionCursor: string | null; settings: CloudSettings;
+  profile: { id: string; name: string; handle: string; avatar: string; avatarRef: string } | null;
+  summary: { totalIncome: number; totalExpenses: number; categories: Record<string, number>; months: Record<string, { income: number; expense: number }> };
+}
+type MutationResult = { result: { id?: string; importedCount?: number }; state: Snapshot };
+const categories: ExpenseCategory[] = [
   { id: 'cat-food', name: 'Food & Drinks', iconKey: 'cup-hot', color: '#F97316' },
   { id: 'cat-groceries', name: 'Groceries', iconKey: 'cart-large-minimalistic', color: '#10B981' },
   { id: 'cat-travel', name: 'Travel', iconKey: 'bus', color: '#3B82F6' },
@@ -30,1011 +28,200 @@ const initialCategories: ExpenseCategory[] = [
   { id: 'cat-fun', name: 'Fun', iconKey: 'confetti', color: '#F59E0B' },
   { id: 'cat-other', name: 'Other', iconKey: 'tag', color: '#71717A' },
 ];
-
-// Initial UPI Profiles for split tracking & settlements
-const initialAccounts: UpiAccount[] = [
-  {
-    id: 'acc-slice',
-    title: 'Personal • Slice UPI',
-    provider: 'slice',
-    upiId: 'alex@slc',
-    cardHolder: 'Alex',
-    cardNumber: '',
-    expiry: '',
-    cardType: 'RuPay',
-    accentColor: '#6366F1',
-    secondaryColor: '#2A2E3D',
-    balance: 0,
-    totalSpent: 4230.15,
-    isDefault: true,
-  },
-  {
-    id: 'acc-gpay',
-    title: 'Main • GPay',
-    provider: 'gpay',
-    upiId: 'alex@okaxis',
-    cardHolder: 'Alex',
-    cardNumber: '',
-    expiry: '',
-    cardType: 'RuPay',
-    accentColor: '#3B82F6',
-    secondaryColor: '#0E2248',
-    balance: 0,
-    totalSpent: 12450.0,
-  },
-  {
-    id: 'acc-phonepe',
-    title: 'Splits • PhonePe',
-    kind: 'upi',
-    provider: 'phonepe',
-    upiId: 'alex@ybl',
-    cardHolder: 'Alex',
-    cardNumber: '',
-    expiry: '',
-    cardType: 'RuPay',
-    accentColor: '#8B5CF6',
-    secondaryColor: '#1E50BA',
-    balance: 0,
-    totalSpent: 1820.5,
-  },
-  {
-    id: 'acc-hdfc-credit',
-    title: 'Millennia Credit',
-    kind: 'credit',
-    bankName: 'HDFC Bank',
-    bankBrand: 'hdfc',
-    provider: 'bank',
-    upiId: '',
-    cardHolder: 'Alex',
-    cardNumber: '•••• •••• •••• 4821',
-    expiry: '08/30',
-    cardType: 'VISA',
-    accentColor: '#1D4ED8',
-    secondaryColor: '#C81E32',
-    balance: 0,
-    totalSpent: 3140.0,
-  },
-  {
-    id: 'acc-icici-debit',
-    title: 'Coral Debit',
-    kind: 'debit',
-    bankName: 'ICICI Bank',
-    bankBrand: 'icici',
-    provider: 'bank',
-    upiId: '',
-    cardHolder: 'Alex',
-    cardNumber: '•••• •••• •••• 9104',
-    expiry: '11/29',
-    cardType: 'Mastercard',
-    accentColor: '#EA580C',
-    secondaryColor: '#9A3412',
-    balance: 0,
-    totalSpent: 960.0,
-  },
-];
-
-// Friends matching Quick Send carousel in Reference Image 2
-const initialFriends: Friend[] = [
-  {
-    id: 'friend-1',
-    name: 'Emily Smith',
-    handle: '@emily_s',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-    upiId: 'emily@oksbi',
-    phone: '+1 555-0192',
-    netBalance: 450.0, // Emily owes you $450
-  },
-  {
-    id: 'friend-2',
-    name: 'Olivia Wilson',
-    handle: '@olivia_w',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
-    upiId: 'olivia@slice',
-    phone: '+1 555-0144',
-    netBalance: -120.0, // You owe Olivia $120
-  },
-  {
-    id: 'friend-3',
-    name: 'James Davis',
-    handle: '@james_d',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    upiId: 'james@okaxis',
-    phone: '+1 555-0188',
-    netBalance: 650.0, // James owes you $650
-  },
-  {
-    id: 'friend-4',
-    name: 'Robert Smith',
-    handle: '@robert_s',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-    upiId: 'robert@ybl',
-    phone: '+1 555-0112',
-    netBalance: -200.0, // You owe Robert $200
-  },
-  {
-    id: 'friend-5',
-    name: 'William Smith',
-    handle: '@william_s',
-    avatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=200&q=80',
-    upiId: 'william@paytm',
-    phone: '+1 555-0131',
-    netBalance: 0.0, // Settled
-  },
-];
-
-// Initial Trips
-const initialTrips: Trip[] = [
-  {
-    id: 'trip-goa',
-    name: 'Goa Road Trip 🌴',
-    category: 'trip',
-    icon: 'Palmtree',
-    coverGradient: ['#FF6036', '#FF3730'],
-    coverImage: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=600&q=80',
-    startDate: 'May 12, 2026',
-    endDate: 'May 18, 2026',
-    totalSpend: 1420.0,
-    members: ['user', 'friend-1', 'friend-2', 'friend-3'],
-    currency: 'INR',
-  },
-  {
-    id: 'trip-manali',
-    name: 'Manali Snow Trek 🏔️',
-    category: 'trip',
-    icon: 'Mountain',
-    coverGradient: ['#1A3E7D', '#4D88FF'],
-    coverImage: 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=600&q=80',
-    startDate: 'Jun 20, 2026',
-    endDate: 'Jun 26, 2026',
-    totalSpend: 2150.0,
-    members: ['user', 'friend-3', 'friend-4', 'friend-5'],
-    currency: 'INR',
-  },
-  {
-    id: 'trip-flatmates',
-    name: 'Apartment 402 & Bills 🏠',
-    category: 'apartment',
-    icon: 'Home',
-    coverGradient: ['#10B981', '#059669'],
-    coverImage: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=600&q=80',
-    startDate: 'Ongoing',
-    totalSpend: 840.5,
-    members: ['user', 'friend-1', 'friend-2'],
-    currency: 'INR',
-  },
-];
-
-// Initial Transactions (matching Reference Image 1 & 3)
-const initialTransactions: Transaction[] = [
-  {
-    id: 'tx-1',
-    title: 'Adobe Creative Cloud',
-    subtitle: 'Today, 09:42',
-    amount: -59.99,
-    type: 'expense',
-    category: 'Software & Tools',
-    categoryIcon: 'Layers',
-    date: '2026-11-11',
-    time: '09:42',
-    upiAccountId: 'acc-slice',
-    paidBy: 'user',
-    splitType: 'equal',
-    splits: [],
-    settled: true,
-  },
-  {
-    id: 'tx-2',
-    title: 'Monthly Allowance',
-    subtitle: 'Today, 08:15',
-    amount: 187.5,
-    type: 'income',
-    category: 'Income',
-    categoryIcon: 'ArrowDownLeft',
-    date: '2026-11-11',
-    time: '08:15',
-    upiAccountId: 'acc-gpay',
-    paidBy: 'user',
-    splitType: 'equal',
-    splits: [],
-    settled: true,
-  },
-  {
-    id: 'tx-3',
-    title: 'Office Supplies',
-    subtitle: 'Jun 28, 10:22',
-    amount: -24.0,
-    type: 'expense',
-    category: 'Work',
-    categoryIcon: 'Briefcase',
-    date: '2026-06-28',
-    time: '10:22',
-    upiAccountId: 'acc-phonepe',
-    paidBy: 'user',
-    splitType: 'equal',
-    splits: [],
-    settled: true,
-  },
-  {
-    id: 'tx-4',
-    title: 'Beach Villa Stay',
-    subtitle: 'Goa Road Trip • Split',
-    amount: -450.0,
-    type: 'expense',
-    category: 'Travel',
-    categoryIcon: 'Home',
-    date: '2026-05-14',
-    time: '14:20',
-    upiAccountId: 'acc-slice',
-    tripId: 'trip-goa',
-    paidBy: 'user',
-    splitType: 'equal',
-    splits: [
-      { friendId: 'user', amount: 112.5, paidAmount: 450 },
-      { friendId: 'friend-1', amount: 112.5, paidAmount: 0 },
-      { friendId: 'friend-2', amount: 112.5, paidAmount: 0 },
-      { friendId: 'friend-3', amount: 112.5, paidAmount: 0 },
-    ],
-    settled: false,
-  },
-  {
-    id: 'tx-5',
-    title: 'Seafood Shack Dinner',
-    subtitle: 'Paid by James Davis',
-    amount: -160.0,
-    type: 'expense',
-    category: 'Food & Drinks',
-    categoryIcon: 'cup-hot',
-    date: '2026-05-15',
-    time: '20:45',
-    upiAccountId: 'acc-gpay',
-    tripId: 'trip-goa',
-    paidBy: 'friend-3',
-    splitType: 'equal',
-    splits: [
-      { friendId: 'user', amount: 40.0, paidAmount: 0 },
-      { friendId: 'friend-1', amount: 40.0, paidAmount: 0 },
-      { friendId: 'friend-2', amount: 40.0, paidAmount: 0 },
-      { friendId: 'friend-3', amount: 40.0, paidAmount: 160 },
-    ],
-    settled: false,
-  },
-  {
-    id: 'tx-6',
-    title: 'Supermarket Grocery Run',
-    subtitle: 'Apartment 402 • Split',
-    amount: -92.4,
-    type: 'expense',
-    category: 'Groceries',
-    categoryIcon: 'ShoppingCart',
-    date: '2026-11-08',
-    time: '18:10',
-    upiAccountId: 'acc-gpay',
-    tripId: 'trip-flatmates',
-    paidBy: 'user',
-    splitType: 'equal',
-    splits: [
-      { friendId: 'user', amount: 30.8, paidAmount: 92.4 },
-      { friendId: 'friend-1', amount: 30.8, paidAmount: 0 },
-      { friendId: 'friend-2', amount: 30.8, paidAmount: 0 },
-    ],
-    settled: false,
-  },
-];
-
-// 3D Glass Category Bubbles matching Reference Image 1 Screen 3 exactly!
-const initialCategoryMetrics: CategoryMetric[] = [
-  {
-    id: 'cat-groceries',
-    name: 'Groceries',
-    percentage: 32.8,
-    amount: 604.36,
-    color: '#FFA500', // Glowing Amber
-    icon: 'ShoppingCart',
-    size: 130,
-    x: 68,
-    y: 38,
-  },
-  {
-    id: 'cat-clothes',
-    name: 'Clothes and Shoes',
-    percentage: 16.1,
-    amount: 296.65,
-    color: '#FF6F59',
-    icon: 'Shirt',
-    size: 104,
-    x: 28,
-    y: 18,
-  },
-  {
-    id: 'cat-cafes',
-    name: 'Cafes and Restaurants',
-    percentage: 14.8,
-    amount: 272.7,
-    color: '#FF8C42',
-    icon: 'Coffee',
-    size: 100,
-    x: 28,
-    y: 58,
-  },
-  {
-    id: 'cat-sport',
-    name: 'Sport',
-    percentage: 11.3,
-    amount: 208.2,
-    color: '#FF7B60',
-    icon: 'Dumbbell',
-    size: 88,
-    x: 24,
-    y: 38,
-  },
-  {
-    id: 'cat-health',
-    name: 'Health',
-    percentage: 8.4,
-    amount: 154.77,
-    color: '#FF5C6C',
-    icon: 'Heart',
-    size: 80,
-    x: 74,
-    y: 16,
-  },
-  {
-    id: 'cat-travel',
-    name: 'Travel',
-    percentage: 6.7,
-    amount: 123.45,
-    color: '#FF9E64',
-    icon: 'Bus',
-    size: 74,
-    x: 72,
-    y: 60,
-  },
-];
-
-// Interactive Financial Spline trajectory points matching Reference Image 2 & 3
-const initialChartData: ChartDataPoint[] = [
-  { date: '2026-02-01', label: 'Feb', income: 420.0, expense: 310.0 },
-  { date: '2026-03-01', label: 'Mar', income: 510.0, expense: 480.0 },
-  { date: '2026-04-01', label: 'Apr', income: 630.0, expense: 390.0 },
-  { date: '2026-05-01', label: 'May', income: 590.0, expense: 520.0 },
-  { date: '2026-06-07', label: 'Jun', income: 567.21, expense: 127.0 },
-  { date: '2026-07-01', label: 'Jul', income: 680.0, expense: 430.0 },
-  { date: '2026-08-01', label: 'Aug', income: 750.0, expense: 490.0 },
-];
+const empty = (uid = ''): Snapshot => ({ schemaVersion: 2, userId: uid, revision: 0, accounts: [], friends: [], trips: [], transactions: [], categories, transactionCursor: null, profile: null, settings: { selectedAccountId: '', currency: 'INR', themeMode: 'dark', hideAmounts: false, isLiquidGlassEnabled: true }, summary: { totalIncome: 0, totalExpenses: 0, categories: {}, months: {} } });
+const cacheKey = (uid: string) => `@splittrack_cloud_v2_${uid}`;
+const rounded = (value: number) => Math.round(value * 100) / 100;
+const entityPath = (type: string, id: string) => `/entities/${type}/${encodeURIComponent(id)}`;
+type AccountDraft = Omit<UpiAccount, 'id' | 'totalSpent'>;
+type TransactionDraft = Omit<Transaction, 'id'>;
 
 interface SplitTrackContextType {
-  accounts: UpiAccount[];
-  friends: Friend[];
-  trips: Trip[];
-  transactions: Transaction[];
-  categories: ExpenseCategory[];
-  categoryMetrics: CategoryMetric[];
-  chartData: ChartDataPoint[];
-  totalBalance: number;
-  totalIncome: number;
-  totalExpenses: number;
-  monthlyExpenses: number;
-  netFriendBalance: number;
-  totalOwedToYou: number;
-  totalYouOwe: number;
-  selectedAccountId: string;
-  setSelectedAccountId: (id: string) => void;
-  addTransaction: (tx: Omit<Transaction, 'id'>) => void;
-  importTransactions: (txs: Omit<Transaction, 'id'>[]) => number;
-  addFriend: (friend: Omit<Friend, 'id' | 'netBalance'>) => Friend;
-  updateFriend: (
-    friendId: string,
-    updates: Partial<Omit<Friend, 'id' | 'netBalance'>>
-  ) => Friend | null;
-  addMemberToTrip: (
-    tripId: string,
-    member: string | MemberDraft
-  ) => Friend | null;
-  removeMemberFromTrip: (tripId: string, friendId: string) => boolean;
-  addTrip: (trip: Omit<Trip, 'id' | 'totalSpend'>) => void;
-  addUpiAccount: (acc: Omit<UpiAccount, 'id' | 'totalSpent'>) => UpiAccount;
-  updateUpiAccount: (id: string, updates: Partial<Omit<UpiAccount, 'id'>>) => void;
-  deleteUpiAccount: (id: string) => boolean;
-  addCategory: (name: string, iconKey: string, color?: string) => ExpenseCategory;
-  updateCategory: (id: string, name: string, iconKey: string, color?: string) => ExpenseCategory | null;
-  deleteCategory: (id: string) => boolean;
-  settleWithFriend: (friendId: string, amount?: number) => void;
-  getSimplifiedDebts: () => DebtSimplification[];
-  resetDemoData: () => void;
-  eraseAllData: () => void;
+  accounts: UpiAccount[]; friends: Friend[]; trips: Trip[]; transactions: Transaction[]; categories: ExpenseCategory[];
+  categoryMetrics: CategoryMetric[]; chartData: ChartDataPoint[];
+  totalBalance: number; totalIncome: number; totalExpenses: number; monthlyExpenses: number;
+  netFriendBalance: number; totalOwedToYou: number; totalYouOwe: number;
+  selectedAccountId: string; settings: CloudSettings; loading: boolean; syncing: boolean; syncError: string;
+  revision: number;
+  refresh(): Promise<void>; loadMoreTransactions(): Promise<void>; hasMoreTransactions: boolean;
+  getTripTransactions(id: string, cursor?: string): Promise<{ items: Transaction[]; cursor: string | null; profiles: (MemberProfile & { id: string })[] }>;
+  setSelectedAccountId(id: string): Promise<void>; saveSettings(settings: Partial<CloudSettings>): Promise<void>;
+  addTransaction(tx: TransactionDraft, intentId?: string): Promise<void>; deleteTransaction(id: string): Promise<void>;
+  importTransactions(txs: TransactionDraft[]): Promise<number>;
+  addFriend(friend: MemberProfile & { friendId?: string; userId?: string }): Promise<Friend>;
+  updateFriend(id: string, updates: Partial<MemberProfile>): Promise<Friend | null>;
+  addMemberToTrip(tripId: string, member: string | MemberDraft): Promise<Friend | null>;
+  removeMemberFromTrip(tripId: string, friendId: string, beforeApply?: () => Promise<void>): Promise<boolean>;
+  addTrip(trip: Omit<Trip, 'id' | 'totalSpend'>, intentId?: string): Promise<void>; deleteTrip(id: string): Promise<void>;
+  addUpiAccount(account: AccountDraft, intentId?: string): Promise<UpiAccount>;
+  updateUpiAccount(id: string, updates: Partial<Omit<UpiAccount, 'id'>>): Promise<void>;
+  deleteUpiAccount(id: string): Promise<boolean>;
+  addCategory(name: string, iconKey: string, color?: string, intentId?: string): Promise<ExpenseCategory>;
+  updateCategory(id: string, name: string, iconKey: string, color?: string): Promise<ExpenseCategory | null>;
+  deleteCategory(id: string): Promise<boolean>;
+  settleWithFriend(friendId: string, amount?: number, accountId?: string, intentId?: string): Promise<void>;
+  getSimplifiedDebts(): DebtSimplification[]; eraseAllData(): Promise<void>;
 }
+const Context = createContext<SplitTrackContextType | undefined>(undefined);
 
-const SplitTrackContext = createContext<SplitTrackContextType | undefined>(undefined);
+export function SplitTrackProvider({ children }: { children: React.ReactNode }) {
+  const { user, profile } = useAuth();
+  return <CloudStore key={user?.uid ?? 'signed-out'} uid={user?.uid ?? ''} ready={Boolean(user && profile?.username)}>{children}</CloudStore>;
+}
+function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: string; ready: boolean }) {
+  const [state, setState] = useState<Snapshot>(() => empty(uid));
+  const stateRef = useRef(state), uidRef = useRef(uid);
+  const [loading, setLoading] = useState(true), [syncing, setSyncing] = useState(false), [syncError, setSyncError] = useState('');
+  const queue = useRef<Promise<unknown>>(Promise.resolve()), pending = useRef(0), refreshPromise = useRef<Promise<void> | null>(null);
+  const serverSnapshot = useRef(false), historyCount = useRef(50), loadingHistory = useRef(false);
+  const accept = useCallback((next: Snapshot, requestedUid: string, fromServer = true) => {
+    if (uidRef.current !== requestedUid || next.userId !== requestedUid || next.schemaVersion !== 2) return;
+    if (!fromServer && serverSnapshot.current) return;
+    if (stateRef.current.userId === requestedUid && next.revision < stateRef.current.revision) return;
+    if (fromServer) serverSnapshot.current = true;
+    stateRef.current = next; setState(next); setSyncError('');
+    void AsyncStorage.setItem(cacheKey(requestedUid), JSON.stringify(next)).catch(() => {});
+  }, []);
+  const restoreHistory = useCallback(async (next: Snapshot, requestedUid: string) => {
+    const items = new Map(next.transactions.map(tx => [tx.id, tx]));
+    let cursor = next.transactionCursor;
+    // Revalidate the pages the user opened, including deletions and settlement
+    // changes, so background sync does not collapse an expanded ledger.
+    for (let pageNumber = 0; cursor && items.size < historyCount.current && pageNumber < 20; pageNumber++) {
+      if (uidRef.current !== requestedUid) return next;
+      const limit = Math.min(100, historyCount.current - items.size);
+      const page = await api<{ items: Transaction[]; cursor: string | null }>(`/transactions?limit=${limit}&cursor=${encodeURIComponent(cursor)}`);
+      page.items.forEach(tx => items.set(tx.id, tx));
+      cursor = page.cursor;
+    }
+    return { ...next, transactions: [...items.values()], transactionCursor: cursor };
+  }, []);
+  const refresh = useCallback((): Promise<void> => {
+    if (!ready || pending.current) return Promise.resolve();
+    if (refreshPromise.current) return refreshPromise.current;
+    const requestedUid = uid;
+    setSyncing(true);
+    const work = api<Snapshot>('/state').then(next => restoreHistory(next, requestedUid)).then(next => accept(next, requestedUid)).catch(error => {
+      if (uidRef.current === requestedUid) setSyncError(errorMessage(error));
+      throw error;
+    }).finally(() => { refreshPromise.current = null; if (uidRef.current === requestedUid) { setSyncing(false); setLoading(false); } });
+    refreshPromise.current = work;
+    return work;
+  }, [uid, ready, accept, restoreHistory]);
 
-export const SplitTrackProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [accounts, setAccounts] = useState<UpiAccount[]>(initialAccounts);
-  const [friends, setFriendsState] = useState<Friend[]>(initialFriends);
-  const [trips, setTripsState] = useState<Trip[]>(initialTrips);
-  const friendsRef = useRef(friends);
-  const tripsRef = useRef(trips);
-  const setFriends = useCallback((next: Friend[]) => {
-    friendsRef.current = next;
-    setFriendsState(next);
-  }, []);
-  const setTrips = useCallback((next: Trip[]) => {
-    tripsRef.current = next;
-    setTripsState(next);
-  }, []);
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
-  const [categories, setCategories] = useState<ExpenseCategory[]>(initialCategories);
-  const [categoryMetrics] = useState<CategoryMetric[]>(initialCategoryMetrics);
-  const [chartData] = useState<ChartDataPoint[]>(initialChartData);
-  const [selectedAccountId, setSelectedAccountIdState] = useState<string>('acc-slice');
-  const setSelectedAccountId = useCallback((id: string) => {
-    setSelectedAccountIdState(id);
-    AsyncStorage.setItem(DEFAULT_ACCOUNT_STORAGE_KEY, id).catch((error) => {
-      console.warn('Failed to save default payment profile', error);
-    });
-  }, []);
-
-  // Persistence
   useEffect(() => {
-    const loadState = async () => {
-      try {
-        const [raw, savedDefaultId] = await Promise.all([
-          AsyncStorage.getItem(STORE_STORAGE_KEY),
-          AsyncStorage.getItem(DEFAULT_ACCOUNT_STORAGE_KEY),
-        ]);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed.accounts) {
-            const hasCards = parsed.accounts.some(
-              (a: UpiAccount) => a.kind === 'debit' || a.kind === 'credit'
-            );
-            const seededCards = initialAccounts.filter(
-              (ia) =>
-                (ia.kind === 'debit' || ia.kind === 'credit') &&
-                !parsed.accounts.some((pa: UpiAccount) => pa.id === ia.id)
-            );
-            const restoredAccounts: UpiAccount[] = hasCards ? parsed.accounts : [...parsed.accounts, ...seededCards];
-            setAccounts(restoredAccounts);
-            setSelectedAccountIdState(
-              restoredAccounts.find((account) => account.id === savedDefaultId)?.id
-                ?? restoredAccounts.find((account) => account.isDefault)?.id
-                ?? restoredAccounts[0]?.id
-                ?? '',
-            );
-          }
-          if (parsed.friends) setFriends(parsed.friends);
-          if (parsed.trips) setTrips(parsed.trips);
-          if (parsed.transactions) setTransactions(parsed.transactions);
-          if (parsed.categories) setCategories(parsed.categories);
-        }
-      } catch (err) {
-        console.warn('Failed to load store state', err);
-      }
-    };
-    loadState();
-  }, [setFriends, setTrips]);
+    let active = true;
+    refreshPromise.current = null;
+    if (ready) {
+      void AsyncStorage.getItem(cacheKey(uid)).then(raw => {
+        if (active && raw) { try { accept(JSON.parse(raw), uid, false); } catch { /* Invalid cache is replaced by AWS. */ } }
+      });
+      void refresh().catch(() => {});
+    }
+    const listener = AppState.addEventListener('change', value => { if (value === 'active' && ready) void refresh().catch(() => {}); });
+    const timer = ready ? setInterval(() => { if (AppState.currentState === 'active') void refresh().catch(() => {}); }, 60000) : undefined;
+    return () => { active = false; listener.remove(); clearInterval(timer); };
+  }, [uid, ready, accept, refresh]);
+  useEffect(() => {
+    uidRef.current = uid;
+    return () => { uidRef.current = ''; if (uid) void AsyncStorage.removeItem(cacheKey(uid)); };
+  }, [uid]);
 
-  const saveState = async (
-    nextAcc = accounts,
-    nextFriends = friends,
-    nextTrips = trips,
-    nextTx = transactions,
-    nextCategories = categories
-  ) => {
+  const mutate = useCallback((path: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown, beforeApply?: () => Promise<void>, intentId?: string): Promise<MutationResult> => {
+    const requestedUid = uid, id = intentId ?? requestId(); pending.current++;
+    const work = queue.current.catch(() => {}).then(async () => {
+      if (!requestedUid || uidRef.current !== requestedUid) throw new Error('Please sign in again.');
+      const result = await api<MutationResult>(path, { method, body, id });
+      if (path === '/state/erase') historyCount.current = 50;
+      let historyError = '';
+      try { result.state = await restoreHistory(result.state, requestedUid); }
+      catch (error) { historyError = `Saved. Older history could not be refreshed. ${errorMessage(error)}`; }
+      await beforeApply?.();
+      accept(result.state, requestedUid);
+      if (historyError && uidRef.current === requestedUid) setSyncError(historyError);
+      return result;
+    }).catch(error => { if (uidRef.current === requestedUid) setSyncError(errorMessage(error)); throw error; }).finally(() => { pending.current--; });
+    queue.current = work;
+    return work;
+  }, [uid, accept, restoreHistory]);
+  const saveSettings = useCallback(async (body: Partial<CloudSettings>) => { await mutate('/api/settings', 'PUT', body); }, [mutate]);
+  const setSelectedAccountId = useCallback(async (id: string) => { await saveSettings({ selectedAccountId: id }); }, [saveSettings]);
+  const addTransaction = useCallback(async (tx: TransactionDraft, intentId?: string) => { await mutate('/transactions', 'POST', tx, undefined, intentId); }, [mutate]);
+  const deleteTransaction = useCallback(async (id: string) => { await mutate(`/transactions/${encodeURIComponent(id)}`, 'DELETE'); }, [mutate]);
+  const importTransactions = useCallback(async (txs: TransactionDraft[]) => {
+    let count = 0;
+    for (let offset = 0; offset < txs.length; offset += 50) {
+      try { const result = await mutate('/transactions/batch', 'POST', { transactions: txs.slice(offset, offset + 50) }); count += result.result.importedCount ?? 0; }
+      catch (error) { await refresh().catch(() => {}); throw new Error(`${count ? `${count} entries were saved. ` : ''}${errorMessage(error)} Review the ledger before importing again.`); }
+    }
+    return count;
+  }, [mutate, refresh]);
+  const addFriend = useCallback(async (friend: MemberProfile & { friendId?: string; userId?: string }) => {
+    const result = await mutate(entityPath('friends', friend.friendId ?? friend.userId ?? requestId()), 'PUT', { userId: friend.friendId ?? friend.userId, handle: friend.handle });
+    return result.state.friends.find(item => item.id === result.result.id)!;
+  }, [mutate]);
+  const updateFriend = useCallback(async (id: string, updates: Partial<MemberProfile>) => {
+    const avatarRef = updates.avatar !== undefined ? await uploadImage(updates.avatar) : undefined;
+    const result = await mutate(entityPath('friends', id), 'PUT', { userId: id, nickname: updates.name, phone: updates.phone, avatarRef });
+    return result.state.friends.find(item => item.id === id) ?? null;
+  }, [mutate]);
+  const addMemberToTrip = useCallback(async (tripId: string, member: string | MemberDraft) => {
+    let id: string;
+    if (typeof member === 'string') id = member;
+    else {
+      const response = await api<{ items: (MemberProfile & { id: string })[] }>(`/api/users/search?q=${encodeURIComponent(member.handle ?? '')}`);
+      const match = response.items.find(item => item.handle.toLowerCase() === member.handle?.toLowerCase());
+      if (!match) throw new Error('Select a registered member from search.');
+      id = match.id;
+    }
+    const result = await mutate(`/api/trips/${encodeURIComponent(tripId)}/members/${encodeURIComponent(id)}`, 'PUT');
+    return result.state.friends.find(item => item.id === id) ?? null;
+  }, [mutate]);
+  const removeMemberFromTrip = useCallback(async (tripId: string, friendId: string, beforeApply?: () => Promise<void>) => { await mutate(`/api/trips/${encodeURIComponent(tripId)}/members/${encodeURIComponent(friendId)}`, 'DELETE', undefined, beforeApply); return true; }, [mutate]);
+  const addTrip = useCallback(async (trip: Omit<Trip, 'id' | 'totalSpend'>, intentId?: string) => { const coverImageRef = await uploadImage(trip.coverImage ?? ''); await mutate(entityPath('trips', intentId ?? requestId()), 'PUT', { ...trip, coverImage: undefined, coverImageRef }, undefined, intentId); }, [mutate]);
+  const deleteTrip = useCallback(async (id: string) => { await mutate(entityPath('trips', id), 'DELETE'); }, [mutate]);
+  const addUpiAccount = useCallback(async (account: AccountDraft, intentId?: string) => {
+    const result = await mutate(entityPath('accounts', intentId ?? requestId()), 'PUT', { ...account, cardNumber: account.cardNumber.replace(/\D/g, '').slice(-4) }, undefined, intentId);
+    return result.state.accounts.find(item => item.id === result.result.id)!;
+  }, [mutate]);
+  const updateUpiAccount = useCallback(async (id: string, updates: Partial<Omit<UpiAccount, 'id'>>) => { await mutate(entityPath('accounts', id), 'PUT', { ...updates, ...(updates.cardNumber !== undefined ? { cardNumber: updates.cardNumber.replace(/\D/g, '').slice(-4) } : {}) }); }, [mutate]);
+  const deleteUpiAccount = useCallback(async (id: string) => { await mutate(entityPath('accounts', id), 'DELETE'); return true; }, [mutate]);
+  const addCategory = useCallback(async (name: string, iconKey: string, color = '#6366F1', intentId?: string) => { const id = intentId ?? requestId(); const result = await mutate(entityPath('categories', id), 'PUT', { name, iconKey, color }, undefined, intentId); return result.state.categories.find(item => item.id === id)!; }, [mutate]);
+  const updateCategory = useCallback(async (id: string, name: string, iconKey: string, color = '#6366F1') => { const result = await mutate(entityPath('categories', id), 'PUT', { name, iconKey, color }); return result.state.categories.find(item => item.id === id) ?? null; }, [mutate]);
+  const deleteCategory = useCallback(async (id: string) => { await mutate(entityPath('categories', id), 'DELETE'); return true; }, [mutate]);
+  const settleWithFriend = useCallback(async (friendId: string, amount?: number, accountId?: string, intentId?: string) => { await mutate('/api/settlements', 'POST', { friendId, amount, accountId, title: 'Settlement' }, undefined, intentId); }, [mutate]);
+  const eraseAllData = useCallback(async () => { await mutate('/state/erase', 'POST'); }, [mutate]);
+  const loadMoreTransactions = useCallback(async () => {
+    const cursor = stateRef.current.transactionCursor;
+    if (!cursor || pending.current || loadingHistory.current) return;
+    loadingHistory.current = true;
+    const revision = stateRef.current.revision;
     try {
-      await AsyncStorage.setItem(
-        STORE_STORAGE_KEY,
-        JSON.stringify({
-          accounts: nextAcc,
-          friends: nextFriends,
-          trips: nextTrips,
-          transactions: nextTx,
-          categories: nextCategories,
-        })
-      );
-    } catch (err) {
-      console.warn('Failed to save store state', err);
-    }
-  };
+      const page = await api<{ items: Transaction[]; cursor: string | null }>(`/transactions?cursor=${encodeURIComponent(cursor)}`);
+      if (stateRef.current.revision !== revision || uidRef.current !== uid) return;
+      const items = [...new Map([...stateRef.current.transactions, ...page.items].map(tx => [tx.id, tx])).values()];
+      historyCount.current = Math.max(historyCount.current, items.length);
+      accept({ ...stateRef.current, transactions: items, transactionCursor: page.cursor }, uid);
+    } finally { loadingHistory.current = false; }
+  }, [uid, accept]);
+  const getTripTransactions = useCallback((id: string, cursor?: string) => api<{ items: Transaction[]; cursor: string | null; profiles: (MemberProfile & { id: string })[] }>(`/api/trips/${encodeURIComponent(id)}/transactions${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`), []);
 
-  // Aggregated totals
-  const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
-  const totalIncome = 12850.0; // matching reference image metric badge
-  const totalExpenses = 5420.0; // matching reference image metric badge
-
-  const totalOwedToYou = friends
-    .filter((f) => f.netBalance > 0)
-    .reduce((sum, f) => sum + f.netBalance, 0);
-
-  const totalYouOwe = Math.abs(
-    friends.filter((f) => f.netBalance < 0).reduce((sum, f) => sum + f.netBalance, 0)
-  );
-
-  const monthlyExpenses = totalExpenses;
-  const netFriendBalance = totalOwedToYou - totalYouOwe;
-
-  // Add Transaction & update splits/balances
-  const addTransaction = (txData: Omit<Transaction, 'id'>) => {
-    const newId = `tx-${Date.now()}`;
-    const newTx: Transaction = {
-      ...txData,
-      id: newId,
-    };
-
-    const nextTx = [newTx, ...transactions];
-    setTransactions(nextTx);
-
-    const targetAccountId = txData.upiAccountId || accounts[0]?.id;
-    const nextAcc = accounts.map((acc) => {
-      if (acc.id === targetAccountId) {
-        const delta = txData.type === 'income' ? txData.amount : -Math.abs(txData.amount);
-        return {
-          ...acc,
-          balance: acc.balance + delta,
-          totalSpent: txData.type === 'expense' ? acc.totalSpent + Math.abs(txData.amount) : acc.totalSpent,
-        };
-      }
-      return acc;
+  const metrics = useMemo(() => {
+    const totalOwedToYou = rounded(state.friends.reduce((sum, friend) => sum + Math.max(0, friend.netBalance), 0));
+    const totalYouOwe = rounded(state.friends.reduce((sum, friend) => sum + Math.max(0, -friend.netBalance), 0));
+    const categoryMetrics = Object.entries(state.summary.categories).filter(([, value]) => value > 0).map(([name, amount], index): CategoryMetric => {
+      const category = state.categories.find(item => item.name === name), percentage = state.summary.totalExpenses ? amount / state.summary.totalExpenses * 100 : 0;
+      return { id: category?.id ?? name, name, amount, percentage, color: category?.color ?? '#71717A', icon: category?.iconKey ?? 'tag', size: Math.max(15, percentage), x: 20 + (index % 3) * 30, y: 25 + Math.floor(index / 3) * 25 };
     });
-    setAccounts(nextAcc);
-
-    // Update friend balances based on splits
-    let nextFriends = [...friends];
-    if (txData.splits && txData.splits.length > 0) {
-      const isPaidByUser = txData.paidBy === 'user';
-      nextFriends = nextFriends.map((friend) => {
-        const splitForFriend = txData.splits.find((s) => s.friendId === friend.id);
-        if (!splitForFriend) return friend;
-
-        let delta = 0;
-        if (isPaidByUser) {
-          // User paid for friend => friend owes user more
-          delta = splitForFriend.amount;
-        } else if (txData.paidBy === friend.id) {
-          // Friend paid for user => user owes friend (friend's net balance decreases towards negative)
-          const userShare = txData.splits.find((s) => s.friendId === 'user')?.amount || 0;
-          delta = -userShare;
-        }
-
-        return {
-          ...friend,
-          netBalance: friend.netBalance + delta,
-        };
-      });
-      setFriends(nextFriends);
-    }
-
-    // Update Trip spend if linked
-    let nextTrips = [...trips];
-    if (txData.tripId) {
-      nextTrips = nextTrips.map((trip) => {
-        if (trip.id === txData.tripId) {
-          return {
-            ...trip,
-            totalSpend: trip.totalSpend + Math.abs(txData.amount),
-          };
-        }
-        return trip;
-      });
-      setTrips(nextTrips);
-    }
-
-    triggerNotification(NotificationType.Success);
-
-    saveState(nextAcc, nextFriends, nextTrips, nextTx);
-  };
-
-  const importTransactions = (imported: Omit<Transaction, 'id'>[]): number => {
-    if (!imported || imported.length === 0) return 0;
-    const now = Date.now();
-    const newItems: Transaction[] = imported.map((txData, index) => ({
-      ...txData,
-      id: `imported-${now}-${index}-${Math.random().toString(36).slice(2, 6)}`,
-    }));
-
-    const nextTx = [...newItems, ...transactions];
-    setTransactions(nextTx);
-
-    const accountSpentDelta: Record<string, number> = {};
-    for (const tx of newItems) {
-      const accId = tx.upiAccountId || accounts[0]?.id;
-      if (accId) {
-        accountSpentDelta[accId] = (accountSpentDelta[accId] || 0) + Math.abs(tx.amount);
-      }
-    }
-
-    const nextAcc = accounts.map((acc) => {
-      if (accountSpentDelta[acc.id]) {
-        return {
-          ...acc,
-          totalSpent: acc.totalSpent + accountSpentDelta[acc.id],
-          balance: acc.balance - accountSpentDelta[acc.id],
-        };
-      }
-      return acc;
-    });
-    setAccounts(nextAcc);
-
-    triggerNotification(NotificationType.Success);
-    saveState(nextAcc, friends, trips, nextTx, categories);
-    return newItems.length;
-  };
-
-  // Add friend
-  const addFriend = (friendData: Omit<Friend, 'id' | 'netBalance'>): Friend => {
-    const currentFriends = friendsRef.current;
-    const newFriend = resolveMember(currentFriends, friendData, nextMemberId());
-    if (!newFriend) throw new Error('A member needs a name.');
-    if (currentFriends.some((friend) => friend.id === newFriend.id)) return newFriend;
-    const nextFriends = [newFriend, ...currentFriends];
-    setFriends(nextFriends);
-    saveState(accounts, nextFriends, tripsRef.current, transactions, categories);
-    return newFriend;
-  };
-
-  // Update existing member details (name, handle, avatar, upiId, phone)
-  const updateFriend = (
-    friendId: string,
-    updates: Partial<Omit<Friend, 'id' | 'netBalance'>>
-  ): Friend | null => {
-    const currentFriends = friendsRef.current;
-    const username = updates.handle === undefined ? undefined : normalizeUsername(updates.handle);
-    if (username !== undefined && (!username || currentFriends.some((friend) =>
-      friend.id !== friendId && normalizeUsername(friend.handle) === username
-    ))) return null;
-    let updated: Friend | null = null;
-    const nextFriends = currentFriends.map((f) => {
-      if (f.id !== friendId) return f;
-      updated = {
-        ...f,
-        ...updates,
-        ...(username === undefined ? {} : { handle: `@${username}` }),
-        id: f.id,
-        netBalance: f.netBalance,
-      };
-      return updated;
-    });
-    if (!updated) return null;
-    setFriends(nextFriends);
-    saveState(accounts, nextFriends, tripsRef.current, transactions, categories);
-    triggerNotification(NotificationType.Success);
-    return updated;
-  };
-
-  // Add either an existing friendId or a newly created member atomically to a trip
-  const addMemberToTrip = (
-    tripId: string,
-    member: string | MemberDraft
-  ): Friend | null => {
-    const currentFriends = friendsRef.current;
-    const currentTrips = tripsRef.current;
-    const trip = currentTrips.find((item) => item.id === tripId);
-    if (!trip) return null;
-    let targetFriend: Friend | null = null;
-    let nextFriends = currentFriends;
-
-    if (typeof member === 'string') {
-      targetFriend = currentFriends.find((f) => f.id === member) || null;
-      if (!targetFriend) return null;
-    } else {
-      targetFriend = resolveMember(currentFriends, member, nextMemberId());
-      if (!targetFriend) return null;
-      if (!currentFriends.some((friend) => friend.id === targetFriend!.id)) {
-        nextFriends = [targetFriend, ...currentFriends];
-        setFriends(nextFriends);
-      }
-    }
-
-    const memberId = targetFriend.id;
-    if (trip.members.includes(memberId)) return targetFriend;
-    const nextTrips = currentTrips.map((t) => {
-      if (t.id !== tripId) return t;
-      if (t.members.includes(memberId)) return t;
-      return { ...t, members: [...t.members, memberId] };
-    });
-
-    setTrips(nextTrips);
-    saveState(accounts, nextFriends, nextTrips, transactions, categories);
-    triggerNotification(NotificationType.Success);
-    return targetFriend;
-  };
-
-  const removeMemberFromTrip = (tripId: string, friendId: string): boolean => {
-    if (friendId === 'user') return false;
-    const currentTrips = tripsRef.current;
-    const trip = currentTrips.find((item) => item.id === tripId);
-    if (!trip?.members.includes(friendId)) return false;
-    const nextTrips = currentTrips.map((item) => item.id === tripId
-      ? { ...item, members: item.members.filter((id) => id !== friendId) }
-      : item);
-    setTrips(nextTrips);
-    // Membership changes leave recorded expense shares and saved identities intact.
-    saveState(accounts, friendsRef.current, nextTrips, transactions, categories);
-    triggerNotification(NotificationType.Success);
-    return true;
-  };
-
-  // Add Trip
-  const addTrip = (tripData: Omit<Trip, 'id' | 'totalSpend'>) => {
-    const newTrip: Trip = {
-      ...tripData,
-      id: `trip-${Date.now()}`,
-      totalSpend: 0,
-    };
-    const nextTrips = [newTrip, ...trips];
-    setTrips(nextTrips);
-    saveState(accounts, friends, nextTrips, transactions);
-  };
-
-  // Add UPI Profile Account
-  const addUpiAccount = (accData: Omit<UpiAccount, 'id' | 'totalSpent'>): UpiAccount => {
-    const newAccount: UpiAccount = {
-      ...accData,
-      id: `acc-${Date.now()}`,
-      totalSpent: 0,
-    };
-    const nextAccounts = [...accounts, newAccount];
-    setAccounts(nextAccounts);
-    saveState(nextAccounts, friends, trips, transactions, categories);
-    return newAccount;
-  };
-
-  // Update Existing UPI or Card Profile
-  const updateUpiAccount = (id: string, updates: Partial<Omit<UpiAccount, 'id'>>) => {
-    const nextAccounts = accounts.map((acc) => (acc.id === id ? { ...acc, ...updates } : acc));
-    setAccounts(nextAccounts);
-    saveState(nextAccounts, friends, trips, transactions, categories);
-  };
-
-  // Delete Existing UPI or Card Profile
-  const deleteUpiAccount = (id: string): boolean => {
-    if (accounts.length <= 1) {
-      // Keep at least one account in system
-      return false;
-    }
-    const nextAccounts = accounts.filter((acc) => acc.id !== id);
-    setAccounts(nextAccounts);
-    if (selectedAccountId === id && nextAccounts[0]) {
-      setSelectedAccountId(nextAccounts[0].id);
-    }
-    saveState(nextAccounts, friends, trips, transactions, categories);
-    return true;
-  };
-
-  // Add Custom Category
-  const addCategory = (name: string, iconKey: string, color: string = '#6366F1'): ExpenseCategory => {
-    const trimmed = name.trim();
-    const existing = categories.find((c) => c.name.toLowerCase() === trimmed.toLowerCase());
-    if (existing) {
-      const updated = categories.map((c) =>
-        c.id === existing.id ? { ...c, iconKey, color } : c
-      );
-      setCategories(updated);
-      saveState(accounts, friends, trips, transactions, updated);
-      return { ...existing, iconKey, color };
-    }
-    const newCat: ExpenseCategory = {
-      id: `cat-${Date.now()}`,
-      name: trimmed,
-      iconKey,
-      color,
-    };
-    const nextCats = [...categories, newCat];
-    setCategories(nextCats);
-    saveState(accounts, friends, trips, transactions, nextCats);
-    triggerNotification(NotificationType.Success);
-    return newCat;
-  };
-
-  // Update Existing Category
-  const updateCategory = (
-    id: string,
-    name: string,
-    iconKey: string,
-    color: string = '#6366F1'
-  ): ExpenseCategory | null => {
-    const trimmed = name.trim();
-    if (!trimmed) return null;
-    let updatedCat: ExpenseCategory | null = null;
-    const nextCats = categories.map((c) => {
-      if (c.id === id) {
-        updatedCat = { ...c, name: trimmed, iconKey, color };
-        return updatedCat;
-      }
-      return c;
-    });
-    if (!updatedCat) return null;
-    setCategories(nextCats);
-    saveState(accounts, friends, trips, transactions, nextCats);
-    triggerNotification(NotificationType.Success);
-    return updatedCat;
-  };
-
-  // Delete Category
-  const deleteCategory = (id: string): boolean => {
-    if (categories.length <= 1) return false;
-    const nextCats = categories.filter((c) => c.id !== id);
-    setCategories(nextCats);
-    saveState(accounts, friends, trips, transactions, nextCats);
-    triggerNotification(NotificationType.Success);
-    return true;
-  };
-
-  // Settle up with a friend
-  const settleWithFriend = (friendId: string, customAmount?: number) => {
-    const friend = friends.find((f) => f.id === friendId);
-    if (!friend) return;
-
-    const amountToSettle = customAmount !== undefined ? customAmount : Math.abs(friend.netBalance);
-    const wasOwedToUser = friend.netBalance > 0;
-
-    // Create settlement transaction
-    const newTx: Transaction = {
-      id: `tx-settle-${Date.now()}`,
-      title: `Settled with ${friend.name}`,
-      subtitle: wasOwedToUser ? 'Received settlement' : 'Marked as settled',
-      amount: wasOwedToUser ? amountToSettle : -amountToSettle,
-      type: 'settlement',
-      category: 'Settlement',
-      categoryIcon: 'CheckCircle2',
-      date: new Date().toISOString().split('T')[0],
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      upiAccountId: selectedAccountId,
-      paidBy: wasOwedToUser ? friend.id : 'user',
-      splitType: 'equal',
-      splits: [],
-      settled: true,
-    };
-
-    const nextFriends = friends.map((f) => {
-      if (f.id === friendId) {
-        return {
-          ...f,
-          netBalance: 0, // Reset to zero
-        };
-      }
-      return f;
-    });
-
-    const nextTx = [newTx, ...transactions];
-    setFriends(nextFriends);
-    setTransactions(nextTx);
-
-    triggerNotification(NotificationType.Success);
-
-    saveState(accounts, nextFriends, trips, nextTx);
-  };
-
-  // Greedy Minimum Cash Flow Algorithm for debt simplification
-  const getSimplifiedDebts = (): DebtSimplification[] => {
-    const activeAccount = getReceivingUpiAccount(accounts, selectedAccountId);
-    // Map of net balances for all entities
-    const netMap: { [id: string]: { name: string; net: number; upiId?: string } } = {
-      user: { name: 'You', net: 0, upiId: activeAccount?.upiId },
-    };
-
-    friends.forEach((f) => {
-      netMap[f.id] = { name: f.name, net: -f.netBalance, upiId: f.upiId }; // if f.netBalance > 0 (owes user), their net is negative (debtor)
-      netMap.user.net += f.netBalance; // user gets positive net
-    });
-
-    const debtors: { id: string; name: string; amount: number; upiId?: string }[] = [];
-    const creditors: { id: string; name: string; amount: number; upiId?: string }[] = [];
-
-    Object.entries(netMap).forEach(([id, data]) => {
-      if (data.net < -0.01) {
-        debtors.push({ id, name: data.name, amount: -data.net, upiId: data.upiId });
-      } else if (data.net > 0.01) {
-        creditors.push({ id, name: data.name, amount: data.net, upiId: data.upiId });
-      }
-    });
-
-    const simplifications: DebtSimplification[] = [];
-    let i = 0;
-    let j = 0;
-
-    while (i < debtors.length && j < creditors.length) {
-      const debtor = debtors[i];
-      const creditor = creditors[j];
-      const minAmount = Math.min(debtor.amount, creditor.amount);
-
-      simplifications.push({
-        fromId: debtor.id,
-        fromName: debtor.name,
-        toId: creditor.id,
-        toName: creditor.name,
-        amount: Math.round(minAmount * 100) / 100,
-        toUpiId: creditor.upiId,
-      });
-
-      debtor.amount -= minAmount;
-      creditor.amount -= minAmount;
-
-      if (debtor.amount <= 0.01) i++;
-      if (creditor.amount <= 0.01) j++;
-    }
-
-    return simplifications;
-  };
-
-  const resetDemoData = () => {
-    setSelectedAccountId('acc-slice');
-    setAccounts(initialAccounts);
-    setFriends(initialFriends);
-    setTrips(initialTrips);
-    setTransactions(initialTransactions);
-    setCategories(initialCategories);
-    saveState(initialAccounts, initialFriends, initialTrips, initialTransactions, initialCategories);
-    triggerNotification(NotificationType.Warning);
-  };
-
-  const eraseAllData = () => {
-    const zeroedAccounts = accounts.map((acc) => ({
-      ...acc,
-      balance: 0,
-      totalSpent: 0,
-    }));
-    const zeroedFriends = friends.map((f) => ({
-      ...f,
-      balance: 0,
-    }));
-    const zeroedTrips = trips.map((t) => ({
-      ...t,
-      totalSpend: 0,
-    }));
-    setAccounts(zeroedAccounts);
-    setFriends(zeroedFriends);
-    setTrips(zeroedTrips);
-    setTransactions([]);
-    saveState(zeroedAccounts, zeroedFriends, zeroedTrips, [], categories);
-    triggerNotification(NotificationType.Warning);
-  };
-
-  return (
-    <SplitTrackContext.Provider
-      value={{
-        accounts,
-        friends,
-        trips,
-        transactions,
-        categories,
-        categoryMetrics,
-        chartData,
-        totalBalance,
-        totalIncome,
-        totalExpenses,
-        monthlyExpenses,
-        netFriendBalance,
-        totalOwedToYou,
-        totalYouOwe,
-        selectedAccountId,
-        setSelectedAccountId,
-        addTransaction,
-        importTransactions,
-        addFriend,
-        updateFriend,
-        addMemberToTrip,
-        removeMemberFromTrip,
-        addTrip,
-        addUpiAccount,
-        updateUpiAccount,
-        deleteUpiAccount,
-        addCategory,
-        updateCategory,
-        deleteCategory,
-        settleWithFriend,
-        getSimplifiedDebts,
-        resetDemoData,
-        eraseAllData,
-      }}
-    >
-      {children}
-    </SplitTrackContext.Provider>
-  );
-};
-
-export const useSplitTrack = () => {
-  const context = useContext(SplitTrackContext);
-  if (!context) {
-    throw new Error('useSplitTrack must be used within a SplitTrackProvider');
-  }
-  return context;
-};
+    const chartData = Object.entries(state.summary.months).sort(([a], [b]) => a.localeCompare(b)).map(([month, values]) => ({ date: `${month}-01`, label: new Date(`${month}-01T12:00:00`).toLocaleDateString('en-IN', { month: 'short' }), income: values.income, expense: values.expense }));
+    return { totalBalance: rounded(state.accounts.reduce((sum, account) => sum + account.balance, 0)), totalIncome: state.summary.totalIncome, totalExpenses: state.summary.totalExpenses, monthlyExpenses: state.summary.months[new Date().toISOString().slice(0, 7)]?.expense ?? 0, totalOwedToYou, totalYouOwe, netFriendBalance: rounded(totalOwedToYou - totalYouOwe), categoryMetrics, chartData };
+  }, [state.accounts, state.friends, state.categories, state.summary]);
+  const getSimplifiedDebts = useCallback((): DebtSimplification[] => {
+    const account = getReceivingUpiAccount(state.accounts, state.settings.selectedAccountId);
+    return state.friends.filter(friend => Math.round(Math.abs(friend.netBalance) * 100) > 0).map(friend => friend.netBalance > 0
+      ? { fromId: friend.id, fromName: friend.name, toId: 'user', toName: 'You', amount: friend.netBalance, toUpiId: account?.upiId }
+      : { fromId: 'user', fromName: 'You', toId: friend.id, toName: friend.name, amount: Math.abs(friend.netBalance), toUpiId: friend.upiId });
+  }, [state.accounts, state.friends, state.settings.selectedAccountId]);
+  const value = useMemo(() => ({ ...metrics, revision: state.revision, accounts: state.accounts, friends: state.friends, trips: state.trips, transactions: state.transactions, categories: state.categories, settings: state.settings, selectedAccountId: state.settings.selectedAccountId, loading, syncing, syncError, refresh, loadMoreTransactions, hasMoreTransactions: Boolean(state.transactionCursor), getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData }), [metrics, state, loading, syncing, syncError, refresh, loadMoreTransactions, getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData]);
+  return <Context.Provider value={value}>{children}</Context.Provider>;
+}
+export function useSplitTrack() { const value = useContext(Context); if (!value) throw new Error('SplitTrackProvider is missing.'); return value; }

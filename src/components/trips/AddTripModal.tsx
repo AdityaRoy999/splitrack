@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { pickedImageUri } from '../../utils/pickedImage';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { CameraIcon } from '@solar-icons/react-native/bold/camera';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
@@ -20,6 +21,7 @@ import { NotificationType, triggerNotification } from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassPill } from '../glass/GlassPill';
+import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
 import { HorizontalEdgeFade, ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
 import { AnimatedPressable } from '../common/MotionPrimitives';
@@ -71,6 +73,7 @@ const TRIP_CATEGORIES = [
 
 export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) => {
   const { friends, categories, addTrip } = useSplitTrack();
+  const { runWithIntent, pending, error } = useAsyncAction();
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
@@ -111,10 +114,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        const nextUri =
-          Platform.OS === 'web' && asset.base64
-            ? `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`
-            : asset.uri;
+        const nextUri = pickedImageUri(asset);
         setCustomCoverUri(nextUri);
         setSelectedCover(nextUri);
       }
@@ -135,12 +135,11 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
   };
 
   const handleCreate = () => {
+    if (pending) return;
     if (!tripName.trim()) return;
 
-    triggerNotification(NotificationType.Success);
-
     const catMeta = categories.find((c) => c.name.toLowerCase() === category.toLowerCase());
-    addTrip({
+    const draft: Parameters<typeof addTrip>[0] = {
       name: tripName.trim(),
       category,
       icon:
@@ -158,13 +157,17 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
       }),
       members: selectedMembers,
       currency: 'INR',
-    });
+    };
+    void runWithIntent(draft, async (savedDraft, intentId) => {
+    await addTrip(savedDraft, intentId);
 
     setTripName('');
     setCustomCoverUri(null);
     setSelectedCover(COVER_PHOTO_PRESETS[0].uri);
     setSelectedMembers(['user']);
     onClose();
+    triggerNotification(NotificationType.Success);
+    });
   };
 
   const bgSheet = isDark ? '#09090B' : '#FFFFFF';
@@ -406,8 +409,10 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
             </ScrollView>
           </ScrollEdgeFade>
 
+          <FormError message={error} />
           <GlassPill
-            label="Create Trip"
+            label={pending ? 'Creating…' : 'Create Trip'}
+            disabled={pending}
             variant="accent"
             size="lg"
             onPress={handleCreate}

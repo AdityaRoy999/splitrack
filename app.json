@@ -45,7 +45,8 @@
         {
           "locationWhenInUsePermission": "Allow Splittrack to access your location to automatically tag expenses."
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

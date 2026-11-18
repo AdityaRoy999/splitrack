@@ -32,7 +32,6 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
     toggleHideAmounts,
     themeMode,
     currency,
-    setCurrency,
     isLiquidGlassEnabled,
   } = useLiquidGlass();
 
@@ -49,8 +48,7 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
   }, [hideAmounts, hideAnim]);
 
   const currConfig = currencies[currency] || currencies.INR;
-  const convertedBalance = totalBalance * (currency === 'INR' ? 1 : currConfig.exchangeRate);
-  const absBalance = Math.abs(convertedBalance);
+  const absBalance = Math.abs(totalBalance);
   const unmaskedBalance = `${totalBalance < 0 ? '-' : ''}${currConfig.symbol}${absBalance.toLocaleString('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -76,13 +74,6 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
   const handleToggleHide = () => {
     triggerImpact(ImpactStyle.Light);
     toggleHideAmounts();
-  };
-
-  const cycleCurrency = () => {
-    triggerImpact(ImpactStyle.Light);
-    const order: ('INR' | 'USD' | 'EUR' | 'GBP')[] = ['INR', 'USD', 'EUR', 'GBP'];
-    const nextIdx = (order.indexOf(currency) + 1) % order.length;
-    setCurrency(order[nextIdx]);
   };
 
   return (
@@ -135,7 +126,7 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
 
             {/* Currency Pill */}
             <AnimatedPressable
-              onPress={cycleCurrency}
+              onPress={() => {}}
               scaleTo={0.94}
               contentStyle={[
                 styles.currencyPill,

@@ -4,7 +4,7 @@ import { Animated, Easing, Platform } from 'react-native';
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 /** Swap chart data while hidden, then reveal it after React commits the new SVG. */
-export function useChartTransition() {
+export function useChartTransition(ready = true) {
   const [opacity] = useState(() => new Animated.Value(1));
   const [translateX] = useState(() => new Animated.Value(0));
   const [revision, setRevision] = useState(0);
@@ -43,6 +43,7 @@ export function useChartTransition() {
   useLayoutEffect(() => {
     const next = pending.current;
     if (!next || next.sequence !== sequence.current) return;
+    if (!ready) return;
     pending.current = null;
     translateX.setValue(next.direction * 12);
     opacity.setValue(0);
@@ -68,7 +69,7 @@ export function useChartTransition() {
       if (frame.current !== null) cancelAnimationFrame(frame.current);
       frame.current = null;
     };
-  }, [revision, opacity, translateX]);
+  }, [revision, ready, opacity, translateX]);
 
   useEffect(() => {
     mounted.current = true;

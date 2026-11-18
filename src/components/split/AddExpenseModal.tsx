@@ -34,6 +34,7 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { currencies } from '../../theme/colors';
 import { renderSolarIcon } from '../../constants/solarIconsCatalog';
 import { GlassPill } from '../glass/GlassPill';
+import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
 import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
 import { ModalBackdrop } from '../common/ModalBackdrop';
@@ -48,6 +49,7 @@ import {
   getTodayLocalISO,
 } from '../common/CalendarDatePickerModal';
 import { ExpenseCategory, SplitMemberShare, SplitType } from '../../types';
+import { allocateSplitAmounts } from '../../utils/splitAmounts';
 
 interface AddExpenseModalProps {
   visible: boolean;
@@ -64,6 +66,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
 }: AddExpenseModalProps) {
   const { accounts, friends, trips, transactions, categories, addTransaction, selectedAccountId } =
     useSplitTrack();
+  const { runWithIntent, pending, error } = useAsyncAction();
   const { currency, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
@@ -239,9 +242,9 @@ export const AddExpenseModal = memo(function AddExpenseModal({
       if (matchTrip?.members?.length) return matchTrip.members;
     }
     if (defaultFriendIds && defaultFriendIds.length > 0) {
-      return Array.from(new Set(['user', ...defaultFriendIds]));
+      return Array.from(new Set(['user', ...defaultFriendIds.filter(id => friends.some(friend => friend.id === id))]));
     }
-    return ['user', 'friend-1', 'friend-3'];
+    return ['user'];
   });
 
   const selectedTrip = useMemo(
@@ -262,7 +265,8 @@ export const AddExpenseModal = memo(function AddExpenseModal({
     setFriendSearchQuery('');
     setPaidBySearchQuery('');
     if (!nextTripId) {
-      setSplitWithMembers(['user', ...friends.slice(0, 2).map((f) => f.id)]);
+      setSplitWithMembers(['user']);
+      setPaidBy('user');
       return;
     }
     const targetTrip = trips.find((t) => t.id === nextTripId);
@@ -330,14 +334,14 @@ export const AddExpenseModal = memo(function AddExpenseModal({
     }
 
     if (splitType === 'equal') {
-      const per = count > 0 ? Math.round((total / count) * 100) / 100 : 0;
+      const shares = allocateSplitAmounts(total, splitWithMembers.map(() => 1));
       const memberAmounts: Record<string, number> = {};
-      splitWithMembers.forEach((id) => {
-        memberAmounts[id] = per;
+      splitWithMembers.forEach((id, index) => {
+        memberAmounts[id] = shares[index];
       });
       return {
         memberAmounts,
-        allocated: Math.round(per * count * 100) / 100,
+        allocated: Math.round(total * 100) / 100,
         remaining: 0,
         isBalanced: true,
         totalShares: count,
@@ -373,6 +377,10 @@ export const AddExpenseModal = memo(function AddExpenseModal({
         totalPct += pct;
         memberAmounts[id] = Math.round(((pct / 100) * total) * 100) / 100;
       });
+      if (Math.abs(totalPct - 100) < 0.0001) {
+        const shares = allocateSplitAmounts(total, splitWithMembers.map(id => parseFloat(customPercentages[id]) || 0));
+        splitWithMembers.forEach((id, index) => { memberAmounts[id] = shares[index]; });
+      }
       const allocated = Math.round(((totalPct / 100) * total) * 100) / 100;
       const remaining = Math.round((total - allocated) * 100) / 100;
       return {
@@ -391,9 +399,9 @@ export const AddExpenseModal = memo(function AddExpenseModal({
         totalShares += Math.max(1, customShares[id] ?? 1);
       });
       const memberAmounts: Record<string, number> = {};
-      splitWithMembers.forEach((id) => {
-        const sh = Math.max(1, customShares[id] ?? 1);
-        memberAmounts[id] = totalShares > 0 ? Math.round(((sh / totalShares) * total) * 100) / 100 : 0;
+      const shares = allocateSplitAmounts(total, splitWithMembers.map(id => Math.max(1, customShares[id] ?? 1)));
+      splitWithMembers.forEach((id, index) => {
+        memberAmounts[id] = shares[index];
       });
       return {
         memberAmounts,
@@ -495,10 +503,9 @@ export const AddExpenseModal = memo(function AddExpenseModal({
   };
 
   const handleSave = () => {
+    if (pending) return;
     const amount = parseFloat(amountStr);
     if (!title.trim() || isNaN(amount) || amount <= 0) return;
-
-    triggerNotification(NotificationType.Success);
 
     const splits: SplitMemberShare[] = splitWithMembers.map((memberId) => ({
       friendId: memberId,
@@ -506,12 +513,12 @@ export const AddExpenseModal = memo(function AddExpenseModal({
       share: splitType === 'shares' ? customShares[memberId] : undefined,
       percentage:
         splitType === 'percentage'
-          ? parseFloat(customPercentages[memberId]) || undefined
+          ? parseFloat(customPercentages[memberId]) || 0
           : undefined,
       paidAmount: memberId === paidBy ? amount : 0,
     }));
 
-    addTransaction({
+    const draft: Parameters<typeof addTransaction>[0] = {
       title: title.trim(),
       subtitle: tripId
         ? trips.find((t) => t.id === tripId)?.name
@@ -529,13 +536,17 @@ export const AddExpenseModal = memo(function AddExpenseModal({
       splits,
       settled: false,
       location: location.trim() || undefined,
-    });
+    };
+    void runWithIntent(draft, async (savedDraft, intentId) => {
+    await addTransaction(savedDraft, intentId);
 
     setTitle('');
     setAmountStr('');
     setLocation('');
     setSelectedDate(getTodayLocalISO());
     onClose();
+    triggerNotification(NotificationType.Success);
+    }, JSON.stringify({ ...draft, time: undefined }));
   };
 
   const cardBg = isLiquidGlassEnabled
@@ -652,6 +663,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
             </View>
           }
           checked={inSplit}
+          ariaLabel={`Include ${name} in the split`}
           onChange={(checked) => handleMemberCheckedChange(id, checked)}
           color={textColor}
           fillColor={activeBg}
@@ -1434,8 +1446,10 @@ export const AddExpenseModal = memo(function AddExpenseModal({
             </ScrollView>
           </ScrollEdgeFade>
 
+          <FormError message={error} />
           <GlassPill
-            label="Save & Split Expense"
+            label={pending ? 'Saving…' : 'Save & Split Expense'}
+            disabled={pending}
             variant="accent"
             size="lg"
             onPress={handleSave}

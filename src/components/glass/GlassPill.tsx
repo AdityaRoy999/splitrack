@@ -14,6 +14,7 @@ interface GlassPillProps {
   style?: ViewStyle;
   textStyle?: TextStyle;
   active?: boolean;
+  disabled?: boolean;
 }
 
 export const GlassPill: React.FC<GlassPillProps> = ({
@@ -25,6 +26,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
   style,
   textStyle,
   active = false,
+  disabled = false,
 }) => {
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
@@ -90,6 +92,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
 
   return (
     <AnimatedPressable
+      disabled={disabled}
       scaleTo={0.95}
       onPress={handlePress}
       style={style}

@@ -38,6 +38,7 @@ export const GlassBubbleChart: React.FC = () => {
   const [selectedCatId, setSelectedCatId] = useState<string>('cat-groceries');
 
   const selectedCategory = categoryMetrics.find((c) => c.id === selectedCatId) || categoryMetrics[0];
+  if (!selectedCategory) return <Text style={{ color: palette.textSecondary, padding: 24, textAlign: 'center' }}>No expenses recorded yet.</Text>;
   const isDark = themeMode === 'dark';
 
   const handleSelect = (cat: CategoryMetric) => {
@@ -145,7 +146,7 @@ export const GlassBubbleChart: React.FC = () => {
       >
         <View style={styles.detailsHeader}>
           <Text style={[styles.detailsTitle, isDark && { color: '#A1A1AA' }]}>Expenses</Text>
-          <Text style={[styles.detailsTotal, isDark && { color: '#FFFFFF' }]}>$1,842.56</Text>
+          <Text style={[styles.detailsTotal, isDark && { color: '#FFFFFF' }]}>{formatAmount(categoryMetrics.reduce((sum, category) => sum + category.amount, 0))}</Text>
         </View>
 
         <View

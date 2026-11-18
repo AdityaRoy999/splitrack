@@ -26,6 +26,8 @@ import {
   useDateMonthSwipeGesture,
 } from '../../hooks/useDateMonthSwipeGesture';
 import { useChartTransition } from '../../hooks/useChartTransition';
+import { useAnalytics } from '../../hooks/useAnalytics';
+import { FormError } from '../../hooks/useAsyncAction';
 
 type DistributionGranularity = 'All' | 'Date' | 'Month' | 'Year';
 
@@ -55,7 +57,7 @@ const MONTH_NAMES_SHORT = [
 
 export const DonutPieChart: React.FC = () => {
   const { width: windowWidth } = useWindowDimensions();
-  const { categoryMetrics, transactions } = useSplitTrack();
+  const { categoryMetrics, categories, transactions } = useSplitTrack();
   const { formatAmount, themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
@@ -68,7 +70,8 @@ export const DonutPieChart: React.FC = () => {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const { runChartTransition, opacity: swipeOpacity, translateX: swipeX, revision } = useChartTransition();
+  const analytics = useAnalytics(granularity, selectedYear, selectedMonth, selectedDate, granularity !== 'All');
+  const { runChartTransition, opacity: swipeOpacity, translateX: swipeX, revision } = useChartTransition(!analytics.loading);
   const lastGlidedSegRef = useRef<string | null>(null);
 
   const stepDay = useCallback(
@@ -127,47 +130,13 @@ export const DonutPieChart: React.FC = () => {
   );
 
   const filteredMetrics = useMemo(() => {
-    if (granularity === 'All') {
-      return categoryMetrics;
-    }
-
-    const matchingExpenses = transactions.filter((tx) => {
-      if (tx.amount >= 0 || tx.type !== 'expense') return false;
-      const [yStr, mStr] = tx.date.split('-');
-      const txYear = Number(yStr);
-      const txMonthIdx = (Number(mStr) || 1) - 1;
-
-      if (granularity === 'Date') {
-        return !selectedDate || tx.date === selectedDate;
-      }
-      if (granularity === 'Month') {
-        return txYear === selectedYear && txMonthIdx === selectedMonth;
-      }
-      return txYear === selectedYear;
+    if (granularity === 'All') return categoryMetrics;
+    const entries = Object.entries(analytics.data?.categories ?? {}), total = entries.reduce((sum, [, amount]) => sum + amount, 0);
+    return entries.sort((a, b) => b[1] - a[1]).map(([name, amount], index) => {
+      const category = categories.find(item => item.name === name);
+      return { id: category?.id ?? name, name, amount, percentage: total ? Math.round(amount / total * 1000) / 10 : 0, color: category?.color ?? SEGMENT_COLORS[index % SEGMENT_COLORS.length], icon: category?.iconKey ?? 'tag', size: 80, x: 50, y: 50 };
     });
-
-    if (matchingExpenses.length === 0) return [];
-
-    const byCat = new Map<string, number>();
-    matchingExpenses.forEach((tx) => {
-      byCat.set(tx.category, (byCat.get(tx.category) || 0) + Math.abs(tx.amount));
-    });
-
-    const total = Array.from(byCat.values()).reduce((s, v) => s + v, 0);
-    return Array.from(byCat.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([catName, amount], idx) => ({
-        id: `filtered-${catName}-${idx}`,
-        name: catName,
-        percentage: total > 0 ? Math.round((amount / total) * 1000) / 10 : 0,
-        amount,
-        color: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
-        icon: 'Tag',
-        size: 80,
-        x: 50,
-        y: 50,
-      }));
-  }, [granularity, selectedDate, selectedMonth, selectedYear, transactions, categoryMetrics]);
+  }, [granularity, categoryMetrics, categories, analytics.data]);
 
   const totalAmount = filteredMetrics.reduce((sum, item) => sum + item.amount, 0);
   const activeId = hoveredId ?? selectedId;
@@ -330,6 +299,8 @@ export const DonutPieChart: React.FC = () => {
   return (
     <GlassCard borderRadius={24} style={styles.card}>
       <View style={styles.container} {...gestureHandlers}>
+      <FormError message={analytics.error} />
+      {analytics.loading ? <Text style={{ color: '#A1A1AA', fontSize: 12, textAlign: 'center' }}>Loading expenses…</Text> : null}
         {/* Top Summary Bar */}
         <View style={styles.topRow}>
           <Text style={[styles.topLabel, { color: mutedText }]}>

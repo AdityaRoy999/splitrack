@@ -20,6 +20,8 @@ import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
 import { GlassPill } from '../glass/GlassPill';
+import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
+import { useAuth } from '../../auth/AuthContext';
 import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
 import { BankIssuerPickerModal } from './BankIssuerPickerModal';
@@ -55,7 +57,9 @@ interface FormContentProps {
 }
 
 const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClose }) => {
-  const { addUpiAccount, updateUpiAccount, setSelectedAccountId, selectedAccountId } = useSplitTrack();
+  const { addUpiAccount, updateUpiAccount, selectedAccountId } = useSplitTrack();
+  const { profile } = useAuth();
+  const { runWithIntent, pending, error } = useAsyncAction();
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
@@ -94,7 +98,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
   const [last4, setLast4] = useState(() =>
     (editingAccount?.cardNumber || '').replace(/\D/g, '').slice(-4)
   );
-  const [expiry, setExpiry] = useState(() => editingAccount?.expiry || '08/30');
+  const [expiry, setExpiry] = useState(() => editingAccount?.expiry || '');
   const [cardType, setCardType] = useState<'VISA' | 'Mastercard' | 'RuPay'>(
     () => (editingAccount?.cardType as any) || 'VISA'
   );
@@ -141,6 +145,9 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
   };
 
   const handleSave = () => {
+    if (pending) return;
+    setFormError('');
+    let draft: Parameters<typeof addUpiAccount>[0];
     if (kind === 'upi') {
       const cleanUpi = upiId.trim().toLowerCase();
       if (!isValidUpiId(cleanUpi)) {
@@ -151,26 +158,12 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
 
       const cleanLabel = label.trim() || `${selectedUpiApp.name} Splits`;
 
-      if (isEditing && editingAccount) {
-        updateUpiAccount(editingAccount.id, {
+      draft = {
           title: cleanLabel,
           kind: 'upi',
           provider: (provider as UpiProvider) || 'bank',
           upiId: cleanUpi,
-          accentColor: selectedUpiApp.accentColor,
-          secondaryColor: selectedUpiApp.secondaryColor,
-          isDefault: makeActive,
-        });
-        if (makeActive) {
-          setSelectedAccountId(editingAccount.id);
-        }
-      } else {
-        const created = addUpiAccount({
-          title: cleanLabel,
-          kind: 'upi',
-          provider: (provider as UpiProvider) || 'bank',
-          upiId: cleanUpi,
-          cardHolder: 'Alex',
+          cardHolder: profile?.displayName ?? '',
           cardNumber: '',
           expiry: '',
           cardType: 'RuPay',
@@ -178,12 +171,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
           secondaryColor: selectedUpiApp.secondaryColor,
           balance: 0,
           isDefault: makeActive,
-        });
-
-        if (makeActive && created?.id) {
-          setSelectedAccountId(created.id);
-        }
-      }
+      };
     } else {
       const cleanLast4 = last4.replace(/\D/g, '').slice(-4);
       if (cleanLast4.length < 4 && kind !== 'netbanking' && kind !== 'wallet') {
@@ -204,48 +192,29 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
           : 'NetBanking';
       const cleanLabel = label.trim() || `${selectedBank.shortName} ${kindSuffix}`;
 
-      if (isEditing && editingAccount) {
-        updateUpiAccount(editingAccount.id, {
-          title: cleanLabel,
-          kind,
-          bankName: selectedBank.name,
-          bankBrand,
-          cardNumber: cleanLast4 ? `•••• •••• •••• ${cleanLast4}` : editingAccount.cardNumber,
-          expiry: expiry.trim() || '08/30',
-          cardType,
-          accentColor: selectedBank.accentColor,
-          secondaryColor: selectedBank.secondaryColor,
-          isDefault: makeActive,
-        });
-        if (makeActive) {
-          setSelectedAccountId(editingAccount.id);
-        }
-      } else {
-        const created = addUpiAccount({
+      draft = {
           title: cleanLabel,
           kind,
           bankName: selectedBank.name,
           bankBrand,
           provider: 'bank',
           upiId: '',
-          cardHolder: 'Alex',
-          cardNumber: cleanLast4 ? `•••• •••• •••• ${cleanLast4}` : '•••• •••• •••• 1001',
-          expiry: expiry.trim() || '08/30',
+          cardHolder: profile?.displayName ?? '',
+          cardNumber: cleanLast4 ? `•••• •••• •••• ${cleanLast4}` : '',
+          expiry: expiry.trim(),
           cardType,
           accentColor: selectedBank.accentColor,
           secondaryColor: selectedBank.secondaryColor,
           balance: 0,
           isDefault: makeActive,
-        });
-
-        if (makeActive && created?.id) {
-          setSelectedAccountId(created.id);
-        }
-      }
+      };
     }
-
+    void runWithIntent({ accountId: isEditing ? editingAccount?.id : undefined, draft }, async (value, intentId) => {
+    if (value.accountId) await updateUpiAccount(value.accountId, value.draft);
+    else await addUpiAccount(value.draft, intentId);
     triggerNotification(NotificationType.Success);
     onClose();
+    });
   };
 
   const webOutlineNone =
@@ -514,7 +483,9 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
             </View>
 
             {formError ? <Text accessibilityRole="alert" style={styles.formError}>{formError}</Text> : null}
+            <FormError message={error} />
             <GlassPill
+              disabled={pending}
               label={
                 isEditing
                   ? 'Save Changes'

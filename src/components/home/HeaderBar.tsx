@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../auth/AuthContext';
 import { UserAvatar } from '../common/UserAvatar';
 import { measureNodeInWindow, type ViewRefNode, type WindowRect } from '../../utils/measureWindow';
 import { Sun2Icon } from '@solar-icons/react-native/bold/sun-2';
@@ -26,7 +26,7 @@ interface HeaderBarProps {
 export const HeaderBar: React.FC<HeaderBarProps> = ({
   onOpenSettings,
   onOpenNotifications,
-  userName = 'Jfiqw Alex',
+  userName = '',
   hideLogo = false,
   onLogoLayout,
   onLogoNode,
@@ -34,15 +34,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   const { themeMode, toggleTheme } = useLiquidGlass();
   const isDark = themeMode === 'dark';
   const logoAnchorRef = useRef<ViewRefNode>(null);
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
-
-  useEffect(() => {
-    AsyncStorage.getItem('splittrack_user_avatar_uri')
-      .then((saved) => {
-        if (saved) setAvatarUri(saved);
-      })
-      .catch(() => {});
-  }, []);
+  const { profile } = useAuth();
+  const avatarUri = profile?.avatar ?? null;
 
   const setLogoRef = useCallback(
     (node: ViewRefNode | null) => {
