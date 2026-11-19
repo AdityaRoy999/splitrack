@@ -56,6 +56,7 @@ export interface JellyRadioProps {
   blurWidth?: number;
   style?: StyleProp<ViewStyle>;
   presentation?: 'auto' | 'chips';
+  dropdownHeight?: number;
 }
 
 const LEVELS_PRESET: JellyRadioItem[] = [
@@ -359,6 +360,7 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   blurWidth = 24,
   style,
   presentation = 'auto',
+  dropdownHeight,
 }) => {
   const scrollEdges = useHorizontalScrollEdges();
   const { themeMode, selectionStyle } = useLiquidGlass();
@@ -446,6 +448,7 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
       items={normalizedItems.map(item => ({ ...item, label: item.label || item.accessibilityLabel || item.value }))}
       value={currentValue} onChange={(_, index) => handleSelect(index)} disabled={disabled}
       backgroundColor={chipColor} textColor={textColor} style={style}
+      triggerHeight={dropdownHeight ?? SIZE_METRICS[size].minHeight}
     />;
   }
 

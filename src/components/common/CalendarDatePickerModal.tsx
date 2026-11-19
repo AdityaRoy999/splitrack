@@ -5,9 +5,7 @@ import {
   StyleSheet,
   Text,
   View,
-  type ViewStyle,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
@@ -123,27 +121,6 @@ function CalendarPresentation(props: CalendarDatePickerModalProps) {
 
   return (
       <View style={styles.overlay}>
-        {Platform.OS === 'web' ? (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.backdropFill,
-              {
-                backdropFilter: 'blur(18px) saturate(145%)',
-                WebkitBackdropFilter: 'blur(18px) saturate(145%)',
-              } as unknown as ViewStyle,
-            ]}
-          />
-        ) : (
-          <View pointerEvents="none" style={styles.backdropFill}>
-            <BlurView
-              intensity={isDark ? 38 : 34}
-              tint={isDark ? 'dark' : 'light'}
-              style={styles.backdropFill}
-            />
-          </View>
-        )}
-
         <ModalBackdrop label="Close calendar backdrop" onClose={onClose} shadeColor={isDark ? 'rgba(6, 7, 11, 0.44)' : 'rgba(15, 23, 42, 0.24)'} />
 
         <Animated.View

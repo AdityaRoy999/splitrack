@@ -5,6 +5,7 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { NativeProgressiveBlur } from './NativeProgressiveBlur';
 import type { GradualBlurProps } from './gradualBlurTypes';
 import { useSceneActive } from '../common/SceneActivityContext';
+import { useModalVisual } from '../common/ModalVisualContext';
 
 export type { GradualBlurProps, GradualBlurPosition } from './gradualBlurTypes';
 export type { GradualBlurCurve } from './blurFalloff';
@@ -18,6 +19,7 @@ export const GradualBlur = React.memo(function GradualBlur({
 }: GradualBlurProps) {
   const { themeMode } = useLiquidGlass();
   const sceneActive = useSceneActive();
+  const modal = useModalVisual();
   const enabled = active && sceneActive;
   const reveal = useSharedValue(enabled ? 1 : 0);
   useEffect(() => {
@@ -39,7 +41,7 @@ export const GradualBlur = React.memo(function GradualBlur({
     overflow: 'hidden',
   };
 
-  if (depth <= 0 || amount <= 0) return null;
+  if (modal || depth <= 0 || amount <= 0) return null;
   return (
     <View collapsable={false} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[edgeStyle, style]}>
       <NativeProgressiveBlur

@@ -9,7 +9,6 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { SplitText } from '../effects/SplitText';
 import { measureNodeInWindow, type ViewRefNode } from '../../utils/measureWindow';
 import type { HeaderLogoRect } from '../home/HeaderBar';
@@ -38,7 +37,8 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 // Auth/provider remounts are not a fresh application launch. Keep this in the
 // JavaScript session rather than storage so a real cold launch still animates.
 let startupPreloaderCompleted = false;
-export const hasCompletedStartupPreloader = () => startupPreloaderCompleted;
+let startupPreloaderStarted = false;
+export const hasCompletedStartupPreloader = () => startupPreloaderCompleted || startupPreloaderStarted;
 
 export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
   ready = true,
@@ -48,8 +48,7 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
   onFinish,
 }) => {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const { themeMode } = useLiquidGlass();
-  const isDark = themeMode === 'dark';
+  const isDark = true;
 
   const [textWidth, setTextWidth] = useState(156);
   const [showWordmark, setShowWordmark] = useState(false);
@@ -313,6 +312,7 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
 
   useEffect(() => {
     if (startupPreloaderCompleted) return;
+    startupPreloaderStarted = true;
     let shrinkAnim: Animated.CompositeAnimation | null = null;
     // Stage 1: Pop hero app icon into screen center
     const introAnim = Animated.parallel([

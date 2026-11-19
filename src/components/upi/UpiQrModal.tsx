@@ -8,9 +8,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-  type ViewStyle,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { CopyIcon } from '@solar-icons/react-native/bold/copy';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
@@ -99,27 +97,6 @@ function QrModalContent({ account, amount, note }: { account: UpiAccount } & Upi
 
   return (
       <View style={[styles.modalOverlay, { paddingTop: Math.max(20, insets.top), paddingBottom: Math.max(20, insets.bottom) }]}>
-        {Platform.OS === 'web' ? (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.backdropFill,
-              {
-                backdropFilter: 'blur(20px) saturate(150%)',
-                WebkitBackdropFilter: 'blur(20px) saturate(150%)',
-              } as unknown as ViewStyle,
-            ]}
-          />
-        ) : (
-          <View pointerEvents="none" style={styles.backdropFill}>
-            <BlurView
-              intensity={isDark ? 42 : 36}
-              tint={isDark ? 'dark' : 'light'}
-              style={styles.backdropFill}
-            />
-          </View>
-        )}
-
         <ModalBackdrop label="Close QR modal backdrop" onClose={handleSmoothClose} shadeColor={isDark ? 'rgba(6, 7, 11, 0.44)' : 'rgba(15, 23, 42, 0.24)'} />
 
         <Animated.View

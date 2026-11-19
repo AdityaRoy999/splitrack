@@ -47,7 +47,7 @@ import {
   formatDisplayDate,
   getTodayLocalISO,
 } from '../common/CalendarDatePickerModal';
-import { ExpenseCategory, SplitMemberShare, SplitType } from '../../types';
+import { ExpenseCategory, SplitMemberShare, SplitType, Transaction } from '../../types';
 import { allocateSplitAmounts } from '../../utils/splitAmounts';
 import { useAuth } from '../../auth/AuthContext';
 import { UserAvatar } from '../common/UserAvatar';
@@ -57,6 +57,7 @@ interface AddExpenseModalProps {
   onClose: () => void;
   defaultTripId?: string;
   defaultFriendIds?: string[];
+  transactionToEdit?: Transaction;
 }
 
 export const AddExpenseModal = memo(function AddExpenseModal({
@@ -64,22 +65,23 @@ export const AddExpenseModal = memo(function AddExpenseModal({
   onClose,
   defaultTripId,
   defaultFriendIds,
+  transactionToEdit,
 }: AddExpenseModalProps) {
-  const { accounts, friends, trips, transactions, categories, addTransaction, selectedAccountId } =
+  const { accounts, friends, trips, transactions, categories, addTransaction, editTransaction, selectedAccountId } =
     useSplitTrack();
   const { runWithIntent, pending, error } = useAsyncAction();
   const { profile } = useAuth();
   const { currency, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
-  const [title, setTitle] = useState('');
-  const [amountStr, setAmountStr] = useState('');
-  const [category, setCategory] = useState(categories[0]?.name || 'Food & Drinks');
-  const [paidBy, setPaidBy] = useState<string>('user');
-  const [tripId, setTripId] = useState<string | undefined>(defaultTripId);
-  const [upiProfileId, setUpiProfileId] = useState<string>(selectedAccountId);
-  const [selectedDate, setSelectedDate] = useState<string>(() => getTodayLocalISO());
-  const [location, setLocation] = useState('');
+  const [title, setTitle] = useState(transactionToEdit?.title || '');
+  const [amountStr, setAmountStr] = useState(transactionToEdit ? String(Math.abs(transactionToEdit.amount)) : '');
+  const [category, setCategory] = useState(transactionToEdit?.category || categories[0]?.name || 'Food & Drinks');
+  const [paidBy, setPaidBy] = useState<string>(transactionToEdit?.paidBy || 'user');
+  const [tripId, setTripId] = useState<string | undefined>(transactionToEdit?.tripId || defaultTripId);
+  const [upiProfileId, setUpiProfileId] = useState<string>(transactionToEdit?.upiAccountId || selectedAccountId);
+  const [selectedDate, setSelectedDate] = useState<string>(() => transactionToEdit?.date || getTodayLocalISO());
+  const [location, setLocation] = useState(transactionToEdit?.location || '');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showFriendSearch, setShowFriendSearch] = useState(false);
@@ -233,12 +235,13 @@ export const AddExpenseModal = memo(function AddExpenseModal({
       }).start();
     }
   };
-  const [splitType, setSplitType] = useState<SplitType>('equal');
-  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+  const [splitType, setSplitType] = useState<SplitType>(transactionToEdit ? 'exact' : 'equal');
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>(() => Object.fromEntries((transactionToEdit?.splits || []).map(split => [split.friendId, String(split.amount)])));
   const [customPercentages, setCustomPercentages] = useState<Record<string, string>>({});
   const [customShares, setCustomShares] = useState<Record<string, number>>({});
   const [categoryToEdit, setCategoryToEdit] = useState<ExpenseCategory | null>(null);
   const [splitWithMembers, setSplitWithMembers] = useState<string[]>(() => {
+    if (transactionToEdit?.splits.length) return transactionToEdit.splits.map(split => split.friendId);
     if (defaultTripId) {
       const matchTrip = trips.find((t) => t.id === defaultTripId);
       if (matchTrip?.members?.length) return matchTrip.members;
@@ -517,7 +520,9 @@ export const AddExpenseModal = memo(function AddExpenseModal({
         splitType === 'percentage'
           ? parseFloat(customPercentages[memberId]) || 0
           : undefined,
-      paidAmount: memberId === paidBy ? amount : 0,
+      paidAmount: transactionToEdit && paidBy === transactionToEdit.paidBy && amount === Math.abs(transactionToEdit.amount)
+        ? transactionToEdit.splits.find(split => split.friendId === memberId)?.paidAmount ?? 0
+        : memberId === paidBy ? amount : 0,
     }));
 
     const draft: Parameters<typeof addTransaction>[0] = {
@@ -530,7 +535,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
       category,
       categoryIcon: categories.find((c) => c.name === category)?.iconKey || 'tag',
       date: selectedDate,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: transactionToEdit?.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       upiAccountId: upiProfileId || selectedAccountId,
       tripId,
       paidBy,
@@ -540,7 +545,8 @@ export const AddExpenseModal = memo(function AddExpenseModal({
       location: location.trim() || undefined,
     };
     void runWithIntent(draft, async (savedDraft, intentId) => {
-    await addTransaction(savedDraft, intentId);
+    if (transactionToEdit) await editTransaction(transactionToEdit.id, savedDraft, intentId);
+    else await addTransaction(savedDraft, intentId);
 
     setTitle('');
     setAmountStr('');
@@ -841,7 +847,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
 
           <View style={styles.headerRow}>
             <View>
-              <Text style={[styles.title, { color: textColor }]}>Add & Split Expense</Text>
+              <Text style={[styles.title, { color: textColor }]}>{transactionToEdit ? 'Edit transaction' : 'Add & Split Expense'}</Text>
               <Text style={[styles.subtitleText, { color: mutedText }]}>
                 {splitType === 'equal'
                   ? 'Instant equal split across selected people'
@@ -1442,7 +1448,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
 
           <FormError message={error} />
           <GlassPill
-            label={pending ? 'Saving…' : 'Save & Split Expense'}
+            label={pending ? 'Saving…' : transactionToEdit ? 'Save changes' : 'Save & Split Expense'}
             disabled={pending}
             variant="accent"
             size="lg"

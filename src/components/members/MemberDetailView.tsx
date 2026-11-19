@@ -13,6 +13,7 @@ import { copyTextSafe, getMemberActivitySummary } from '../../utils/memberActivi
 import { renderSolarIcon } from '../../constants/solarIconsCatalog';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
+import { useTransactionActions } from '../transactions/TransactionActions';
 import { Friend, Transaction, type UpiAccount } from '../../types';
 import { getDebtReceivingAccount, type UpiPaymentDetails } from '../../utils/upi';
 import { UpiQrModal } from '../upi/UpiQrModal';
@@ -44,6 +45,7 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
 }) => {
   const { transactions, trips, categories, getSimplifiedDebts, accounts, selectedAccountId, friends } = useSplitTrack();
   const { formatAmount, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
+  const actions = useTransactionActions();
   const isDark = themeMode === 'dark';
 
   const [txFilter, setTxFilter] = useState<MemberTxFilter>('All');
@@ -582,9 +584,11 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
                 <AnimatedPressable
                   key={tx.id}
                   scaleTo={0.98}
-                  onPress={() => onSettleFriend(friend)}
+                  onPress={() => actions.open(tx)}
+                  onLongPress={() => actions.select(tx)}
+                  accessibilityState={{ selected: actions.selected.has(tx.id) }}
                 >
-                  <GlassCard borderRadius={22} style={styles.txItemCard}>
+                  <GlassCard borderRadius={22} style={[styles.txItemCard, actions.selected.has(tx.id) && { backgroundColor: isDark ? '#303039' : '#E2E2EC' }]}>
                     <View style={styles.txRow}>
                       <View style={styles.txLeft}>
                         <View

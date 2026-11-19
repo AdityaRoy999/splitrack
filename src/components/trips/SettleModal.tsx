@@ -3,6 +3,7 @@ import { SheetModal } from '../common/SheetModal';
 import React, { useCallback, useState } from 'react';
 import {
   ScrollView,
+  TextInput,
   Share,
   StyleSheet,
   Text,
@@ -42,6 +43,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
   const { runWithIntent, pending, error } = useAsyncAction();
   const { formatAmount, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const [notice, setNotice] = useState<BubbleNotice | null>(null);
+  const [paymentAmounts, setPaymentAmounts] = useState<Record<string, string>>({});
   const [qrRequest, setQrRequest] = useState<({ account: UpiAccount } & UpiPaymentDetails) | null>(null);
   const dismissNotice = useCallback(() => setNotice(null), []);
   const closeQr = useCallback(() => setQrRequest(null), []);
@@ -117,7 +119,6 @@ export const SettleModal: React.FC<SettleModalProps> = ({
       ]}
     >
       {items.map((item, idx) => {
-        const isUserDebtor = item.fromId === 'user';
         const isUserCreditor = item.toId === 'user';
         const debtAccount = getDebtReceivingAccount(item, accounts, selectedAccountId, friends);
         const showDivider = idx < items.length - 1;
@@ -180,16 +181,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                 </Text>
 
                 <View style={styles.actionsGroup}>
-                  {isUserDebtor ? (
-                    <GlassPill
-                      label={pending ? 'Saving…' : 'Mark Settled'}
-                      disabled={pending}
-                      icon={<CheckCircleIcon size={14} color={isDark ? '#000000' : '#FFFFFF'} />}
-                      variant="accent"
-                      size="sm"
-                      onPress={() => handleSettle(item.fromId, item.toId, item.amount)}
-                    />
-                  ) : isUserCreditor ? (
+                  {isUserCreditor ? (
                     <View style={styles.creditorBtnRow}>
                       <GlassPill
                         label="Remind"
@@ -204,21 +196,15 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                         icon={<CheckCircleIcon size={14} color={isDark ? '#000000' : '#FFFFFF'} />}
                         variant="accent"
                         size="sm"
-                        onPress={() => handleSettle(item.fromId, item.toId, item.amount)}
+                        onPress={() => handleSettle(item.fromId, item.toId, Number(paymentAmounts[item.fromId] ?? item.amount))}
                       />
                     </View>
                   ) : (
-                    <GlassPill
-                      label={pending ? 'Saving…' : 'Mark Settled'}
-                      disabled={pending}
-                      icon={<CheckCircleIcon size={14} color={textColor} />}
-                      variant="dark"
-                      size="sm"
-                      onPress={() => handleSettle(item.fromId, item.toId, item.amount)}
-                    />
+                    <Text style={{ color: mutedText, fontSize: 12 }}>The receiver confirms payment</Text>
                   )}
                 </View>
               </View>
+              {isUserCreditor ? <TextInput accessibilityLabel={`Amount received from ${item.fromName}`} keyboardType="decimal-pad" value={paymentAmounts[item.fromId] ?? String(item.amount)} onChangeText={value => setPaymentAmounts(old => ({ ...old, [item.fromId]: value }))} style={{ height: 44, borderRadius: 16, borderWidth: 0, paddingHorizontal: 12, marginTop: 10, backgroundColor: pillSurface, color: textColor }} /> : null}
             </View>
 
             {showDivider && (

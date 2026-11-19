@@ -31,7 +31,10 @@ masks in the pinned iOS library without rotating its UIKit backdrop. The patch
 also caches the mask/filter and updates only the radius during reveal animations,
 so the material does not reset on every frame. iOS scroll viewports remain
 transparent to sample their actual sheet surface; Android capture viewports use
-the containing surface with alpha tints composited over it. Modal scenes keep
-their blur active through the full exit, independently of the retained tab.
+the containing surface with alpha tints composited over it. Main screens keep
+their progressive blur. SheetModal provides ModalVisualContext so progressive
+blur is omitted and GlassSurface/GlassCard use solid matte surfaces throughout
+modal content. QR/calendar backdrops use dimming without blur. Sheets retain
+their content and backdrop through the exit animation.
 Physical-device checks should cover those edges, light/dark themes, scrolling,
 foreground return, and image highlight transitions.

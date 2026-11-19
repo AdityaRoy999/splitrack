@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
+import { useTransactionActions } from '../transactions/TransactionActions';
 import { renderSolarIcon } from '../../constants/solarIconsCatalog';
 import { Transaction } from '../../types';
 import { AnimatedPressable } from '../common/MotionPrimitives';
@@ -13,11 +14,11 @@ interface RecentTransactionsProps {
 }
 
 export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
-  onSelectTransaction,
   onViewAll,
 }) => {
   const { transactions, categories } = useSplitTrack();
   const { formatAmount, themeMode, palette } = useLiquidGlass();
+  const actions = useTransactionActions();
 
   const isDarkSheet = themeMode === 'dark';
 
@@ -58,8 +59,10 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
               <React.Fragment key={tx.id}>
                 <AnimatedPressable
                   scaleTo={0.985}
-                  onPress={() => onSelectTransaction && onSelectTransaction(tx)}
-                  contentStyle={styles.txRow}
+                  onPress={() => actions.open(tx)}
+                  onLongPress={() => actions.select(tx)}
+                  accessibilityState={{ selected: actions.selected.has(tx.id) }}
+                  contentStyle={[styles.txRow, actions.selected.has(tx.id) && { backgroundColor: isDarkSheet ? '#303039' : '#E2E2EC', borderRadius: 14 }]}
                 >
                   <View style={styles.leftCol}>
                     <View style={[styles.iconBox, iconBoxStyle]}>

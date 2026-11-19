@@ -21,6 +21,7 @@ import { GlassPill } from '../glass/GlassPill';
 import { AddMemberModal } from './AddMemberModal';
 import { TripMemberPill } from './TripMemberPill';
 import { UserAvatar } from '../common/UserAvatar';
+import { useTransactionActions } from '../transactions/TransactionActions';
 
 interface TripDetailViewProps {
   trip: Trip;
@@ -35,8 +36,8 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
   onBack,
   onAddTripExpense,
   onOpenSettle,
-  onSelectTransaction,
 }) => {
+  const actions = useTransactionActions();
   const { friends, transactions, categories, removeMemberFromTrip, getTripTransactions, revision } = useSplitTrack();
   const { user, profile } = useAuth();
   const canManageMembers = trip.ownerId === user?.uid;
@@ -231,10 +232,10 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
                 <React.Fragment key={tx.id}>
                   <AnimatedPressable
                     scaleTo={0.985}
-                    onPress={() =>
-                      onSelectTransaction ? onSelectTransaction(tx) : onOpenSettle()
-                    }
-                    contentStyle={styles.txRow}
+                    onPress={() => actions.open(tx)}
+                    onLongPress={() => actions.select(tx)}
+                    accessibilityState={{ selected: actions.selected.has(tx.id) }}
+                    contentStyle={[styles.txRow, actions.selected.has(tx.id) && { backgroundColor: isDark ? '#303039' : '#E2E2EC', borderRadius: 14 }]}
                   >
                     <View style={[styles.txIconBox, { backgroundColor: `${meta.color}20` }]}>
                       {renderSolarIcon(meta.iconKey, 18, meta.color)}

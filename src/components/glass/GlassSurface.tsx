@@ -5,6 +5,7 @@ import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'ex
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { BackdropSurfaceContext } from '../common/BackdropSurfaceContext';
+import { useModalVisual } from '../common/ModalVisualContext';
 
 const canUseNativeLiquidGlass = (() => {
   if (Platform.OS !== 'ios') return false;
@@ -58,9 +59,10 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
   children,
 }) => {
   const { isLiquidGlassEnabled, themeMode } = useLiquidGlass();
+  const modal = useModalVisual();
   const isDark = themeMode === 'dark';
 
-  const resolvedMatte = matteColor || (isDark ? '#111114' : '#FFFFFF');
+  const resolvedMatte = modal && (!matteColor || matteColor.startsWith('rgba') || matteColor === 'transparent') ? (isDark ? '#17171C' : '#FFFFFF') : matteColor || (isDark ? '#111114' : '#FFFFFF');
 
   const cornerRadii: ViewStyle = {
     borderRadius,
@@ -70,7 +72,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
     ...(borderBottomRightRadius !== undefined ? { borderBottomRightRadius } : {}),
   };
 
-  if (!isLiquidGlassEnabled) {
+  if (!isLiquidGlassEnabled || modal) {
     return (
       <View
         style={[

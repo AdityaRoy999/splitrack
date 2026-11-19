@@ -5,6 +5,7 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 interface AnimatedPressableProps {
   children: React.ReactNode;
   onPress?: () => void;
+  onLongPress?: () => void;
   onHoverIn?: () => void;
   onHoverOut?: () => void;
   disabled?: boolean;
@@ -24,6 +25,7 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   children,
   onPress,
+  onLongPress,
   onHoverIn,
   onHoverOut,
   disabled = false,
@@ -56,6 +58,8 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
         activeOpacity={0.9}
         disabled={disabled || !onPress}
         onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={350}
         onPressIn={() => !disabled && animateTo(scaleTo)}
         onPressOut={() => animateTo(1)}
         hitSlop={hitSlop}

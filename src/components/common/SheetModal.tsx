@@ -3,6 +3,7 @@ import { Keyboard, Modal, Platform, useWindowDimensions, View, type ModalProps }
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SceneActivityContext } from './SceneActivityContext';
+import { ModalVisualContext } from './ModalVisualContext';
 
 const SheetModalContext = createContext({ open: true, ready: true, close: () => {}, finishExit: () => {} });
 export const useSheetModal = () => useContext(SheetModalContext);
@@ -53,12 +54,14 @@ export function SheetModal({ visible = false, children, onRequestClose, onShow, 
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider initialMetrics={initialMetrics}>
           <SheetModalContext.Provider value={value}>
+            <ModalVisualContext.Provider value>
             {/* A sheet keeps its live backdrop until its exit finishes. */}
             <SceneActivityContext.Provider value>
               <View pointerEvents={visible ? 'auto' : 'none'} style={{ flex: 1 }}>
                 {visible ? children : presentation.content}
               </View>
             </SceneActivityContext.Provider>
+            </ModalVisualContext.Provider>
           </SheetModalContext.Provider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

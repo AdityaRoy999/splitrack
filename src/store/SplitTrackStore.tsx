@@ -46,7 +46,11 @@ interface SplitTrackContextType {
   refresh(): Promise<void>; loadMoreTransactions(): Promise<void>; hasMoreTransactions: boolean;
   getTripTransactions(id: string, cursor?: string): Promise<{ items: Transaction[]; cursor: string | null; profiles: (MemberProfile & { id: string })[] }>;
   setSelectedAccountId(id: string): Promise<void>; saveSettings(settings: Partial<CloudSettings>): Promise<void>;
-  addTransaction(tx: TransactionDraft, intentId?: string): Promise<void>; deleteTransaction(id: string): Promise<void>;
+  addTransaction(tx: TransactionDraft, intentId?: string): Promise<void>; deleteTransaction(id: string, intentId?: string): Promise<void>;
+  editTransaction(id: string, updates: Partial<TransactionDraft>, intentId?: string): Promise<void>;
+  restoreTransaction(id: string, intentId?: string): Promise<void>;
+  getTransactionBin(): Promise<Transaction[]>;
+  settleTransaction(id: string, friendId: string, amount: number, accountId?: string, intentId?: string): Promise<void>;
   importTransactions(txs: TransactionDraft[]): Promise<number>;
   addFriend(friend: MemberProfile & { friendId?: string; userId?: string }): Promise<Friend>;
   updateFriend(id: string, updates: Partial<MemberProfile>): Promise<Friend | null>;
@@ -208,7 +212,11 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
   const saveSettings = useCallback(async (body: Partial<CloudSettings>) => { await mutate('/api/settings', 'PUT', body); }, [mutate]);
   const setSelectedAccountId = useCallback(async (id: string) => { await saveSettings({ selectedAccountId: id }); }, [saveSettings]);
   const addTransaction = useCallback(async (tx: TransactionDraft, intentId?: string) => { await mutate('/transactions', 'POST', tx, undefined, intentId); }, [mutate]);
-  const deleteTransaction = useCallback(async (id: string) => { await mutate(`/transactions/${encodeURIComponent(id)}`, 'DELETE'); }, [mutate]);
+  const deleteTransaction = useCallback(async (id: string, intentId?: string) => { await mutate(`/transactions/${encodeURIComponent(id)}`, 'DELETE', undefined, undefined, intentId); }, [mutate]);
+  const editTransaction = useCallback(async (id: string, updates: Partial<TransactionDraft>, intentId?: string) => { await mutate(`/api/transactions/${encodeURIComponent(id)}`, 'PUT', updates, undefined, intentId); }, [mutate]);
+  const restoreTransaction = useCallback(async (id: string, intentId?: string) => { await mutate(`/api/transactions/${encodeURIComponent(id)}/restore`, 'POST', undefined, undefined, intentId); }, [mutate]);
+  const getTransactionBin = useCallback(async () => (await api<{ items: Transaction[] }>('/api/transactions/bin')).items, []);
+  const settleTransaction = useCallback(async (id: string, friendId: string, amount: number, accountId?: string, intentId?: string) => { await mutate(`/api/transactions/${encodeURIComponent(id)}/settle`, 'POST', { friendId, amount, accountId }, undefined, intentId); }, [mutate]);
   const importTransactions = useCallback(async (txs: TransactionDraft[]) => {
     let count = 0;
     for (let offset = 0; offset < txs.length; offset += 50) {
@@ -286,7 +294,7 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
       ? { fromId: friend.id, fromName: friend.name, toId: 'user', toName: 'You', amount: friend.netBalance, toUpiId: account?.upiId }
       : { fromId: 'user', fromName: 'You', toId: friend.id, toName: friend.name, amount: Math.abs(friend.netBalance), toUpiId: friend.upiId });
   }, [state.accounts, state.friends, state.settings.selectedAccountId]);
-  const value = useMemo(() => ({ ...metrics, revision: state.revision, accounts: state.accounts, friends: state.friends, trips: state.trips, transactions: state.transactions, categories: state.categories, settings: state.settings, selectedAccountId: state.settings.selectedAccountId, loading, syncing, syncError, refresh, loadMoreTransactions, hasMoreTransactions: Boolean(state.transactionCursor), getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData }), [metrics, state, loading, syncing, syncError, refresh, loadMoreTransactions, getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData]);
+  const value = useMemo(() => ({ ...metrics, revision: state.revision, accounts: state.accounts, friends: state.friends, trips: state.trips, transactions: state.transactions, categories: state.categories, settings: state.settings, selectedAccountId: state.settings.selectedAccountId, loading, syncing, syncError, refresh, loadMoreTransactions, hasMoreTransactions: Boolean(state.transactionCursor), getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, editTransaction, restoreTransaction, getTransactionBin, settleTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData }), [metrics, state, loading, syncing, syncError, refresh, loadMoreTransactions, getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, editTransaction, restoreTransaction, getTransactionBin, settleTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export function useSplitTrack() { const value = useContext(Context); if (!value) throw new Error('SplitTrackProvider is missing.'); return value; }

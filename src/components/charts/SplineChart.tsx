@@ -356,6 +356,7 @@ export const SplineChart: React.FC = () => {
               textColor={mutedText}
               activeTextColor={activeText}
               size="xs"
+              dropdownHeight={28}
               noWrap
               gap={4}
               radius={999}

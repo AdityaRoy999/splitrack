@@ -376,6 +376,7 @@ export const DonutPieChart: React.FC = () => {
               textColor={mutedText}
               activeTextColor={activeText}
               size="xs"
+              dropdownHeight={32}
               noWrap
               gap={4}
               radius={999}

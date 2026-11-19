@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import ReactBitsGradualBlur from '../../vendor/react-bits/GradualBlur';
 import type { GradualBlurProps } from './gradualBlurTypes';
 import { useSceneActive } from '../common/SceneActivityContext';
+import { useModalVisual } from '../common/ModalVisualContext';
 
 export type { GradualBlurProps, GradualBlurPosition } from './gradualBlurTypes';
 export type { GradualBlurCurve } from './blurFalloff';
@@ -15,7 +16,9 @@ export const GradualBlur = React.memo(function GradualBlur({
   tint = 'transparent', zIndex = 20, active = true, style,
 }: GradualBlurProps) {
   const sceneActive = useSceneActive();
+  const modal = useModalVisual();
   const enabled = active && sceneActive;
+  if (modal) return null;
   return (
     <ReactBitsGradualBlur
       position={position} height={height} width={width} strength={enabled ? strength : 0}

@@ -13,9 +13,10 @@ export interface DropdownOption {
 interface DropdownSelectProps {
   items: DropdownOption[]; value: string; onChange(value: string, index: number): void;
   disabled?: boolean; label?: string; backgroundColor?: string; textColor?: string; style?: StyleProp<ViewStyle>;
+  triggerHeight?: number;
 }
 
-export function DropdownSelect({ items, value, onChange, disabled, label = 'Choose an option', backgroundColor, textColor, style }: DropdownSelectProps) {
+export function DropdownSelect({ items, value, onChange, disabled, label = 'Choose an option', backgroundColor, textColor, style, triggerHeight = 38 }: DropdownSelectProps) {
   const { themeMode } = useLiquidGlass();
   const dark = themeMode === 'dark';
   const { width, height } = useWindowDimensions();
@@ -67,7 +68,7 @@ export function DropdownSelect({ items, value, onChange, disabled, label = 'Choo
 
   return (
     <View ref={anchor} collapsable={false} style={style}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${label}: ${chosen?.label ?? 'None selected'}`} accessibilityState={{ expanded: open, disabled }} disabled={disabled} onPress={show} style={[styles.trigger, { backgroundColor: backgroundColor ?? (dark ? '#1C1C22' : '#EFEFF4'), opacity: disabled ? 0.5 : 1 }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${label}: ${chosen?.label ?? 'None selected'}`} accessibilityState={{ expanded: open, disabled }} disabled={disabled} onPress={show} style={[styles.trigger, { height: triggerHeight, borderRadius: triggerHeight / 2, backgroundColor: backgroundColor ?? (dark ? '#1C1C22' : '#EFEFF4'), opacity: disabled ? 0.5 : 1 }]}>
         {chosen?.icon || chosen?.color ? <View pointerEvents="none">{optionIcon(chosen)}</View> : null}
         <Text numberOfLines={1} style={[styles.label, { color }]}>{chosen?.label || label}</Text>
         <AltArrowDownIcon size={16} color={color} />
@@ -90,7 +91,7 @@ export function DropdownSelect({ items, value, onChange, disabled, label = 'Choo
 }
 
 const styles = StyleSheet.create({
-  trigger: { minHeight: 44, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 0 },
+  trigger: { paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 0 },
   label: { flex: 1, fontSize: 13, fontWeight: '500' },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.16)' },
   menu: { position: 'absolute', borderRadius: 18, padding: 6, overflow: 'hidden', borderWidth: 0 },

@@ -3,6 +3,7 @@ import { StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { getGlassStyles } from '../../theme/colors';
 import { GlassSurface } from './GlassSurface';
+import { useModalVisual } from '../common/ModalVisualContext';
 
 interface GlassCardProps {
   children: React.ReactNode;
@@ -25,7 +26,8 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   overflow = 'hidden',
 }) => {
   const { isLiquidGlassEnabled, themeMode } = useLiquidGlass();
-  const glassStyles = getGlassStyles(isLiquidGlassEnabled, themeMode);
+  const modal = useModalVisual();
+  const glassStyles = getGlassStyles(isLiquidGlassEnabled && !modal, themeMode);
 
   return (
     <GlassSurface

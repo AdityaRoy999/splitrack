@@ -127,6 +127,11 @@ export interface Transaction {
   creatorId?: string;
   toAccountId?: string;
   remainingAmount?: number;
+  sourceTransactionId?: string;
+  settlementVector?: { memberId: string; remainingAmount: number; balances: { creditorId: string; debtorId: string; amount: number }[] }[];
+  deletedAt?: string;
+  expiresAt?: number;
+  canRestore?: boolean;
 }
 
 export interface DebtSimplification {

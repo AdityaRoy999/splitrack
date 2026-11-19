@@ -70,6 +70,7 @@ import { AnimatedPressable } from './src/components/common/MotionPrimitives';
 import { TabScene } from './src/components/common/TabScene';
 import { JellyRadio } from './src/components/common/JellyRadio';
 import { CloudStatus } from './src/components/common/CloudStatus';
+import { TransactionActionsProvider, useTransactionActions } from './src/components/transactions/TransactionActions';
 import { ExpenseCategory, Friend, Transaction } from './src/types';
 
 type ExpenseFilter = 'All' | 'Expenses' | 'Splits' | 'Income';
@@ -105,6 +106,7 @@ function MainAppContent({
 }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const transactionActions = useTransactionActions();
   const { palette, themeMode, formatAmount, isLiquidGlassEnabled } = useLiquidGlass();
   const {
     totalIncome,
@@ -449,6 +451,7 @@ function MainAppContent({
               </View>
             </GlassCard>
 
+            <View style={{ alignItems: 'flex-end', marginBottom: 12 }}><GlassPill label="Transaction bin" size="sm" onPress={transactionActions.openBin} /></View>
             {/* Rounded JellyRadio Category Filter + Calendar Date Trigger */}
             <View style={styles.filterWrap}>
               <View style={styles.filterChipsCol}>
@@ -463,6 +466,7 @@ function MainAppContent({
                   textColor={textColor}
                   activeTextColor={activeText}
                   size="sm"
+                  dropdownHeight={36}
                   gap={8}
                   radius={999}
                 />
@@ -508,6 +512,7 @@ function MainAppContent({
                   textColor={textColor}
                   activeTextColor={activeText}
                   size="sm"
+                  dropdownHeight={36}
                   gap={8}
                   radius={999}
                 />
@@ -593,8 +598,10 @@ function MainAppContent({
                       <React.Fragment key={tx.id}>
                         <AnimatedPressable
                           scaleTo={0.985}
-                          onPress={() => setShowSettle(true)}
-                          contentStyle={styles.groupedRow}
+                          onPress={() => transactionActions.open(tx)}
+                          onLongPress={() => transactionActions.select(tx)}
+                          accessibilityState={{ selected: transactionActions.selected.has(tx.id) }}
+                          contentStyle={[styles.groupedRow, transactionActions.selected.has(tx.id) && { backgroundColor: chipBg }]}
                         >
                           <View style={styles.tripExpenseRow}>
                             <View style={styles.tripExpenseLeft}>
@@ -667,7 +674,7 @@ function MainAppContent({
     );
   }, [activeBg, activeText, categories, categoryFilterItems, chipBg, dividerColor,
     dynamicScrollContent, expenseFilter, formatAmount, isDark, mutedText, openQuickExpense, rootBg,
-    selectedCategoryFilter, selectedExpenseDate, textColor, totalExpenses, transactions, hasMoreTransactions, loadMoreTransactions]);
+    selectedCategoryFilter, selectedExpenseDate, textColor, totalExpenses, transactions, hasMoreTransactions, loadMoreTransactions, transactionActions]);
 
   const renderTripsTab = useCallback(() => {
     const activeTrip = selectedTripId ? trips.find((t) => t.id === selectedTripId) : undefined;
@@ -915,10 +922,10 @@ function MainAppContent({
                       <React.Fragment key={tx.id}>
                         <AnimatedPressable
                           scaleTo={0.985}
-                          onPress={() =>
-                            tx.tripId ? setSelectedTripId(tx.tripId) : setShowSettle(true)
-                          }
-                          contentStyle={styles.groupedRow}
+                          onPress={() => transactionActions.open(tx)}
+                          onLongPress={() => transactionActions.select(tx)}
+                          accessibilityState={{ selected: transactionActions.selected.has(tx.id) }}
+                          contentStyle={[styles.groupedRow, transactionActions.selected.has(tx.id) && { backgroundColor: isDark ? '#303039' : '#E2E2EC' }]}
                         >
                           <View style={styles.tripExpenseRow}>
                             <View style={styles.tripExpenseLeft}>
@@ -979,7 +986,7 @@ function MainAppContent({
   }, [categories, dividerColor, dynamicScrollContent, formatAmount, friends,
     getSimplifiedDebts, isDark, mutedText, selectedTripId, textColor,
     totalOwedToYou, totalYouOwe, transactions, trips, removalMode, removableTrips.length,
-    removeTrip, tripRemovalError, user?.uid]);
+    removeTrip, tripRemovalError, user?.uid, transactionActions]);
 
   const renderAnalyticsTab = useCallback(() => (
     <ScrollView
@@ -1175,9 +1182,7 @@ export default function App() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <AuthProvider>
-          <SplitTrackProvider>
-            <LiquidGlassProvider><AppContent /></LiquidGlassProvider>
-          </SplitTrackProvider>
+          <AppContent />
         </AuthProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
@@ -1210,6 +1215,7 @@ function AppContent() {
 
   return (
             <View style={styles.appRoot} onLayout={() => { void SplashScreen.hideAsync().catch(() => {}); }}>
+              <SplitTrackProvider><LiquidGlassProvider>
               {loading ? (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#09090B' }}><ActivityIndicator color="#FFFFFF" /><Text style={{ color: '#A1A1AA', marginTop: 16 }}>Loading your account…</Text></View>
               ) : user && profileError ? (
@@ -1219,7 +1225,7 @@ function AppContent() {
                   <GlassPill label="Sign out" onPress={handleSignOut} />
                 </View>
               ) : isAuthenticated ? (
-                <MainAppContent
+                <TransactionActionsProvider><MainAppContent
                   key={user?.uid}
                   userDisplayName={userDisplayName}
                   userHandle={userHandle}
@@ -1227,7 +1233,7 @@ function AppContent() {
                   hideHeaderLogo={hideHeaderLogo}
                   onHeaderLogoLayout={showPreloader ? setHeaderLogoRect : undefined}
                   onHeaderLogoNode={handleHeaderLogoNode}
-                />
+                /></TransactionActionsProvider>
               ) : user ? (
                 <OnboardingUsernameScreen
                   initialDisplayName={user.displayName || profile?.displayName}
@@ -1246,6 +1252,7 @@ function AppContent() {
                 />
               )}
               {sessionError ? <Text accessibilityLiveRegion="polite" style={{ color: '#F87171', padding: 12 }}>{sessionError}</Text> : null}
+              </LiquidGlassProvider></SplitTrackProvider>
               {showPreloader ? (
                 <PreloaderSplash
                   ready={!loading}
