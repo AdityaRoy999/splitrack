@@ -85,7 +85,7 @@ export const QuickSendTray: React.FC<QuickSendTrayProps> = ({
         </AnimatedPressable>
       </View>
 
-      <HorizontalEdgeFade style={styles.horizontalBlurWrap} width={22} left={scrollEdges.left} right={scrollEdges.right}>
+      <HorizontalEdgeFade style={styles.horizontalBlurWrap} tint={isDark ? '#09090B' : '#F4F4F8'} width={22} left={scrollEdges.left} right={scrollEdges.right}>
         <ScrollView
           horizontal
           onScroll={scrollEdges.onScroll}

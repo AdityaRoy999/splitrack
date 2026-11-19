@@ -83,7 +83,7 @@ export function HorizontalEdgeFade({ children, style, tint, width = 24, left = t
 // and only enable a fade where content is actually being clipped.
 export function ScrollEdgeFade({ children, style, tint, top = 24, bottom = 28 }: ScrollEdgeFadeProps) {
   const { themeMode } = useLiquidGlass();
-  const background = captureBackground(tint, themeMode === 'dark' ? '#09090B' : '#FFFFFF');
+  const background = captureBackground(tint, themeMode === 'dark' ? '#09090B' : '#F4F4F8');
   const edges = useScrollEdges(false);
   const scroller = React.isValidElement<ScrollViewProps>(children) ? React.cloneElement(children, {
     style: [styles.content, children.props.style],
