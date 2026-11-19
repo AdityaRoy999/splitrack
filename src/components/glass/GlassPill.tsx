@@ -4,17 +4,19 @@ import { triggerImpact, ImpactStyle } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassSurface } from './GlassSurface';
+import { useModalVisual } from '../common/ModalVisualContext';
 
 interface GlassPillProps {
   label?: string;
   icon?: React.ReactNode;
   onPress: () => void;
-  variant?: 'light' | 'glass' | 'accent' | 'dark';
+  variant?: 'light' | 'glass' | 'accent' | 'dark' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   style?: ViewStyle;
   textStyle?: TextStyle;
   active?: boolean;
   disabled?: boolean;
+  shape?: 'pill' | 'rounded';
 }
 
 export const GlassPill: React.FC<GlassPillProps> = ({
@@ -27,9 +29,12 @@ export const GlassPill: React.FC<GlassPillProps> = ({
   textStyle,
   active = false,
   disabled = false,
+  shape,
 }) => {
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
+  const modal = useModalVisual();
+  const radius = (shape ?? (modal ? 'rounded' : 'pill')) === 'rounded' ? 14 : 999;
 
   const handlePress = () => {
     triggerImpact(ImpactStyle.Light);
@@ -46,6 +51,8 @@ export const GlassPill: React.FC<GlassPillProps> = ({
         return {
           backgroundColor: isDark ? '#FFFFFF' : '#000000',
         };
+      case 'danger':
+        return { backgroundColor: '#E5484D' };
       case 'dark':
         return {
           backgroundColor: isDark ? '#1C1C20' : '#E5E5EA',
@@ -60,6 +67,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
 
   const getTextColor = () => {
     if (variant === 'light') return '#000000';
+    if (variant === 'danger') return '#FFFFFF';
     if (variant === 'accent') return isDark ? '#000000' : '#FFFFFF';
     return isDark ? '#FFFFFF' : '#000000';
   };
@@ -70,7 +78,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
     lg: { paddingVertical: 12, paddingHorizontal: 22, height: 48 },
   }[size];
 
-  const useTranslucentGlass = isLiquidGlassEnabled && (variant === 'glass' || variant === 'dark') && !active;
+  const useTranslucentGlass = isLiquidGlassEnabled && !modal && (variant === 'glass' || variant === 'dark') && !active;
 
   const innerContent = (
     <>
@@ -98,9 +106,10 @@ export const GlassPill: React.FC<GlassPillProps> = ({
       style={style}
       contentStyle={
         useTranslucentGlass
-          ? styles.glassPressReset
+          ? [styles.glassPressReset, { borderRadius: radius }]
           : [
               styles.base,
+              { borderRadius: radius },
               getContainerStyle(),
               sizePadding,
               active && { backgroundColor: isDark ? '#FFFFFF' : '#000000' },
@@ -109,7 +118,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
     >
       {useTranslucentGlass ? (
         <GlassSurface
-          borderRadius={999}
+          borderRadius={radius}
           glassStyle="clear"
           interactive
           intensity={36}
@@ -122,7 +131,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
                 ? 'rgba(255, 255, 255, 0.16)'
                 : 'rgba(255, 255, 255, 0.45)'
           }
-          style={[styles.base, sizePadding]}
+          style={[styles.base, sizePadding, { borderRadius: radius }]}
         >
           {innerContent}
         </GlassSurface>

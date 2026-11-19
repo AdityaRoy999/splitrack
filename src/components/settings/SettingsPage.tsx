@@ -787,14 +787,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             style={[
               styles.eraseBtn,
               {
-                backgroundColor: isDark ? '#140808' : '#FEE2E2',
+                backgroundColor: '#E5484D',
               },
             ]}
             activeOpacity={0.7}
             accessibilityLabel="Start a fresh ledger"
             disabled={pending}
           >
-            <TrashBinTrashIcon size={16} color="#EF4444" />
+            <TrashBinTrashIcon size={16} color="#FFFFFF" />
             <Text style={styles.eraseBtnTitle}>Start a Fresh Ledger</Text>
           </TouchableOpacity>
 
@@ -1237,11 +1237,12 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 13,
     paddingHorizontal: 16,
-    borderRadius: 16,
+    borderRadius: 14,
+    minHeight: 48,
     borderWidth: 0,
   },
   eraseBtnTitle: {
-    color: '#EF4444',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1251,7 +1252,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 13,
-    borderRadius: 999,
+    borderRadius: 14,
+    minHeight: 48,
+    borderWidth: 0,
   },
   resetBtnText: {
     fontSize: 13,

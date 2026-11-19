@@ -159,6 +159,7 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
       {/* Trip-Style Double-Matte Spotlight Profile Hero */}
       <View style={styles.heroWrap}>
         <SpotlightCard
+          blurCover={false}
           borderRadius={24}
           coverImageUri={isPhotoUri(friend.avatar) ? friend.avatar : undefined}
           highlightableCover={isPhotoUri(friend.avatar)}

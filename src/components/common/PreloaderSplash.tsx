@@ -81,6 +81,7 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
   const exitRequestedRef = useRef(false);
   const mountedRef = useRef(true);
   const finishedRef = useRef(false);
+  const handoffRef = useRef(false);
   const framesRef = useRef(new Set<number>());
   const letterExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revealRef = useRef(onRevealHeaderLogo);
@@ -107,13 +108,15 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
   }, []);
 
   const finishStartup = useCallback(() => {
-    if (!mountedRef.current || finishedRef.current) return;
-    finishedRef.current = true;
+    if (!mountedRef.current || finishedRef.current || handoffRef.current) return;
+    handoffRef.current = true;
     startupPreloaderCompleted = true;
     revealRef.current?.();
-    // Commit the destination logo before removing the moving image.
-    scheduleFrame(() => scheduleFrame(() => finishRef.current()));
-  }, [scheduleFrame]);
+    // Keep the landed logo while the header photo fades in beneath it.
+    Animated.timing(introOpacity, { toValue: 0, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: USE_NATIVE_DRIVER, isInteraction: false }).start(({ finished }) => {
+      if (finished && mountedRef.current && !finishedRef.current) { finishedRef.current = true; finishRef.current(); }
+    });
+  }, [introOpacity]);
 
   useEffect(() => {
     if (skipAnimation) finishStartup();
@@ -380,7 +383,7 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
 
   const animatedCornerRadius = cornerProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [28, HERO_ICON_SIZE / 2],
+    outputRange: [28, 14 * HERO_ICON_SIZE / HEADER_ICON_SIZE],
   });
 
   const bgColor = isDark ? '#000000' : '#FFFFFF';

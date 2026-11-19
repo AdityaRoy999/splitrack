@@ -48,8 +48,8 @@ export function TransactionSwipeRow({ transaction, children }: { transaction: Tr
 
 const styles = StyleSheet.create({
   row: { borderRadius: 16, borderWidth: 0 },
-  actions: { width: 144, flexDirection: 'row', gap: 6, paddingVertical: 3 },
-  action: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 14, borderWidth: 0 },
+  actions: { width: 164, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 4 },
+  action: { width: 66, height: 56, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 14, borderWidth: 0 },
   edit: { backgroundColor: '#5A5B65' }, delete: { backgroundColor: '#E5484D' },
   label: { fontSize: 11, fontWeight: '600', color: '#FFFFFF' },
 });

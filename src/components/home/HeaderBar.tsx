@@ -1,7 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useAuth } from '../../auth/AuthContext';
-import { UserAvatar } from '../common/UserAvatar';
+import { HeaderAvatar } from './HeaderAvatar';
 import { measureNodeInWindow, type ViewRefNode, type WindowRect } from '../../utils/measureWindow';
 import { Sun2Icon } from '@solar-icons/react-native/bold/sun-2';
 import { MoonIcon } from '@solar-icons/react-native/bold/moon';
@@ -76,14 +76,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             onLayout={reportLogoLayout}
             style={styles.avatarSlot}
           >
-            <View style={{ opacity: hideLogo ? 0 : 1 }}>
-              <UserAvatar
-                avatarUri={avatarUri}
-                size={40}
-                borderRadius={14}
-                isDark={isDark}
-              />
-            </View>
+            <HeaderAvatar key={avatarUri ?? 'default-avatar'} uri={avatarUri} hidden={hideLogo} dark={isDark} name={userName} />
           </View>
         </AnimatedPressable>
         <View style={styles.greetingCol}>

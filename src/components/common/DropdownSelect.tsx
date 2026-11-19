@@ -67,11 +67,11 @@ export function DropdownSelect({ items, value, onChange, disabled, label = 'Choo
   const top = Math.max(insets.top + 8, Math.min(bottomEdge - maxHeight - 12, opensBelow ? (rect?.y ?? 0) + (rect?.height ?? 0) + 8 : (rect?.y ?? 0) - maxHeight - 8));
 
   return (
-    <View ref={anchor} collapsable={false} style={style}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${label}: ${chosen?.label ?? 'None selected'}`} accessibilityState={{ expanded: open, disabled }} disabled={disabled} onPress={show} style={[styles.trigger, { height: triggerHeight, borderRadius: triggerHeight / 2, backgroundColor: backgroundColor ?? (dark ? '#1C1C22' : '#EFEFF4'), opacity: disabled ? 0.5 : 1 }]}>
+    <View ref={anchor} collapsable={false} style={[styles.anchor, style]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${label}: ${chosen?.label ?? 'None selected'}`} accessibilityState={{ expanded: open, disabled }} disabled={disabled} onPress={show} style={[styles.trigger, { height: triggerHeight, borderRadius: 12, backgroundColor: backgroundColor ?? (dark ? '#1C1C22' : '#EFEFF4'), opacity: disabled ? 0.5 : 1 }]}>
         {chosen?.icon || chosen?.color ? <View pointerEvents="none">{optionIcon(chosen)}</View> : null}
-        <Text numberOfLines={1} style={[styles.label, { color }]}>{chosen?.label || label}</Text>
-        <AltArrowDownIcon size={16} color={color} />
+        <Text numberOfLines={1} style={[styles.triggerLabel, { color }]}>{chosen?.label || label}</Text>
+        <View pointerEvents="none" style={styles.arrow}><AltArrowDownIcon size={16} color={color} /></View>
       </Pressable>
       {retained && rect ? <Modal transparent visible animationType="none" statusBarTranslucent navigationBarTranslucent presentationStyle="overFullScreen" onRequestClose={close}>
         <View style={styles.overlay}>
@@ -91,7 +91,10 @@ export function DropdownSelect({ items, value, onChange, disabled, label = 'Choo
 }
 
 const styles = StyleSheet.create({
-  trigger: { paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 0 },
+  anchor: { flexShrink: 0, minWidth: 96 },
+  trigger: { paddingLeft: 12, paddingRight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 0 },
+  triggerLabel: { flexShrink: 1, minWidth: 0, fontSize: 13, fontWeight: '500' },
+  arrow: { position: 'absolute', top: 0, bottom: 0, right: 8, width: 20, alignItems: 'center', justifyContent: 'center' },
   label: { flex: 1, fontSize: 13, fontWeight: '500' },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.16)' },
   menu: { position: 'absolute', borderRadius: 18, padding: 6, overflow: 'hidden', borderWidth: 0 },

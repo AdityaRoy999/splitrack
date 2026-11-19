@@ -29,7 +29,11 @@ const categories: ExpenseCategory[] = [
   { id: 'cat-fun', name: 'Fun', iconKey: 'confetti', color: '#F59E0B' },
   { id: 'cat-other', name: 'Other', iconKey: 'tag', color: '#71717A' },
 ];
-const empty = (uid = ''): Snapshot => ({ schemaVersion: 2, userId: uid, revision: 0, accounts: [], friends: [], trips: [], transactions: [], categories, transactionCursor: null, profile: null, settings: { selectedAccountId: '', currency: 'INR', themeMode: 'dark', hideAmounts: false, isLiquidGlassEnabled: true }, summary: { totalIncome: 0, totalExpenses: 0, categories: {}, months: {} } });
+type Appearance = Pick<CloudSettings, 'themeMode' | 'isLiquidGlassEnabled' | 'hideAmounts' | 'selectionStyle' | 'notificationDirection'>;
+const appearances = new Map<string, Appearance>();
+const appearanceKey = (uid: string) => `@splittrack_appearance_v1_${uid}`;
+const appearanceOf = (settings: CloudSettings): Appearance => ({ themeMode: settings.themeMode, isLiquidGlassEnabled: settings.isLiquidGlassEnabled, hideAmounts: settings.hideAmounts, selectionStyle: settings.selectionStyle ?? 'chips', notificationDirection: settings.notificationDirection ?? 'bottom' });
+const empty = (uid = ''): Snapshot => ({ schemaVersion: 2, userId: uid, revision: 0, accounts: [], friends: [], trips: [], transactions: [], categories, transactionCursor: null, profile: null, settings: { selectedAccountId: '', currency: 'INR', themeMode: 'dark', hideAmounts: false, isLiquidGlassEnabled: true, ...appearances.get(uid) }, summary: { totalIncome: 0, totalExpenses: 0, categories: {}, months: {} } });
 const cacheKey = (uid: string) => `@splittrack_cloud_v2_${uid}`;
 const rounded = (value: number) => Math.round(value * 100) / 100;
 const entityPath = (type: string, id: string) => `/entities/${type}/${encodeURIComponent(id)}`;
@@ -41,7 +45,7 @@ interface SplitTrackContextType {
   categoryMetrics: CategoryMetric[]; chartData: ChartDataPoint[];
   totalBalance: number; totalIncome: number; totalExpenses: number; monthlyExpenses: number;
   netFriendBalance: number; totalOwedToYou: number; totalYouOwe: number;
-  selectedAccountId: string; settings: CloudSettings; loading: boolean; syncing: boolean; syncError: string;
+  selectedAccountId: string; settings: CloudSettings; loading: boolean; syncing: boolean; syncError: string; preferencesReady: boolean;
   revision: number;
   refresh(): Promise<void>; loadMoreTransactions(): Promise<void>; hasMoreTransactions: boolean;
   getTripTransactions(id: string, cursor?: string): Promise<{ items: Transaction[]; cursor: string | null; profiles: (MemberProfile & { id: string })[] }>;
@@ -76,6 +80,7 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
   const [state, setState] = useState<Snapshot>(() => empty(uid));
   const stateRef = useRef(state), uidRef = useRef(uid);
   const [loading, setLoading] = useState(true), [syncing, setSyncing] = useState(false), [syncError, setSyncError] = useState('');
+  const [preferencesReady, setPreferencesReady] = useState(() => !uid || appearances.has(uid));
   const queue = useRef<Promise<unknown>>(Promise.resolve()), pending = useRef(0), refreshPromise = useRef<Promise<void> | null>(null);
   const serverSnapshot = useRef(false), historyCount = useRef(50), loadingHistory = useRef(false);
   const cacheWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -87,8 +92,13 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
     if (fromServer) serverSnapshot.current = true;
     if (fromServer) lastSnapshotAt.current = Date.now();
     const retained = preserveOpenedHistory(next, stateRef.current, historyCount.current);
-    const normalized = { ...retained, settings: { ...next.settings, selectionStyle: next.settings.selectionStyle ?? 'chips', notificationDirection: next.settings.notificationDirection ?? 'bottom' } };
+    const normalized = { ...retained, settings: { ...next.settings, selectionStyle: next.settings.selectionStyle ?? 'chips', notificationDirection: next.settings.notificationDirection ?? 'bottom', ...(!fromServer ? appearances.get(requestedUid) : undefined) } };
     stateRef.current = normalized; setState(normalized); setSyncError('');
+    const appearance = appearanceOf(normalized.settings);
+    const previousAppearance = appearances.get(requestedUid);
+    appearances.set(requestedUid, appearance);
+    setPreferencesReady(true);
+    if (JSON.stringify(previousAppearance) !== JSON.stringify(appearance)) void AsyncStorage.setItem(appearanceKey(requestedUid), JSON.stringify(appearance)).catch(() => {});
     if (cacheWrite.current) clearTimeout(cacheWrite.current);
     cacheWrite.current = setTimeout(() => {
       if (uidRef.current === requestedUid) void AsyncStorage.setItem(cacheKey(requestedUid), JSON.stringify(stateRef.current)).catch(() => {});
@@ -141,9 +151,23 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
     let active = true;
     refreshPromise.current = null;
     if (ready) {
-      void AsyncStorage.getItem(cacheKey(uid)).then(raw => {
-        if (active && raw) { try { accept(JSON.parse(raw), uid, false); } catch { /* Invalid cache is replaced by AWS. */ } }
-      });
+      void AsyncStorage.multiGet([appearanceKey(uid), cacheKey(uid)]).then(([[, appearanceRaw], [, ledgerRaw]]) => {
+        if (!active || serverSnapshot.current) return;
+        if (appearanceRaw && !appearances.has(uid)) {
+          try {
+            const saved = JSON.parse(appearanceRaw) as Appearance;
+            if (['dark', 'light'].includes(saved.themeMode) && typeof saved.isLiquidGlassEnabled === 'boolean' && typeof saved.hideAmounts === 'boolean'
+              && (saved.selectionStyle === undefined || ['chips', 'dropdown'].includes(saved.selectionStyle))
+              && (saved.notificationDirection === undefined || ['top', 'bottom'].includes(saved.notificationDirection))) {
+              const appearance = appearanceOf({ ...stateRef.current.settings, ...saved });
+              appearances.set(uid, appearance);
+              const next = { ...stateRef.current, settings: { ...stateRef.current.settings, ...appearance } };
+              stateRef.current = next; setState(next); setPreferencesReady(true);
+            }
+          } catch { /* The first AWS snapshot replaces invalid preferences. */ }
+        }
+        if (ledgerRaw) { try { accept(JSON.parse(ledgerRaw), uid, false); } catch { /* Invalid cache is replaced by AWS. */ } }
+      }).catch(() => { /* AWS remains authoritative if device storage is unavailable. */ });
       void Promise.resolve().then(refresh).catch(() => {});
     }
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -294,7 +318,7 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
       ? { fromId: friend.id, fromName: friend.name, toId: 'user', toName: 'You', amount: friend.netBalance, toUpiId: account?.upiId }
       : { fromId: 'user', fromName: 'You', toId: friend.id, toName: friend.name, amount: Math.abs(friend.netBalance), toUpiId: friend.upiId });
   }, [state.accounts, state.friends, state.settings.selectedAccountId]);
-  const value = useMemo(() => ({ ...metrics, revision: state.revision, accounts: state.accounts, friends: state.friends, trips: state.trips, transactions: state.transactions, categories: state.categories, settings: state.settings, selectedAccountId: state.settings.selectedAccountId, loading, syncing, syncError, refresh, loadMoreTransactions, hasMoreTransactions: Boolean(state.transactionCursor), getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, editTransaction, restoreTransaction, getTransactionBin, settleTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData }), [metrics, state, loading, syncing, syncError, refresh, loadMoreTransactions, getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, editTransaction, restoreTransaction, getTransactionBin, settleTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData]);
+  const value = useMemo(() => ({ ...metrics, revision: state.revision, accounts: state.accounts, friends: state.friends, trips: state.trips, transactions: state.transactions, categories: state.categories, settings: state.settings, selectedAccountId: state.settings.selectedAccountId, loading, syncing, syncError, preferencesReady, refresh, loadMoreTransactions, hasMoreTransactions: Boolean(state.transactionCursor), getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, editTransaction, restoreTransaction, getTransactionBin, settleTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData }), [metrics, state, loading, syncing, syncError, preferencesReady, refresh, loadMoreTransactions, getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, editTransaction, restoreTransaction, getTransactionBin, settleTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export function useSplitTrack() { const value = useContext(Context); if (!value) throw new Error('SplitTrackProvider is missing.'); return value; }

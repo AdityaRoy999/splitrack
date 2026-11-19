@@ -24,6 +24,7 @@ interface SpotlightCardProps {
   onPress?: () => void;
   coverImageUri?: string;
   highlightableCover?: boolean;
+  blurCover?: boolean;
   onCoverToggle?: (highlighted: boolean) => void;
   style?: StyleProp<ViewStyle>;
   panelStyle?: StyleProp<ViewStyle>;
@@ -41,6 +42,7 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
   onPress,
   coverImageUri,
   highlightableCover = false,
+  blurCover = true,
   onCoverToggle,
   style,
   panelStyle,
@@ -143,10 +145,10 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
               },
             ]}
           />
-          <GradualBlur
+          {blurCover ? <GradualBlur
             position="bottom" height={120} intensity={85} startOffset={0.05}
             tint={isDark ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.08)'} zIndex={1}
-          />
+          /> : null}
         </View>
       ) : null}
 

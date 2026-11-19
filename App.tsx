@@ -782,17 +782,15 @@ function MainAppContent({
                   onPress={() => { setRemovingTrips(!removalMode); setTripRemovalError(''); }}
                   accessibilityLabel={removalMode ? 'Finish removing trips' : 'Remove trips'}
                   accessibilityState={{ selected: removalMode }}
-                  contentStyle={[styles.tripRemoveToggle, { backgroundColor: isDark ? '#18181D' : '#EFEFF4' }]}
+                  contentStyle={[styles.tripRemoveToggle, { backgroundColor: removalMode ? (isDark ? '#18181D' : '#EFEFF4') : '#E5484D' }]}
                 >
-                  {removalMode ? <CheckCircleIcon size={20} color="#10B981" /> : <MinusCircleIcon size={20} color={textColor} />}
+                  {removalMode ? <CheckCircleIcon size={20} color="#10B981" /> : <MinusCircleIcon size={20} color="#FFFFFF" />}
                 </AnimatedPressable> : null}
-                <GlassPill
-                  label="New Trip"
-                  icon={<AddCircleIcon size={16} color={textColor} />}
-                  variant="dark"
-                  size="sm"
+                <AnimatedPressable
+                  accessibilityLabel="Add a trip or group"
+                  contentStyle={[styles.tripRemoveToggle, { backgroundColor: isDark ? '#242428' : '#EFEFF4' }]}
                   onPress={() => { setRemovingTrips(false); setShowAddTrip(true); }}
-                />
+                ><AddCircleIcon size={20} color={textColor} /></AnimatedPressable>
               </View>
             </View>
 
@@ -1038,7 +1036,7 @@ function MainAppContent({
       <View collapsable={false} style={[styles.mainViewport, { backgroundColor: rootBg }]}>
         <View style={[styles.tabPagesContainer, { backgroundColor: rootBg }]}>
           {showSettings ? (
-            <View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
+            <TabScene active><View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
               <SettingsPage
                 onBack={() => setShowSettings(false)}
                 onSignOut={onSignOut}
@@ -1062,24 +1060,23 @@ function MainAppContent({
                   navigateTab('expenses');
                 }}
               />
-            </View>
-          ) : (
-            <View style={styles.tabPagesContainer}>
-              <TabScene active={currentTab === 'home'} effectsActive={effectsActive} render={renderHomeTab} />
+            </View></TabScene>
+          ) : null}
+            <View pointerEvents={showSettings ? 'none' : 'box-none'} style={styles.tabPagesContainer}>
+              <TabScene active={!showSettings && currentTab === 'home'} sceneKey={`${homeView}:${selectedMemberId ?? ''}`} effectsActive={effectsActive} render={renderHomeTab} />
 
               {visitedTabs.expenses && (
-                <TabScene active={currentTab === 'expenses'} effectsActive={effectsActive} render={renderExpensesTab} />
+                <TabScene active={!showSettings && currentTab === 'expenses'} effectsActive={effectsActive} render={renderExpensesTab} />
               )}
 
               {visitedTabs.trips && (
-                <TabScene active={currentTab === 'trips'} effectsActive={effectsActive} render={renderTripsTab} />
+                <TabScene active={!showSettings && currentTab === 'trips'} sceneKey={selectedTripId ?? 'groups'} effectsActive={effectsActive} render={renderTripsTab} />
               )}
 
               {visitedTabs.analytics && (
-                <TabScene active={currentTab === 'analytics'} effectsActive={effectsActive} render={renderAnalyticsTab} />
+                <TabScene active={!showSettings && currentTab === 'analytics'} effectsActive={effectsActive} render={renderAnalyticsTab} />
               )}
             </View>
-          )}
 
         </View>
         <GradualBlur
@@ -1191,6 +1188,9 @@ function AppContent() {
   const isAuthenticated = Boolean(user && profile?.username);
   const userDisplayName = profile?.displayName ?? user?.displayName ?? '';
   const userHandle = profile?.handle ?? '';
+  const uid = user?.uid ?? '';
+  const [appearanceStatus, setAppearanceStatus] = useState({ uid: '', ready: false });
+  const reportPreferencesReady = useCallback((ready: boolean) => setAppearanceStatus(previous => previous.uid === uid && previous.ready === ready ? previous : { uid, ready }), [uid]);
   const [sessionError, setSessionError] = useState('');
   const [showPreloader, setShowPreloader] = useState(() => !hasCompletedStartupPreloader());
   const [hideHeaderLogo, setHideHeaderLogo] = useState(() => !hasCompletedStartupPreloader());
@@ -1212,7 +1212,7 @@ function AppContent() {
 
   return (
             <View style={styles.appRoot} onLayout={() => { void SplashScreen.hideAsync().catch(() => {}); }}>
-              <SplitTrackProvider><LiquidGlassProvider>
+              <SplitTrackProvider><LiquidGlassProvider onPreferencesReady={reportPreferencesReady}>
               {loading ? (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#09090B' }}><ActivityIndicator color="#FFFFFF" /><Text style={{ color: '#A1A1AA', marginTop: 16 }}>Loading your account…</Text></View>
               ) : user && profileError ? (
@@ -1252,7 +1252,7 @@ function AppContent() {
               </LiquidGlassProvider></SplitTrackProvider>
               {showPreloader ? (
                 <PreloaderSplash
-                  ready={!loading}
+                  ready={!loading && (!isAuthenticated || (appearanceStatus.uid === uid && appearanceStatus.ready))}
                   targetLogoRect={activeTargetRect}
                   targetLogoNodeRef={activeTargetNodeRef}
                   onRevealHeaderLogo={() => {
@@ -1275,7 +1275,7 @@ function AppContent() {
 
 const styles = StyleSheet.create({
   tripActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tripRemoveToggle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  tripRemoveToggle: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 0 },
   tripRemovalHint: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
   appRoot: {
     flex: 1,
