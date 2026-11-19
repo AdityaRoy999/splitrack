@@ -9,22 +9,29 @@ if (version !== '0.1.3') {
   throw new Error(`expo-backdrop patch requires version 0.1.3; found ${version}. Review the native source before upgrading.`);
 }
 
-const nativeFile = join(packageRoot, 'android', 'src', 'main', 'java', 'expo', 'modules', 'blurview', 'views', 'ProgressiveBlurView.kt');
-const original = readFileSync(nativeFile, 'utf8');
-const lineEnding = original.includes('\r\n') ? '\r\n' : '\n';
-let source = original.replace(/\r\n/g, '\n');
-let changed = false;
+const nativeDirectory = join(packageRoot, 'android', 'src', 'main', 'java', 'expo', 'modules', 'blurview', 'views');
+function loadSource(name) {
+  const path = join(nativeDirectory, name);
+  const original = readFileSync(path, 'utf8');
+  return {
+    path, source: original.replace(/\r\n/g, '\n'),
+    lineEnding: original.includes('\r\n') ? '\r\n' : '\n', changed: false,
+  };
+}
+const viewFile = loadSource('ProgressiveBlurView.kt');
+const layerFile = loadSource('ProgressiveBlurLayer.kt');
+let target = viewFile;
 
 function patchOnce(label, before, after) {
-  const oldCount = source.split(before).length - 1;
-  const newCount = source.split(after).length - 1;
+  const oldCount = target.source.split(before).length - 1;
+  const newCount = target.source.split(after).length - 1;
   const embeddedOriginalCount = after.split(before).length - 1;
   if (oldCount === embeddedOriginalCount && newCount === 1) return;
   if (oldCount !== 1 || newCount !== 0) {
     throw new Error(`expo-backdrop ${label} patch did not match the expected 0.1.3 source. Refusing a partial patch.`);
   }
-  source = source.replace(before, after);
-  changed = true;
+  target.source = target.source.replace(before, after);
+  target.changed = true;
 }
 
 // Upstream treats an explicit transparent color as "no custom color" and
@@ -111,9 +118,24 @@ patchOnce(
   private fun applyIntensity() {`,
 );
 
+// Qm's asynchronous window PixelCopy callback can arrive after detach/resize
+// released its bitmap fields. Accept Java's nullable platform arguments and
+// reject stale captures before accessing input.width or invoking native blur.
+target = layerFile;
+patchOnce(
+  'late capture lifecycle',
+  `  override fun blur(input: Bitmap, output: Bitmap) {
+    if (width == 0 || height == 0) return`,
+  `  override fun blur(input: Bitmap?, output: Bitmap?) {
+    // Splittrack: discard late PixelCopy after teardown or bitmap recycling.
+    if (!isAttachedToWindow || input == null || output == null || input.isRecycled || output.isRecycled) return
+    if (width == 0 || height == 0) return`,
+);
+
 // Validate every replacement before writing so an upstream source mismatch
 // never leaves only part of the fixes applied during npm ci / cloud builds.
-if (changed) {
-  writeFileSync(nativeFile, source.replace(/\n/g, lineEnding));
+const changedFiles = [viewFile, layerFile].filter(file => file.changed);
+for (const file of changedFiles) {
+  writeFileSync(file.path, file.source.replace(/\n/g, file.lineEnding));
 }
-console.log(`expo-backdrop 0.1.3 Android fixes ${changed ? 'applied' : 'already applied'}.`);
+console.log(`expo-backdrop 0.1.3 Android fixes ${changedFiles.length ? 'applied' : 'already applied'}.`);
