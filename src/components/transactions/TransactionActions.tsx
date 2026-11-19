@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
   title: { fontSize: 22, fontWeight: '600', marginBottom: 4 },
   caption: { fontSize: 12, lineHeight: 18 },
-  close: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 0 },
+  close: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 0 },
   empty: { alignItems: 'center', gap: 10, paddingVertical: 24 },
   emptyIcon: { padding: 18, borderRadius: 24 }, emptyTitle: { fontSize: 16, fontWeight: '500' },
   deletedRow: { flexDirection: 'row', alignItems: 'center', gap: 12 }, deletedTitle: { fontSize: 15, fontWeight: '500', flex: 1 },
