@@ -13,6 +13,7 @@ import {
 import { triggerSelection } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { HorizontalEdgeFade, useHorizontalScrollEdges } from './ScrollEdgeFade';
+import { DropdownSelect } from './DropdownSelect';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -54,6 +55,7 @@ export interface JellyRadioProps {
   fadeColor?: string;
   blurWidth?: number;
   style?: StyleProp<ViewStyle>;
+  presentation?: 'auto' | 'chips';
 }
 
 const LEVELS_PRESET: JellyRadioItem[] = [
@@ -356,9 +358,10 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   fadeColor,
   blurWidth = 24,
   style,
+  presentation = 'auto',
 }) => {
   const scrollEdges = useHorizontalScrollEdges();
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, selectionStyle } = useLiquidGlass();
   const isDark = themeMode === 'dark';
   const normalizedItems: JellyRadioItem[] =
     items === 'levels'
@@ -437,6 +440,14 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
       )) : normalizedItems.map(renderChip)}
     </View>
   );
+
+  if (presentation === 'auto' && selectionStyle === 'dropdown' && normalizedItems.length > 1) {
+    return <DropdownSelect
+      items={normalizedItems.map(item => ({ ...item, label: item.label || item.accessibilityLabel || item.value }))}
+      value={currentValue} onChange={(_, index) => handleSelect(index)} disabled={disabled}
+      backgroundColor={chipColor} textColor={textColor} style={style}
+    />;
+  }
 
   if (scrollable) {
     const resolvedFade = fadeColor || (isDark ? 'rgba(18, 18, 22, 0.85)' : 'rgba(255, 255, 255, 0.85)');

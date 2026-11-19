@@ -5,6 +5,7 @@ import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { BillListIcon } from '@solar-icons/react-native/bold/bill-list';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { CopyIcon } from '@solar-icons/react-native/bold/copy';
+import { QrCodeIcon } from '@solar-icons/react-native/bold/qr-code';
 import { Pen2Icon } from '@solar-icons/react-native/bold/pen-2';
 import { PhoneRoundedIcon } from '@solar-icons/react-native/bold/phone-rounded';
 import { ImpactStyle, NotificationType, triggerImpact, triggerNotification } from '../../utils/haptics';
@@ -12,7 +13,9 @@ import { copyTextSafe, getMemberActivitySummary } from '../../utils/memberActivi
 import { renderSolarIcon } from '../../constants/solarIconsCatalog';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
-import { Friend, Transaction } from '../../types';
+import { Friend, Transaction, type UpiAccount } from '../../types';
+import { getDebtReceivingAccount, type UpiPaymentDetails } from '../../utils/upi';
+import { UpiQrModal } from '../upi/UpiQrModal';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { GlassCard } from '../glass/GlassCard';
@@ -39,12 +42,13 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
   onSplitWithFriend,
   onOpenTrip,
 }) => {
-  const { transactions, trips, categories, getSimplifiedDebts } = useSplitTrack();
+  const { transactions, trips, categories, getSimplifiedDebts, accounts, selectedAccountId, friends } = useSplitTrack();
   const { formatAmount, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const [txFilter, setTxFilter] = useState<MemberTxFilter>('All');
   const [copiedUpi, setCopiedUpi] = useState(false);
+  const [qrRequest, setQrRequest] = useState<({ account: UpiAccount } & UpiPaymentDetails) | null>(null);
 
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
@@ -385,6 +389,7 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
         <GlassCard borderRadius={22} style={styles.groupedCard}>
           {/* Pending simplified debt routes */}
           {memberDebts.map((debt, idx) => {
+            const debtAccount = getDebtReceivingAccount(debt, accounts, selectedAccountId, friends);
             const directionText =
               debt.fromId === 'user'
                 ? `You owe ${debt.toName}`
@@ -428,6 +433,11 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
                     >
                       {formatAmount(debt.amount)}
                     </Text>
+                    {debtAccount ? <AnimatedPressable
+                      scaleTo={0.93} accessibilityLabel={`Show payment QR for ${debt.toName}`}
+                      onPress={() => setQrRequest({ account: debtAccount, amount: debt.amount, note: `SplitTrack settlement with ${debt.fromName}` })}
+                      contentStyle={[styles.miniSettleBtn, { backgroundColor: pillSurface, flexDirection: 'row', gap: 5 }]}
+                    ><QrCodeIcon size={14} color={textColor} /><Text style={[styles.miniSettleText, { color: textColor }]}>QR</Text></AnimatedPressable> : null}
                     <AnimatedPressable
                       scaleTo={0.93}
                       onPress={() => onSettleFriend(friend)}
@@ -624,6 +634,7 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
           </View>
         )}
       </View>
+      <UpiQrModal visible={qrRequest !== null} onClose={() => setQrRequest(null)} account={qrRequest?.account ?? null} amount={qrRequest?.amount} note={qrRequest?.note} />
     </View>
   );
 };

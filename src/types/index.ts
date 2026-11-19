@@ -8,6 +8,8 @@ export interface CurrencyConfig {
 
 export type ThemeMode = 'dark' | 'light';
 
+export type SelectionStyle = 'chips' | 'dropdown';
+
 export type UpiProvider = 'slice' | 'gpay' | 'phonepe' | 'paytm' | 'bank' | 'cred' | string;
 
 export type PaymentProfileKind =
@@ -53,6 +55,7 @@ export interface Friend {
   handle: string;
   avatar: string;
   upiId?: string;
+  paymentName?: string;
   phone?: string;
   netBalance: number; // Positive = friend owes you, Negative = you owe friend
   avatarRef?: string;

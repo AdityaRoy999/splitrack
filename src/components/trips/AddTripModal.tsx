@@ -74,7 +74,7 @@ const TRIP_CATEGORIES = [
 export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) => {
   const { friends, categories, addTrip } = useSplitTrack();
   const { runWithIntent, pending, error } = useAsyncAction();
-  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled, selectionStyle } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const [tripName, setTripName] = useState('');
@@ -263,7 +263,12 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
               {/* Album Cover Photo Selector */}
               <View style={styles.fieldGroup}>
                 <Text style={[styles.fieldLabel, { color: mutedText }]}>ALBUM COVER PHOTO</Text>
-                <HorizontalEdgeFade style={styles.horizontalBlurWrap} tint={inputBg} width={16}>
+                {selectionStyle === 'dropdown' ? <JellyRadio
+                  items={[{ value: 'upload', label: customCoverUri ? 'Change uploaded photo' : 'Upload photo' }, ...COVER_PHOTO_PRESETS.map(preset => ({ value: preset.uri, label: preset.label, icon: <Image source={{ uri: preset.uri }} style={{ width: 28, height: 28, borderRadius: 7 }} /> }))]}
+                  value={customCoverUri && selectedCover === customCoverUri ? 'upload' : selectedCover}
+                  onChange={value => { if (value === 'upload') void handlePickCoverPhoto(); else setSelectedCover(value); }}
+                  chipColor={chipBg} textColor={textColor}
+                /> : <HorizontalEdgeFade style={styles.horizontalBlurWrap} tint={inputBg} width={16}>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -343,7 +348,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
                   );
                 })}
                   </ScrollView>
-                </HorizontalEdgeFade>
+                </HorizontalEdgeFade>}
               </View>
 
               {/* Members Selection using React Bits SpringCheck */}

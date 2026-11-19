@@ -168,7 +168,6 @@ export const SpringCheck: React.FC<SpringCheckProps> = ({
           })
         : 0;
 
-  const ringStrokeWidth = Math.max(1.4, boxSize * 0.068);
   const gap = Math.max(10, Math.round(boxSize * 0.45));
   const ruleHeight = Math.max(1.2, Math.round(fontSize * 0.08));
   const effectiveRadius = boxRadius >= boxSize / 2 ? boxSize / 2 : boxRadius;
@@ -256,8 +255,8 @@ export const SpringCheck: React.FC<SpringCheckProps> = ({
             width: boxSize,
             height: boxSize,
             borderRadius: effectiveRadius,
-            borderWidth: ringStrokeWidth,
-            borderColor: color,
+            borderWidth: 0,
+            backgroundColor: themeMode === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.12)',
             transform: [{ scale: boxSwell }],
           },
         ]}

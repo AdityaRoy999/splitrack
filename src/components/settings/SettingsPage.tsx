@@ -35,14 +35,13 @@ import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { DangerCircleIcon } from '@solar-icons/react-native/bold/danger-circle';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { UserAvatar } from '../common/UserAvatar';
-import { HorizontalEdgeFade } from '../common/ScrollEdgeFade';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
 import { SmoothCollapsible, triggerSmoothLayout } from '../common/SmoothCollapsible';
 import { AnimatedPressable } from '../common/MotionPrimitives';
-import { CurrencyCode, ThemeMode } from '../../types';
+import { CurrencyCode, ThemeMode, type SelectionStyle } from '../../types';
 import { currencies } from '../../theme/colors';
 import {
   ImportParseResult,
@@ -85,6 +84,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setThemeMode,
     currency,
     setCurrency,
+    selectionStyle,
+    setSelectionStyle,
   } = useLiquidGlass();
 
   const {
@@ -150,7 +151,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setImportResult(null);
     setImportStatusMsg({
       type: 'success',
-      text: 'Your fresh ledger is ready. Earlier history is hidden.',
+      text: 'Your fresh ledger is ready. Earlier ledger data has been deleted.',
     });
     triggerNotification(NotificationType.Success);
     triggerSmoothLayout(240);
@@ -512,6 +513,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           <View style={[styles.sectionDivider, { backgroundColor: dividerColor }]} />
 
+          <View style={styles.joinedSection}>
+            <Text style={[styles.sectionHeader, { color: mutedText }]}>SELECTION MENUS</Text>
+            <JellyRadio
+              presentation="chips"
+              items={[{ value: 'chips', label: 'Slide & Select' }, { value: 'dropdown', label: 'Dropdown' }]}
+              value={selectionStyle} onChange={value => setSelectionStyle(value as SelectionStyle)}
+              chipColor={chipBg} activeColor={activeBg} textColor={textColor} activeTextColor={activeText}
+              size="sm" gap={10}
+            />
+            <Text style={[styles.surfaceCaption, { color: mutedText }]}>Use this selection style throughout the app.</Text>
+          </View>
+          <View style={[styles.sectionDivider, { backgroundColor: dividerColor }]} />
+
           {/* Currency Settings */}
           <View style={styles.joinedSection}>
             <Text style={[styles.sectionHeader, { color: mutedText }]}>CURRENCY</Text>
@@ -683,37 +697,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <Text style={[styles.accountPickLabel, { color: mutedText }]}>
                   LINK TO UPI / CARD PROFILE:
                 </Text>
-                <HorizontalEdgeFade tint={cardBg}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.accountPickRow}
-                >
-                  {accounts.map((acc) => {
-                    const isPicked = targetAccountId === acc.id;
-                    return (
-                      <AnimatedPressable
-                        key={acc.id}
-                        scaleTo={0.94}
-                        onPress={() => setTargetAccountId(acc.id)}
-                        contentStyle={[
-                          styles.accountPickChip,
-                          { backgroundColor: isPicked ? activeBg : cardBg },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.accountPickChipText,
-                            { color: isPicked ? activeText : textColor },
-                          ]}
-                        >
-                          {acc.title}
-                        </Text>
-                      </AnimatedPressable>
-                    );
-                  })}
-                </ScrollView>
-                </HorizontalEdgeFade>
+                <JellyRadio scrollable fadeColor={cardBg} items={accounts.map(account => ({ value: account.id, label: account.title }))} value={targetAccountId} onChange={setTargetAccountId} chipColor={chipBg} activeColor={activeBg} textColor={textColor} activeTextColor={activeText} size="sm" />
 
                 {/* Preview Rows */}
                 <View style={styles.previewEntriesList}>
@@ -778,7 +762,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               styles.eraseBtn,
               {
                 backgroundColor: isDark ? '#140808' : '#FEE2E2',
-                borderColor: isDark ? 'rgba(239, 68, 68, 0.25)' : '#FCA5A5',
               },
             ]}
             activeOpacity={0.7}
@@ -823,7 +806,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               styles.confirmDialogCard,
               {
                 backgroundColor: isDark ? '#0C0C0F' : '#FFFFFF',
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
               },
             ]}
           >
@@ -839,7 +821,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               Start a Fresh Ledger?
             </Text>
             <Text style={[styles.confirmDialogMessage, { color: mutedText }]}>
-              This clears current payment profiles and hides earlier history. Settle balances and archive trips first. Your registered profile stays.
+              Delete your earlier ledger entries, payment profiles and saved rules, clear shared balances, and remove your trips. Your sign-in, profile and app preferences stay. This cannot be undone.
             </Text>
             <FormError message={error} />
 
@@ -1230,7 +1212,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 16,
     borderRadius: 16,
-    borderWidth: 1,
+    borderWidth: 0,
   },
   eraseBtnTitle: {
     color: '#EF4444',
@@ -1263,7 +1245,7 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     gap: 12,
-    borderWidth: 1,
+    borderWidth: 0,
   },
   confirmIconWrap: {
     width: 48,

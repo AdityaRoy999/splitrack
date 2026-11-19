@@ -745,8 +745,7 @@ const styles = StyleSheet.create({
   radarRing: {
     position: 'absolute',
     borderRadius: 999,
-    borderColor: '#FFFFFF',
-    borderWidth: 1,
+    borderWidth: 0,
   },
   handleRadarPill: {
     flexDirection: 'row',

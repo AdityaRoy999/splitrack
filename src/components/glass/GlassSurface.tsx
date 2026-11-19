@@ -4,6 +4,7 @@ import { BlurView } from 'expo-blur';
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
+import { BackdropSurfaceContext } from '../common/BackdropSurfaceContext';
 
 const canUseNativeLiquidGlass = (() => {
   if (Platform.OS !== 'ios') return false;
@@ -79,7 +80,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
           style,
         ]}
       >
-        {children}
+        <BackdropSurfaceContext.Provider value={resolvedMatte}>{children}</BackdropSurfaceContext.Provider>
       </View>
     );
   }
@@ -159,7 +160,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
         style={[StyleSheet.absoluteFill, cornerRadii]}
       />
 
-      {children}
+      <BackdropSurfaceContext.Provider value={resolvedMatte}>{children}</BackdropSurfaceContext.Provider>
     </View>
   );
 };

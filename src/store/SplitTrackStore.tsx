@@ -4,19 +4,20 @@ import { AppState } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { api, errorMessage, requestId } from '../services/api';
 import { uploadImage } from '../services/media';
-import type { UpiAccount, Friend, Trip, Transaction, CategoryMetric, ChartDataPoint, ExpenseCategory, DebtSimplification, ThemeMode } from '../types';
+import type { UpiAccount, Friend, Trip, Transaction, CategoryMetric, ChartDataPoint, ExpenseCategory, DebtSimplification, ThemeMode, SelectionStyle } from '../types';
 import type { MemberDraft, MemberProfile } from '../utils/memberProfiles';
 import { getReceivingUpiAccount } from '../utils/upi';
+import { preserveOpenedHistory } from './cloudSnapshot';
 
-export interface CloudSettings { selectedAccountId: string; receivingAccountId?: string; themeMode: ThemeMode; currency: 'INR'; hideAmounts: boolean; isLiquidGlassEnabled: boolean }
+export interface CloudSettings { selectedAccountId: string; receivingAccountId?: string; themeMode: ThemeMode; currency: 'INR'; hideAmounts: boolean; isLiquidGlassEnabled: boolean; selectionStyle?: SelectionStyle }
 interface Snapshot {
-  schemaVersion: 2; userId: string; revision: number;
+  schemaVersion: 2; userId: string; revision: number; generation?: number; ledgerResetId?: string | null;
   accounts: UpiAccount[]; friends: Friend[]; trips: Trip[]; transactions: Transaction[]; categories: ExpenseCategory[];
   transactionCursor: string | null; settings: CloudSettings;
   profile: { id: string; name: string; handle: string; avatar: string; avatarRef: string } | null;
   summary: { totalIncome: number; totalExpenses: number; categories: Record<string, number>; months: Record<string, { income: number; expense: number }> };
 }
-type MutationResult = { result: { id?: string; importedCount?: number }; state: Snapshot };
+type MutationResult = { result: { id?: string; importedCount?: number; needsContinue?: boolean }; state: Snapshot };
 const categories: ExpenseCategory[] = [
   { id: 'cat-food', name: 'Food & Drinks', iconKey: 'cup-hot', color: '#F97316' },
   { id: 'cat-groceries', name: 'Groceries', iconKey: 'cart-large-minimalistic', color: '#10B981' },
@@ -73,13 +74,21 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
   const [loading, setLoading] = useState(true), [syncing, setSyncing] = useState(false), [syncError, setSyncError] = useState('');
   const queue = useRef<Promise<unknown>>(Promise.resolve()), pending = useRef(0), refreshPromise = useRef<Promise<void> | null>(null);
   const serverSnapshot = useRef(false), historyCount = useRef(50), loadingHistory = useRef(false);
+  const cacheWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSnapshotAt = useRef(0);
   const accept = useCallback((next: Snapshot, requestedUid: string, fromServer = true) => {
     if (uidRef.current !== requestedUid || next.userId !== requestedUid || next.schemaVersion !== 2) return;
     if (!fromServer && serverSnapshot.current) return;
     if (stateRef.current.userId === requestedUid && next.revision < stateRef.current.revision) return;
     if (fromServer) serverSnapshot.current = true;
-    stateRef.current = next; setState(next); setSyncError('');
-    void AsyncStorage.setItem(cacheKey(requestedUid), JSON.stringify(next)).catch(() => {});
+    if (fromServer) lastSnapshotAt.current = Date.now();
+    const retained = preserveOpenedHistory(next, stateRef.current, historyCount.current);
+    const normalized = { ...retained, settings: { ...next.settings, selectionStyle: next.settings.selectionStyle ?? 'chips' } };
+    stateRef.current = normalized; setState(normalized); setSyncError('');
+    if (cacheWrite.current) clearTimeout(cacheWrite.current);
+    cacheWrite.current = setTimeout(() => {
+      if (uidRef.current === requestedUid) void AsyncStorage.setItem(cacheKey(requestedUid), JSON.stringify(stateRef.current)).catch(() => {});
+    }, 250);
   }, []);
   const restoreHistory = useCallback(async (next: Snapshot, requestedUid: string) => {
     const items = new Map(next.transactions.map(tx => [tx.id, tx]));
@@ -95,18 +104,34 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
     }
     return { ...next, transactions: [...items.values()], transactionCursor: cursor };
   }, []);
-  const refresh = useCallback((): Promise<void> => {
+  const reconcile = useCallback((silent = false): Promise<void> => {
     if (!ready || pending.current) return Promise.resolve();
     if (refreshPromise.current) return refreshPromise.current;
     const requestedUid = uid;
-    setSyncing(true);
-    const work = api<Snapshot>('/state').then(next => restoreHistory(next, requestedUid)).then(next => accept(next, requestedUid)).catch(error => {
+    if (!silent) setSyncing(true);
+    const work = (silent && serverSnapshot.current && Date.now() - lastSnapshotAt.current < 30000
+      ? api<{ changed: boolean; state?: Snapshot }>(`/state?after=${stateRef.current.revision}`).then(result => result.changed ? result.state : undefined)
+      : api<Snapshot>('/state'))
+      .then(async next => {
+        if (uidRef.current !== requestedUid) return;
+        setSyncError('');
+        if (!next || pending.current) return;
+        accept(next, requestedUid);
+        if (next.transactionCursor && historyCount.current > next.transactions.length) {
+          void restoreHistory(next, requestedUid).then(expanded => {
+            if (!pending.current && stateRef.current.revision === next.revision) accept(expanded, requestedUid);
+          }).catch(error => {
+            if (uidRef.current === requestedUid) setSyncError(`Older history could not be refreshed. ${errorMessage(error)}`);
+          });
+        }
+      }).catch(error => {
       if (uidRef.current === requestedUid) setSyncError(errorMessage(error));
       throw error;
-    }).finally(() => { refreshPromise.current = null; if (uidRef.current === requestedUid) { setSyncing(false); setLoading(false); } });
+    }).finally(() => { refreshPromise.current = null; if (uidRef.current === requestedUid) { if (!silent) setSyncing(false); setLoading(false); } });
     refreshPromise.current = work;
     return work;
   }, [uid, ready, accept, restoreHistory]);
+  const refresh = useCallback(() => reconcile(false), [reconcile]);
 
   useEffect(() => {
     let active = true;
@@ -115,34 +140,71 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
       void AsyncStorage.getItem(cacheKey(uid)).then(raw => {
         if (active && raw) { try { accept(JSON.parse(raw), uid, false); } catch { /* Invalid cache is replaced by AWS. */ } }
       });
-      void refresh().catch(() => {});
+      void Promise.resolve().then(refresh).catch(() => {});
     }
-    const listener = AppState.addEventListener('change', value => { if (value === 'active' && ready) void refresh().catch(() => {}); });
-    const timer = ready ? setInterval(() => { if (AppState.currentState === 'active') void refresh().catch(() => {}); }, 60000) : undefined;
-    return () => { active = false; listener.remove(); clearInterval(timer); };
-  }, [uid, ready, accept, refresh]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let failureCount = 0;
+    const schedule = () => {
+      clearTimeout(timer);
+      if (active && ready && AppState.currentState === 'active') timer = setTimeout(poll, Math.min(15000, 1200 * 2 ** failureCount));
+    };
+    const poll = async () => {
+      if (!active || AppState.currentState !== 'active') return;
+      try { await reconcile(true); failureCount = 0; }
+      catch { failureCount = Math.min(4, failureCount + 1); }
+      schedule();
+    };
+    const listener = AppState.addEventListener('change', value => {
+      clearTimeout(timer);
+      if (value === 'active' && ready) { failureCount = 0; void poll(); }
+    });
+    schedule();
+    return () => { active = false; listener.remove(); clearTimeout(timer); };
+  }, [uid, ready, accept, refresh, reconcile]);
   useEffect(() => {
     uidRef.current = uid;
-    return () => { uidRef.current = ''; if (uid) void AsyncStorage.removeItem(cacheKey(uid)); };
+    return () => { uidRef.current = ''; if (cacheWrite.current) clearTimeout(cacheWrite.current); if (uid) void AsyncStorage.removeItem(cacheKey(uid)); };
   }, [uid]);
 
   const mutate = useCallback((path: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown, beforeApply?: () => Promise<void>, intentId?: string): Promise<MutationResult> => {
     const requestedUid = uid, id = intentId ?? requestId(); pending.current++;
     const work = queue.current.catch(() => {}).then(async () => {
       if (!requestedUid || uidRef.current !== requestedUid) throw new Error('Please sign in again.');
-      const result = await api<MutationResult>(path, { method, body, id });
-      if (path === '/state/erase') historyCount.current = 50;
-      let historyError = '';
-      try { result.state = await restoreHistory(result.state, requestedUid); }
-      catch (error) { historyError = `Saved. Older history could not be refreshed. ${errorMessage(error)}`; }
+      let result = await api<MutationResult>(path, { method, body, id });
+      while (path === '/state/erase' && result.result.needsContinue) {
+        accept(result.state, requestedUid);
+        result = await api<MutationResult>(path, { method, body, id });
+      }
+      if (path === '/state/erase') { historyCount.current = 50; await AsyncStorage.removeItem(cacheKey(requestedUid)); }
       await beforeApply?.();
       accept(result.state, requestedUid);
-      if (historyError && uidRef.current === requestedUid) setSyncError(historyError);
+      if (result.state.transactionCursor && historyCount.current > result.state.transactions.length) {
+        void restoreHistory(result.state, requestedUid).then(expanded => {
+          if (stateRef.current.revision === result.state.revision) accept(expanded, requestedUid);
+        }).catch(error => {
+          if (uidRef.current === requestedUid) setSyncError(`Saved. Older history could not be refreshed. ${errorMessage(error)}`);
+        });
+      }
       return result;
     }).catch(error => { if (uidRef.current === requestedUid) setSyncError(errorMessage(error)); throw error; }).finally(() => { pending.current--; });
     queue.current = work;
     return work;
   }, [uid, accept, restoreHistory]);
+  useEffect(() => {
+    if (!ready || !state.ledgerResetId) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+    const resume = async () => {
+      if (stopped) return;
+      if (pending.current || AppState.currentState !== 'active') { timer = setTimeout(resume, 2000); return; }
+      try { await mutate('/state/erase', 'POST', undefined, undefined, state.ledgerResetId!); }
+      catch { if (!stopped) timer = setTimeout(resume, Math.min(15000, 2000 * 2 ** Math.min(++attempts, 3))); }
+    };
+    // A durable server marker also resumes after an app restart or a lost reply.
+    timer = setTimeout(resume, 1200);
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [ready, state.ledgerResetId, mutate]);
   const saveSettings = useCallback(async (body: Partial<CloudSettings>) => { await mutate('/api/settings', 'PUT', body); }, [mutate]);
   const setSelectedAccountId = useCallback(async (id: string) => { await saveSettings({ selectedAccountId: id }); }, [saveSettings]);
   const addTransaction = useCallback(async (tx: TransactionDraft, intentId?: string) => { await mutate('/transactions', 'POST', tx, undefined, intentId); }, [mutate]);

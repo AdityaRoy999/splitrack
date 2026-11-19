@@ -1,4 +1,4 @@
-import type { UpiAccount } from '../types';
+import type { DebtSimplification, Friend, UpiAccount } from '../types';
 
 export interface UpiPaymentDetails {
   /** Amount in INR, before any display-currency conversion. */
@@ -30,6 +30,19 @@ export const getReceivingUpiAccount = (
     ?? accounts.find(canReceive)
     ?? null;
 };
+
+// The same receiving identity is used by the creditor's and debtor's QR.
+// A friend's bank/card details are never needed to create this payment link.
+export function getDebtReceivingAccount(debt: DebtSimplification, accounts: UpiAccount[], selectedAccountId: string, friends: Friend[]): UpiAccount | null {
+  if (debt.toId === 'user') return getReceivingUpiAccount(accounts, selectedAccountId);
+  const friend = friends.find(item => item.id === debt.toId);
+  if (!friend?.upiId || !isValidUpiId(friend.upiId)) return null;
+  return {
+    id: `receiving-${friend.id}`, title: friend.paymentName || friend.name, kind: 'upi',
+    provider: 'bank', upiId: friend.upiId, cardHolder: '', cardNumber: '', expiry: '', cardType: 'RuPay',
+    accentColor: '#6366F1', secondaryColor: '#8B5CF6', balance: 0, totalSpent: 0,
+  };
+}
 
 /** Interoperable UPI payment link; the receiving app authorizes the payment. */
 export const buildUpiPaymentUri = (

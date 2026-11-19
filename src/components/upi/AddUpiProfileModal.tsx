@@ -60,7 +60,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
   const { addUpiAccount, updateUpiAccount, selectedAccountId } = useSplitTrack();
   const { profile } = useAuth();
   const { runWithIntent, pending, error } = useAsyncAction();
-  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled, selectionStyle } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const [kind, setKind] = useState<PaymentProfileKind>(
@@ -353,7 +353,8 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
                   <View style={{ marginTop: 4 }}>
                     <JellyRadio
                       scrollable
-                      items={QUICK_PROVIDERS.map((p) => ({ value: p.value, label: p.label }))}
+                      fadeColor={cardBg}
+                      items={selectionStyle === 'dropdown' ? [...UPI_APPS_CATALOG, BANK_UPI_APP].map(p => ({ value: p.id, label: p.name })) : QUICK_PROVIDERS.map((p) => ({ value: p.value, label: p.label }))}
                       value={provider}
                       onChange={(val) => {
                         const matched = val === 'bank' ? BANK_UPI_APP : UPI_APPS_CATALOG.find((a) => a.id === val);
@@ -389,7 +390,8 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
                   <View style={{ marginTop: 4 }}>
                     <JellyRadio
                       scrollable
-                      items={BANKS_CATALOG.slice(0, 6).map((b) => ({
+                      fadeColor={cardBg}
+                      items={(selectionStyle === 'dropdown' ? BANKS_CATALOG : BANKS_CATALOG.slice(0, 6)).map((b) => ({
                         value: b.id,
                         label: b.shortName,
                       }))}

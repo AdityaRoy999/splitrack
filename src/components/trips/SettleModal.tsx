@@ -23,7 +23,7 @@ import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
 import { UpiQrModal } from '../upi/UpiQrModal';
 import { BottomBubble, type BubbleNotice } from '../common/BottomBubble';
-import { buildUpiPaymentUri, formatUpiAmount, getReceivingUpiAccount, type UpiPaymentDetails } from '../../utils/upi';
+import { buildUpiPaymentUri, formatUpiAmount, getReceivingUpiAccount, getDebtReceivingAccount, type UpiPaymentDetails } from '../../utils/upi';
 import type { UpiAccount } from '../../types';
 import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
 
@@ -119,6 +119,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
       {items.map((item, idx) => {
         const isUserDebtor = item.fromId === 'user';
         const isUserCreditor = item.toId === 'user';
+        const debtAccount = getDebtReceivingAccount(item, accounts, selectedAccountId, friends);
         const showDivider = idx < items.length - 1;
 
         return (
@@ -150,11 +151,11 @@ export const SettleModal: React.FC<SettleModalProps> = ({
 
                 <View style={styles.partyBoxRight}>
                   <View style={styles.recipientNameRow}>
-                    {isUserCreditor && receivingAccount ? (
+                    {debtAccount ? (
                       <AnimatedPressable
                         scaleTo={0.93}
-                        onPress={() => openPaymentQr(item.amount, item.fromName)}
-                        accessibilityLabel={`Show payment QR for ${item.fromName} to pay you ${formatUpiAmount(item.amount)} rupees`}
+                        onPress={() => { triggerImpact(ImpactStyle.Light); setQrRequest({ account: debtAccount, amount: item.amount, note: `SplitTrack settlement with ${item.fromName}` }); }}
+                        accessibilityLabel={`Show QR to pay ${item.toName} ${formatUpiAmount(item.amount)} rupees`}
                         contentStyle={[styles.debtQrButton, { backgroundColor: pillSurface }]}
                       >
                         <QrCodeIcon size={17} color={textColor} />

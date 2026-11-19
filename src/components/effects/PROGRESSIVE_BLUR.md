@@ -26,6 +26,12 @@ made. Limit depth and the number of simultaneously visible effects.
 
 SpotlightCard renders its image, bottom blur, then controls. The shared edge
 wrapper leaves touch events to content. The browser retains React Bits through
-GradualBlur.web.tsx. Native left/right on iOS rotate the single library view;
-physical-device checks should cover those edges, light/dark themes, scrolling,
+GradualBlur.web.tsx. scripts/patch-ios-progressive-blur.mjs adds horizontal native
+masks in the pinned iOS library without rotating its UIKit backdrop. The patch
+also caches the mask/filter and updates only the radius during reveal animations,
+so the material does not reset on every frame. iOS scroll viewports remain
+transparent to sample their actual sheet surface; Android capture viewports use
+the containing surface with alpha tints composited over it. Modal scenes keep
+their blur active through the full exit, independently of the retained tab.
+Physical-device checks should cover those edges, light/dark themes, scrolling,
 foreground return, and image highlight transitions.

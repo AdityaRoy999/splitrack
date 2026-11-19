@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import type { CurrencyCode, ThemeMode } from '../types';
+import type { CurrencyCode, ThemeMode, SelectionStyle } from '../types';
 import { themePalettes, type ThemePalette } from './colors';
 import { useAuth } from '../auth/AuthContext';
 import { useSplitTrack, type CloudSettings } from '../store/SplitTrackStore';
@@ -11,6 +11,7 @@ interface LiquidGlassContextType {
   themeMode: ThemeMode; setThemeMode(mode: ThemeMode): void; toggleTheme(): void;
   currency: CurrencyCode; setCurrency(currency: CurrencyCode): void;
   hideAmounts: boolean; setHideAmounts(hide: boolean): void; toggleHideAmounts(): void;
+  selectionStyle: SelectionStyle; setSelectionStyle(style: SelectionStyle): void;
   formatAmount(amount: number, showSign?: boolean): string; palette: ThemePalette;
 }
 const Context = createContext<LiquidGlassContextType | undefined>(undefined);
@@ -21,6 +22,7 @@ export function LiquidGlassProvider({ children }: { children: React.ReactNode })
   const themeMode = overrides.themeMode ?? settings.themeMode;
   const hideAmounts = overrides.hideAmounts ?? settings.hideAmounts;
   const isLiquidGlassEnabled = overrides.isLiquidGlassEnabled ?? settings.isLiquidGlassEnabled;
+  const selectionStyle = overrides.selectionStyle ?? settings.selectionStyle ?? 'chips';
   const [notice, setNotice] = useState<BubbleNotice | null>(null);
   const dismiss = useCallback(() => setNotice(null), []);
   const persist = useCallback((next: Partial<CloudSettings>) => {
@@ -32,6 +34,7 @@ export function LiquidGlassProvider({ children }: { children: React.ReactNode })
   const setThemeMode = useCallback((mode: ThemeMode) => persist({ themeMode: mode }), [persist]);
   const setHideAmounts = useCallback((hide: boolean) => persist({ hideAmounts: hide }), [persist]);
   const setIsLiquidGlassEnabled = useCallback((enabled: boolean) => persist({ isLiquidGlassEnabled: enabled }), [persist]);
+  const setSelectionStyle = useCallback((style: SelectionStyle) => persist({ selectionStyle: style }), [persist]);
   const setCurrency = useCallback((currency: CurrencyCode) => { if (currency !== 'INR') setNotice(previous => ({ id: (previous?.id ?? 0) + 1, message: 'Balances and UPI payments are recorded in INR.' })); }, []);
   const toggleTheme = useCallback(() => setThemeMode(themeMode === 'dark' ? 'light' : 'dark'), [themeMode, setThemeMode]);
   const toggleHideAmounts = useCallback(() => setHideAmounts(!hideAmounts), [hideAmounts, setHideAmounts]);
@@ -40,7 +43,7 @@ export function LiquidGlassProvider({ children }: { children: React.ReactNode })
     const sign = showSign ? value > 0 ? '+' : value < 0 ? '-' : '' : '';
     return `${sign}₹${Math.abs(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }, [hideAmounts]);
-  const value = useMemo(() => ({ themeMode, setThemeMode, toggleTheme, hideAmounts, setHideAmounts, toggleHideAmounts, isLiquidGlassEnabled, setIsLiquidGlassEnabled, currency: 'INR' as const, setCurrency, formatAmount, palette: themePalettes[themeMode] }), [themeMode, setThemeMode, toggleTheme, hideAmounts, setHideAmounts, toggleHideAmounts, isLiquidGlassEnabled, setIsLiquidGlassEnabled, setCurrency, formatAmount]);
+  const value = useMemo(() => ({ themeMode, setThemeMode, toggleTheme, hideAmounts, setHideAmounts, toggleHideAmounts, isLiquidGlassEnabled, setIsLiquidGlassEnabled, selectionStyle, setSelectionStyle, currency: 'INR' as const, setCurrency, formatAmount, palette: themePalettes[themeMode] }), [themeMode, setThemeMode, toggleTheme, hideAmounts, setHideAmounts, toggleHideAmounts, isLiquidGlassEnabled, setIsLiquidGlassEnabled, selectionStyle, setSelectionStyle, setCurrency, formatAmount]);
   return <Context.Provider value={value}>{children}<BottomBubble notice={notice} onDismiss={dismiss} /></Context.Provider>;
 }
 export function useLiquidGlass() { const value = useContext(Context); if (!value) throw new Error('LiquidGlassProvider is missing.'); return value; }

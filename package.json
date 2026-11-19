@@ -57,7 +57,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "postinstall": "node scripts/patch-expo-backdrop.mjs"
+    "postinstall": "node scripts/patch-expo-backdrop.mjs && node scripts/patch-ios-progressive-blur.mjs"
   },
   "private": true,
   "expo": {

@@ -1660,7 +1660,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 9,
     gap: 10,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
   },
   payerAvatar: {
     width: 32,
@@ -1836,7 +1836,7 @@ const styles = StyleSheet.create({
   },
   dynamicControlsWrap: {
     paddingTop: 8,
-    borderTopWidth: 1,
+    borderTopWidth: 0,
     borderTopColor: 'rgba(255,255,255,0.06)',
     gap: 8,
   },
