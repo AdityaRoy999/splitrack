@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassSurface } from '../glass/GlassSurface';
 import { useSheetMotion } from './useSheetMotion';
+import { SheetSizingContext } from './SheetSizingContext';
 
 interface GlassModalSheetProps {
   style?: StyleProp<ViewStyle>;
@@ -33,22 +34,36 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
   const tintGlass = isDark ? 'rgba(18, 18, 24, 0.88)' : 'rgba(255, 255, 255, 0.92)';
 
   const maxSheetHeight = Math.round(Math.min(windowHeight * 0.92, windowHeight - insets.top - 8));
+  const [fittedHeight, setFittedHeight] = useState<number | null>(null);
+  const sheetHeight = Math.min(fittedHeight ?? maxSheetHeight, maxSheetHeight);
+  const measuredHeight = useRef(maxSheetHeight);
+  const chromeHeight = useRef<number | null>(null);
+  useLayoutEffect(() => { measuredHeight.current = sheetHeight; }, [sheetHeight]);
+  const fitContent = useCallback((viewport: number, content: number) => {
+    if (viewport <= 0 || content <= 0) return;
+    // Capture the header/footer once from the initial bounded layout. Reusing
+    // it prevents content-size events racing viewport layout during resizing.
+    const chrome = chromeHeight.current ?? Math.max(0, measuredHeight.current - viewport);
+    chromeHeight.current = chrome;
+    const next = Math.round(Math.min(maxSheetHeight, content + chrome));
+    setFittedHeight(previous => previous !== null && Math.abs(previous - next) < 2 ? previous : next);
+  }, [maxSheetHeight]);
   const { animatedStyle, gesture, close } = useSheetMotion(windowHeight);
 
-  const bottomPadding = Math.max(34, insets.bottom + 16);
+  const bottomPadding = Math.max(16, insets.bottom + 8);
 
   return (
     <Animated.View
       style={[
         styles.animWrap,
         {
-          height: maxSheetHeight,
+          height: sheetHeight,
           maxHeight: maxSheetHeight,
         },
         animatedStyle,
       ]}
     >
-      <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={windowHeight - maxSheetHeight}>
+      <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={windowHeight - sheetHeight}>
         <GlassSurface
           borderTopLeftRadius={32}
           borderTopRightRadius={32}
@@ -71,7 +86,7 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
             },
           ]}
         >
-          {children}
+          <SheetSizingContext.Provider value={fitContent}>{children}</SheetSizingContext.Provider>
         </GlassSurface>
       </KeyboardAvoidingView>
       <GestureDetector gesture={gesture} touchAction="none" userSelect="none">

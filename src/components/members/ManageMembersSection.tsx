@@ -146,7 +146,6 @@ const styles = StyleSheet.create({
   outerWrap: {
     width: '100%',
     paddingHorizontal: 16,
-    marginTop: 10,
   },
   sheetContainer: {
     padding: 18,

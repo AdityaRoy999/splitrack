@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     gap: 12,
     paddingTop: 8,
-    paddingBottom: 20,
+    paddingBottom: 4,
   },
   sectionCard: {
     borderRadius: 20,

@@ -1,3 +1,4 @@
+import { TransactionSwipeRow } from '../transactions/TransactionSwipeRow';
 import React, { useMemo, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
@@ -581,14 +582,12 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
                 .join(' • ');
 
               return (
-                <AnimatedPressable
+                <TransactionSwipeRow key={tx.id} transaction={tx}><AnimatedPressable
                   key={tx.id}
                   scaleTo={0.98}
                   onPress={() => actions.open(tx)}
-                  onLongPress={() => actions.select(tx)}
-                  accessibilityState={{ selected: actions.selected.has(tx.id) }}
                 >
-                  <GlassCard borderRadius={22} style={[styles.txItemCard, actions.selected.has(tx.id) && { backgroundColor: isDark ? '#303039' : '#E2E2EC' }]}>
+                  <GlassCard borderRadius={22} style={styles.txItemCard}>
                     <View style={styles.txRow}>
                       <View style={styles.txLeft}>
                         <View
@@ -632,7 +631,7 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
                       </View>
                     </View>
                   </GlassCard>
-                </AnimatedPressable>
+                </AnimatedPressable></TransactionSwipeRow>
               );
             })}
           </View>

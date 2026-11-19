@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
@@ -15,16 +15,19 @@ interface BottomBubbleProps {
 }
 
 export function BottomBubble({ notice, onDismiss }: BottomBubbleProps) {
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, notificationDirection } = useLiquidGlass();
   const insets = useSafeAreaInsets();
   const [progress] = useState(() => new Animated.Value(0));
   const noticeId = notice?.id;
+  const dismissRef = useRef(onDismiss);
+  useLayoutEffect(() => { dismissRef.current = onDismiss; }, [onDismiss]);
 
   useEffect(() => {
     if (noticeId === undefined) return;
     let cancelled = false;
     const useNativeDriver = Platform.OS !== 'web';
     progress.stopAnimation();
+    progress.setValue(0);
     Animated.spring(progress, {
       toValue: 1, friction: 8, tension: 85, useNativeDriver, isInteraction: false,
     }).start();
@@ -33,7 +36,7 @@ export function BottomBubble({ notice, onDismiss }: BottomBubbleProps) {
         toValue: 0, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver,
         isInteraction: false,
       }).start(({ finished }) => {
-        if (finished && !cancelled) onDismiss();
+        if (finished && !cancelled) dismissRef.current();
       });
     }, 2600);
     return () => {
@@ -41,7 +44,7 @@ export function BottomBubble({ notice, onDismiss }: BottomBubbleProps) {
       clearTimeout(timer);
       progress.stopAnimation();
     };
-  }, [noticeId, onDismiss, progress]);
+  }, [noticeId, progress]);
 
   if (!notice) return null;
 
@@ -51,9 +54,11 @@ export function BottomBubble({ notice, onDismiss }: BottomBubbleProps) {
       style={[
         styles.wrap,
         {
-          bottom: Math.max(26, insets.bottom + 12), opacity: progress,
+          ...(notificationDirection === 'top'
+            ? { top: Math.max(16, insets.top + 12) }
+            : { bottom: Math.max(26, insets.bottom + 12) }), opacity: progress,
           transform: [
-            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [72, 0] }) },
+            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [notificationDirection === 'top' ? -72 : 72, 0] }) },
             { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) },
           ],
         },

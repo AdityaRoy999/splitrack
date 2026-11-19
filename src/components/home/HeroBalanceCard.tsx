@@ -273,7 +273,6 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 8,
     paddingHorizontal: 16,
     width: '100%',
   },

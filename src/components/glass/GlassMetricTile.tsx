@@ -59,7 +59,6 @@ export const GlassMetricTile: React.FC<GlassMetricTileProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 4,
     width: '100%',
   },
   card: {

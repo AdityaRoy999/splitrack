@@ -1,3 +1,4 @@
+import { TransactionSwipeRow } from '../transactions/TransactionSwipeRow';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSplitTrack } from '../../store/SplitTrackStore';
@@ -57,12 +58,10 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
 
             return (
               <React.Fragment key={tx.id}>
-                <AnimatedPressable
+                <TransactionSwipeRow transaction={tx}><AnimatedPressable
                   scaleTo={0.985}
                   onPress={() => actions.open(tx)}
-                  onLongPress={() => actions.select(tx)}
-                  accessibilityState={{ selected: actions.selected.has(tx.id) }}
-                  contentStyle={[styles.txRow, actions.selected.has(tx.id) && { backgroundColor: isDarkSheet ? '#303039' : '#E2E2EC', borderRadius: 14 }]}
+                  contentStyle={styles.txRow}
                 >
                   <View style={styles.leftCol}>
                     <View style={[styles.iconBox, iconBoxStyle]}>
@@ -98,7 +97,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
                       </Text>
                     )}
                   </View>
-                </AnimatedPressable>
+                </AnimatedPressable></TransactionSwipeRow>
 
                 {showDivider && (
                   <View
@@ -125,7 +124,6 @@ const styles = StyleSheet.create({
   outerWrap: {
     width: '100%',
     paddingHorizontal: 16,
-    marginTop: 10,
   },
   sheetContainer: {
     padding: 18,

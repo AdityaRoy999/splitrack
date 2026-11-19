@@ -19,7 +19,8 @@ import { UpiAccount } from '../../types';
 import { GlassPill } from '../glass/GlassPill';
 import { GlassSurface } from '../glass/GlassSurface';
 import { StyledUpiQr } from './StyledUpiQr';
-import { getUpiBrandMeta } from './upiBrandLogo';
+import { BlurView } from 'expo-blur';
+import { useBackdropBlurTarget } from '../common/BackdropBlurTarget';
 import { SheetModal } from '../common/SheetModal';
 import { ModalBackdrop } from '../common/ModalBackdrop';
 import { usePopupMotion } from '../common/usePopupMotion';
@@ -48,6 +49,7 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
 
 function QrModalContent({ account, amount, note }: { account: UpiAccount } & UpiPaymentDetails) {
   const insets = useSafeAreaInsets();
+  const blurTarget = useBackdropBlurTarget();
   const { progress: animVal, close: handleSmoothClose } = usePopupMotion();
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,16 +95,17 @@ function QrModalContent({ account, amount, note }: { account: UpiAccount } & Upi
     } catch {}
   };
 
-  const brandMeta = getUpiBrandMeta(account.provider, account.bankBrand);
-
   return (
       <View style={[styles.modalOverlay, { paddingTop: Math.max(20, insets.top), paddingBottom: Math.max(20, insets.bottom) }]}>
+        <BlurView pointerEvents="none" style={StyleSheet.absoluteFill} intensity={55}
+          tint={isDark ? 'dark' : 'light'} blurTarget={blurTarget} blurMethod="dimezisBlurView" />
         <ModalBackdrop label="Close QR modal backdrop" onClose={handleSmoothClose} shadeColor={isDark ? 'rgba(6, 7, 11, 0.44)' : 'rgba(15, 23, 42, 0.24)'} />
 
         <Animated.View
           style={[
             styles.contentCardWrap,
             {
+              opacity: animVal,
               transform: [
                 {
                   scale: animVal.interpolate({
@@ -135,11 +138,7 @@ function QrModalContent({ account, amount, note }: { account: UpiAccount } & Upi
             </TouchableOpacity>
 
             <View style={styles.header}>
-              <View style={[styles.appBadgePill, { backgroundColor: pillBg }]}>
-                <View style={[styles.appDot, { backgroundColor: brandMeta.primary }]} />
-                <Text style={[styles.appBadgeText, { color: textColor }]}>{brandMeta.label}</Text>
-              </View>
-              <Text style={[styles.title, { color: textColor }]}>{rupeeAmount ? 'Scan to Settle via UPI' : 'Scan to Pay via UPI'}</Text>
+              <Text style={[styles.title, { color: textColor }]}>{rupeeAmount ? 'Scan to settle' : 'Scan to pay'}</Text>
               <Text style={[styles.subtitle, { color: mutedText }]}>{account.title}</Text>
               {rupeeAmount ? <Text style={[styles.paymentAmount, { color: textColor }]}>{rupeeAmount}</Text> : null}
               {note ? <Text numberOfLines={2} style={[styles.paymentNote, { color: mutedText }]}>{note}</Text> : null}
@@ -233,25 +232,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 18,
-  },
-  appBadgePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    marginBottom: 8,
-  },
-  appDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  appBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.2,
   },
   title: {
     fontSize: 18,

@@ -1,3 +1,5 @@
+import { BackdropBlurTargetProvider } from './src/components/common/BackdropBlurTarget';
+import { TransactionSwipeRow } from './src/components/transactions/TransactionSwipeRow';
 import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { errorMessage } from './src/services/api';
@@ -335,7 +337,7 @@ function MainAppContent({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={dynamicScrollContent}
       >
-        <View key="home-tab" style={styles.contentConstrainer}>
+        <View key="home-tab" style={[styles.contentConstrainer, styles.homeSections]}>
           <HeaderBar
             onOpenSettings={() => setShowSettings(true)}
             userName={userDisplayName}
@@ -451,7 +453,6 @@ function MainAppContent({
               </View>
             </GlassCard>
 
-            <View style={{ alignItems: 'flex-end', marginBottom: 12 }}><GlassPill label="Transaction bin" size="sm" onPress={transactionActions.openBin} /></View>
             {/* Rounded JellyRadio Category Filter + Calendar Date Trigger */}
             <View style={styles.filterWrap}>
               <View style={styles.filterChipsCol}>
@@ -596,12 +597,10 @@ function MainAppContent({
                     const showDivider = idx < visibleList.length - 1;
                     return (
                       <React.Fragment key={tx.id}>
-                        <AnimatedPressable
+                        <TransactionSwipeRow transaction={tx}><AnimatedPressable
                           scaleTo={0.985}
                           onPress={() => transactionActions.open(tx)}
-                          onLongPress={() => transactionActions.select(tx)}
-                          accessibilityState={{ selected: transactionActions.selected.has(tx.id) }}
-                          contentStyle={[styles.groupedRow, transactionActions.selected.has(tx.id) && { backgroundColor: chipBg }]}
+                          contentStyle={styles.groupedRow}
                         >
                           <View style={styles.tripExpenseRow}>
                             <View style={styles.tripExpenseLeft}>
@@ -648,7 +647,7 @@ function MainAppContent({
                               )}
                             </View>
                           </View>
-                        </AnimatedPressable>
+                        </AnimatedPressable></TransactionSwipeRow>
 
                         {showDivider && (
                           <View
@@ -920,12 +919,10 @@ function MainAppContent({
                     const showDivider = idx < visibleTrips.length - 1;
                     return (
                       <React.Fragment key={tx.id}>
-                        <AnimatedPressable
+                        <TransactionSwipeRow transaction={tx}><AnimatedPressable
                           scaleTo={0.985}
                           onPress={() => transactionActions.open(tx)}
-                          onLongPress={() => transactionActions.select(tx)}
-                          accessibilityState={{ selected: transactionActions.selected.has(tx.id) }}
-                          contentStyle={[styles.groupedRow, transactionActions.selected.has(tx.id) && { backgroundColor: isDark ? '#303039' : '#E2E2EC' }]}
+                          contentStyle={styles.groupedRow}
                         >
                           <View style={styles.tripExpenseRow}>
                             <View style={styles.tripExpenseLeft}>
@@ -963,7 +960,7 @@ function MainAppContent({
                               </Text>
                             </View>
                           </View>
-                        </AnimatedPressable>
+                        </AnimatedPressable></TransactionSwipeRow>
 
                         {showDivider && (
                           <View
@@ -1225,7 +1222,7 @@ function AppContent() {
                   <GlassPill label="Sign out" onPress={handleSignOut} />
                 </View>
               ) : isAuthenticated ? (
-                <TransactionActionsProvider><MainAppContent
+                <BackdropBlurTargetProvider><TransactionActionsProvider><MainAppContent
                   key={user?.uid}
                   userDisplayName={userDisplayName}
                   userHandle={userHandle}
@@ -1233,7 +1230,7 @@ function AppContent() {
                   hideHeaderLogo={hideHeaderLogo}
                   onHeaderLogoLayout={showPreloader ? setHeaderLogoRect : undefined}
                   onHeaderLogoNode={handleHeaderLogoNode}
-                /></TransactionActionsProvider>
+                /></TransactionActionsProvider></BackdropBlurTargetProvider>
               ) : user ? (
                 <OnboardingUsernameScreen
                   initialDisplayName={user.displayName || profile?.displayName}
@@ -1319,12 +1316,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
   },
+  homeSections: { gap: 16 },
   metricsSection: {
     width: '100%',
     paddingHorizontal: 16,
-    marginTop: 6,
-    marginBottom: 6,
-    gap: 2,
+    gap: 12,
   },
   sectionTitleRow: {
     flexDirection: 'row',

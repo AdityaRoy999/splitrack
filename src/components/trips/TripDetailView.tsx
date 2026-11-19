@@ -1,3 +1,4 @@
+import { TransactionSwipeRow } from '../transactions/TransactionSwipeRow';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
@@ -230,12 +231,10 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
 
               return (
                 <React.Fragment key={tx.id}>
-                  <AnimatedPressable
+                  <TransactionSwipeRow transaction={tx}><AnimatedPressable
                     scaleTo={0.985}
                     onPress={() => actions.open(tx)}
-                    onLongPress={() => actions.select(tx)}
-                    accessibilityState={{ selected: actions.selected.has(tx.id) }}
-                    contentStyle={[styles.txRow, actions.selected.has(tx.id) && { backgroundColor: isDark ? '#303039' : '#E2E2EC', borderRadius: 14 }]}
+                    contentStyle={styles.txRow}
                   >
                     <View style={[styles.txIconBox, { backgroundColor: `${meta.color}20` }]}>
                       {renderSolarIcon(meta.iconKey, 18, meta.color)}
@@ -262,7 +261,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
                     >
                       {formatAmount(tx.amount, true)}
                     </Text>
-                  </AnimatedPressable>
+                  </AnimatedPressable></TransactionSwipeRow>
                   {showDivider ? (
                     <View style={[styles.divider, { backgroundColor: dividerColor }]} />
                   ) : null}

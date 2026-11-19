@@ -3,6 +3,8 @@ import { Platform, processColor, StyleSheet, View, type LayoutChangeEvent, type 
 import { GradualBlur } from '../effects/GradualBlur';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { BackdropSurfaceContext } from './BackdropSurfaceContext';
+import { useModalVisual } from './ModalVisualContext';
+import { useSheetSizing } from './SheetSizingContext';
 
 interface ScrollEdgeFadeProps {
   children: React.ReactNode;
@@ -92,6 +94,9 @@ export function ScrollEdgeFade({ children, style, tint, top = 24, bottom = 28 }:
   const surface = useContext(BackdropSurfaceContext);
   const background = captureBackground(tint, surface ?? (themeMode === 'dark' ? '#09090B' : '#F4F4F8'));
   const edges = useScrollEdges(false);
+  const modal = useModalVisual();
+  const fitContent = useSheetSizing();
+  const measurements = useRef({ viewport: 0, content: 0 });
   const scroller = React.isValidElement<ScrollViewProps>(children) ? React.cloneElement(children, {
     style: [styles.content, children.props.style],
     automaticallyAdjustContentInsets: false,
@@ -99,15 +104,25 @@ export function ScrollEdgeFade({ children, style, tint, top = 24, bottom = 28 }:
     keyboardShouldPersistTaps: children.props.keyboardShouldPersistTaps ?? 'handled',
     keyboardDismissMode: children.props.keyboardDismissMode ?? 'interactive',
     scrollEventThrottle: children.props.scrollEventThrottle ?? 16,
-    onLayout: (event: LayoutChangeEvent) => { edges.onLayout(event); children.props.onLayout?.(event); },
-    onContentSizeChange: (width: number, height: number) => { edges.onContentSizeChange(width, height); children.props.onContentSizeChange?.(width, height); },
-    onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => { edges.onScroll(event); children.props.onScroll?.(event); },
+    onLayout: (event: LayoutChangeEvent) => {
+      measurements.current.viewport = event.nativeEvent.layout.height;
+      fitContent?.(measurements.current.viewport, measurements.current.content);
+      if (!modal) edges.onLayout(event);
+      children.props.onLayout?.(event);
+    },
+    onContentSizeChange: (width: number, height: number) => {
+      measurements.current.content = height;
+      fitContent?.(measurements.current.viewport, height);
+      if (!modal) edges.onContentSizeChange(width, height);
+      children.props.onContentSizeChange?.(width, height);
+    },
+    onScroll: modal ? children.props.onScroll : (event: NativeSyntheticEvent<NativeScrollEvent>) => { edges.onScroll(event); children.props.onScroll?.(event); },
   }) : children;
   return (
     <View collapsable={false} style={[styles.viewport, { backgroundColor: Platform.OS === 'ios' ? 'transparent' : background }, style]}>
       {scroller}
-      {top > 0 ? <GradualBlur position="top" active={edges.left} height={top} strength={0.5} curve="bezier" /> : null}
-      {bottom > 0 ? <GradualBlur position="bottom" active={edges.right} height={bottom} strength={0.5} curve="bezier" /> : null}
+      {!modal && top > 0 ? <GradualBlur position="top" active={edges.left} height={top} strength={0.5} curve="bezier" /> : null}
+      {!modal && bottom > 0 ? <GradualBlur position="bottom" active={edges.right} height={bottom} strength={0.5} curve="bezier" /> : null}
     </View>
   );
 }

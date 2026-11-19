@@ -1,5 +1,6 @@
 import { ModalBackdrop } from '../common/ModalBackdrop';
 import { SheetModal } from '../common/SheetModal';
+import { BackdropBlurTargetProvider } from '../common/BackdropBlurTarget';
 import React, { useCallback, useState } from 'react';
 import {
   ScrollView,
@@ -225,6 +226,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
       statusBarTranslucent
       onRequestClose={onClose}
     >
+      <BackdropBlurTargetProvider>
       <View style={styles.modalOverlay}>
         <ModalBackdrop onClose={onClose} />
         <GlassModalSheet style={styles.sheetContainer}>
@@ -330,6 +332,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
       </View>
 
       <UpiQrModal visible={Boolean(qrRequest)} onClose={closeQr} account={qrRequest?.account ?? null} amount={qrRequest?.amount} note={qrRequest?.note} />
+      </BackdropBlurTargetProvider>
     </SheetModal>
   );
 };

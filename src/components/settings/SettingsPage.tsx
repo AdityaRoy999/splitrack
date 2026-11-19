@@ -41,7 +41,8 @@ import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
 import { SmoothCollapsible, triggerSmoothLayout } from '../common/SmoothCollapsible';
 import { AnimatedPressable } from '../common/MotionPrimitives';
-import { CurrencyCode, ThemeMode, type SelectionStyle } from '../../types';
+import { CurrencyCode, ThemeMode, type SelectionStyle, type NotificationDirection } from '../../types';
+import { useTransactionActions } from '../transactions/TransactionActions';
 import { currencies } from '../../theme/colors';
 import {
   ImportParseResult,
@@ -86,7 +87,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setCurrency,
     selectionStyle,
     setSelectionStyle,
+    notificationDirection,
+    setNotificationDirection,
   } = useLiquidGlass();
+  const transactionActions = useTransactionActions();
 
   const {
     eraseAllData,
@@ -526,6 +530,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </View>
           <View style={[styles.sectionDivider, { backgroundColor: dividerColor }]} />
 
+          <View style={styles.joinedSection}>
+            <Text style={[styles.sectionHeader, { color: mutedText }]}>IN-APP NOTIFICATIONS</Text>
+            <JellyRadio
+              presentation="chips"
+              items={[{ value: 'top', label: 'Top' }, { value: 'bottom', label: 'Bottom' }]}
+              value={notificationDirection} onChange={value => setNotificationDirection(value as NotificationDirection)}
+              chipColor={chipBg} activeColor={activeBg} textColor={textColor} activeTextColor={activeText}
+              size="sm" gap={10}
+            />
+            <Text style={[styles.surfaceCaption, { color: mutedText }]}>Choose where notification bubbles appear.</Text>
+          </View>
+          <View style={[styles.sectionDivider, { backgroundColor: dividerColor }]} />
+
           {/* Currency Settings */}
           <View style={styles.joinedSection}>
             <Text style={[styles.sectionHeader, { color: mutedText }]}>CURRENCY</Text>
@@ -755,6 +772,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         <FormError message={error} />
         {/* Data Management Section */}
         <View style={styles.dataActionsSection}>
+          <TouchableOpacity
+            onPress={transactionActions.openDeleted}
+            style={[styles.resetBtn, { backgroundColor: chipBg }]}
+            activeOpacity={0.7} accessibilityRole="button"
+          >
+            <TrashBinTrashIcon size={16} color={textColor} />
+            <Text style={[styles.resetBtnText, { color: textColor }]}>Deleted transactions</Text>
+            <AltArrowRightIcon size={16} color={mutedText} />
+          </TouchableOpacity>
           {/* Erase All Data Button */}
           <TouchableOpacity
             onPress={handleEraseAllData}

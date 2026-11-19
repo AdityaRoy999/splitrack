@@ -9,7 +9,7 @@ import type { MemberDraft, MemberProfile } from '../utils/memberProfiles';
 import { getReceivingUpiAccount } from '../utils/upi';
 import { preserveOpenedHistory } from './cloudSnapshot';
 
-export interface CloudSettings { selectedAccountId: string; receivingAccountId?: string; themeMode: ThemeMode; currency: 'INR'; hideAmounts: boolean; isLiquidGlassEnabled: boolean; selectionStyle?: SelectionStyle }
+export interface CloudSettings { selectedAccountId: string; receivingAccountId?: string; themeMode: ThemeMode; currency: 'INR'; hideAmounts: boolean; isLiquidGlassEnabled: boolean; selectionStyle?: SelectionStyle; notificationDirection?: 'top' | 'bottom' }
 interface Snapshot {
   schemaVersion: 2; userId: string; revision: number; generation?: number; ledgerResetId?: string | null;
   accounts: UpiAccount[]; friends: Friend[]; trips: Trip[]; transactions: Transaction[]; categories: ExpenseCategory[];
@@ -87,7 +87,7 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
     if (fromServer) serverSnapshot.current = true;
     if (fromServer) lastSnapshotAt.current = Date.now();
     const retained = preserveOpenedHistory(next, stateRef.current, historyCount.current);
-    const normalized = { ...retained, settings: { ...next.settings, selectionStyle: next.settings.selectionStyle ?? 'chips' } };
+    const normalized = { ...retained, settings: { ...next.settings, selectionStyle: next.settings.selectionStyle ?? 'chips', notificationDirection: next.settings.notificationDirection ?? 'bottom' } };
     stateRef.current = normalized; setState(normalized); setSyncError('');
     if (cacheWrite.current) clearTimeout(cacheWrite.current);
     cacheWrite.current = setTimeout(() => {
