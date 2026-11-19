@@ -179,12 +179,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.34",
-      "versionDate": "2026-11-19T05:05:38Z",
-      "versionDescription": "fix: match blur capture backgrounds to app surfaces",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-34/Splittrack-unsigned.ipa",
-      "size": 27129702,
+      "version": "1.0.36",
+      "versionDate": "2026-11-19T09:10:45Z",
+      "versionDescription": "fix: smooth modal blur and add global dropdown selection",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-36/Splittrack-unsigned.ipa",
+      "size": 27138485,
       "versions": [
+        {
+          "version": "1.0.36",
+          "buildVersion": "36",
+          "date": "2026-11-19T09:10:45Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-36/Splittrack-unsigned.ipa",
+          "size": 27138485,
+          "localizedDescription": "fix: smooth modal blur and add global dropdown selection"
+        },
         {
           "version": "1.0.34",
           "buildVersion": "34",
