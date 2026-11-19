@@ -179,12 +179,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.36",
-      "versionDate": "2026-11-19T09:10:45Z",
-      "versionDescription": "fix: smooth modal blur and add global dropdown selection",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-36/Splittrack-unsigned.ipa",
-      "size": 27138485,
+      "version": "1.0.37",
+      "versionDate": "2026-11-19T17:53:46Z",
+      "versionDescription": "Add transaction editing and bin, owned settlements and solid modal surfaces",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-37/Splittrack-unsigned.ipa",
+      "size": 27145480,
       "versions": [
+        {
+          "version": "1.0.37",
+          "buildVersion": "37",
+          "date": "2026-11-19T17:53:46Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-37/Splittrack-unsigned.ipa",
+          "size": 27145480,
+          "localizedDescription": "Add transaction editing and bin, owned settlements and solid modal surfaces"
+        },
         {
           "version": "1.0.36",
           "buildVersion": "36",
