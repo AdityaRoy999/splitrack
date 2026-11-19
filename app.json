@@ -57,8 +57,17 @@
         "expo-build-properties",
         {
           "android": {
-            "extraProguardRules": "# Expo creates GLView via reflection and C++ resolves GLContext.flush() and EXGL native bindings by name.\n-keep class expo.modules.gl.GLView { *; }\n-keep class expo.modules.gl.GLContext { *; }\n-keep class expo.modules.gl.cpp.EXGL { *; }"
+            "extraProguardRules": "# Expo reflection and native JNI callbacks must retain their release names.\n-keep class expo.modules.gl.GLView { *; }\n-keep class expo.modules.gl.GLContext { *; }\n-keep class expo.modules.gl.cpp.EXGL { *; }\n-keep class expo.modules.blurview.views.ProgressiveBlurView { *; }\n-keep class com.qmdeve.blurview.BlurNative { *; }"
           }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-transparent.png",
+          "backgroundColor": "#FFFFFF",
+          "imageWidth": 1,
+          "dark": { "image": "./assets/splash-transparent.png", "backgroundColor": "#000000" }
         }
       ]
     ]

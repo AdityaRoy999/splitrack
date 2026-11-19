@@ -13,6 +13,7 @@ import { triggerSelection } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassSurface } from './GlassSurface';
+import { GradualBlur } from '../effects/GradualBlur';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -123,7 +124,7 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
       ]}
     >
       {coverImageUri ? (
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: innerRadius, overflow: 'hidden' }]}>
+        <View collapsable={false} pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: innerRadius, overflow: 'hidden' }]}>
           <Animated.Image
             source={{ uri: coverImageUri }}
             resizeMode="cover"
@@ -141,6 +142,10 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
                 opacity: scrimOpacity,
               },
             ]}
+          />
+          <GradualBlur
+            position="bottom" height={120} intensity={85} startOffset={0.05}
+            tint={isDark ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.08)'} zIndex={1}
           />
         </View>
       ) : null}

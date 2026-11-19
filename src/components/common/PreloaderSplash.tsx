@@ -22,13 +22,10 @@ interface PreloaderSplashProps {
   onFinish: () => void;
 }
 
-interface FlightSpec {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  startCornerRadius: number;
-  endCornerRadius: number;
+interface FlightDestination {
+  translateX: number;
+  translateY: number;
+  scale: number;
 }
 
 const HERO_ICON_SIZE = 112;
@@ -37,6 +34,11 @@ const HEADER_ICON_SIZE = 42;
 const SHRUNK_SCALE = SHRUNK_ICON_SIZE / HERO_ICON_SIZE;
 const ICON_TEXT_GAP = 14;
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
+// Auth/provider remounts are not a fresh application launch. Keep this in the
+// JavaScript session rather than storage so a real cold launch still animates.
+let startupPreloaderCompleted = false;
+export const hasCompletedStartupPreloader = () => startupPreloaderCompleted;
 
 export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
   ready = true,
@@ -52,22 +54,19 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
   const [textWidth, setTextWidth] = useState(156);
   const [showWordmark, setShowWordmark] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
-  const [flightSpec, setFlightSpec] = useState<FlightSpec | null>(null);
+  const [flightDestination, setFlightDestination] = useState<FlightDestination | null>(null);
+  const [skipAnimation] = useState(hasCompletedStartupPreloader);
 
   const [introOpacity] = useState(() => new Animated.Value(0));
   const [iconScale] = useState(() => new Animated.Value(0.8));
-  const [iconTranslateX] = useState(() => new Animated.Value((ICON_TEXT_GAP + 156) / 2));
+  const [iconTranslateX] = useState(() => new Animated.Value(0));
+  const [iconTranslateY] = useState(() => new Animated.Value(0));
   const [cornerProgress] = useState(() => new Animated.Value(0));
-  const [flightTranslateX] = useState(() => new Animated.Value(0));
-  const [flightTranslateY] = useState(() => new Animated.Value(0));
-  const [flightScale] = useState(() => new Animated.Value(1));
-  const [flightCornerProgress] = useState(() => new Animated.Value(0));
   const [wordmarkOpacity] = useState(() => new Animated.Value(1));
   const [wordmarkTranslateX] = useState(() => new Animated.Value(0));
   const [backdropOpacity] = useState(() => new Animated.Value(1));
 
   const overlayRef = useRef<ViewRefNode>(null);
-  const iconSlotRef = useRef<ViewRefNode>(null);
   const overlayRectRef = useRef({
     x: 0,
     y: 0,
@@ -81,9 +80,45 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
   const exitedRef = useRef(false);
   const readyRef = useRef(ready);
   const exitRequestedRef = useRef(false);
-  const flightStartedRef = useRef(false);
+  const mountedRef = useRef(true);
+  const finishedRef = useRef(false);
+  const framesRef = useRef(new Set<number>());
+  const letterExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revealRef = useRef(onRevealHeaderLogo);
   const finishRef = useRef(onFinish);
+
+  useEffect(() => {
+    const frames = framesRef.current;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      frames.forEach(cancelAnimationFrame);
+      frames.clear();
+      if (letterExitTimerRef.current !== null) clearTimeout(letterExitTimerRef.current);
+    };
+  }, []);
+
+  const scheduleFrame = useCallback((callback: () => void) => {
+    const frame = requestAnimationFrame(() => {
+      framesRef.current.delete(frame);
+      if (mountedRef.current) callback();
+    });
+    framesRef.current.add(frame);
+    return frame;
+  }, []);
+
+  const finishStartup = useCallback(() => {
+    if (!mountedRef.current || finishedRef.current) return;
+    finishedRef.current = true;
+    startupPreloaderCompleted = true;
+    revealRef.current?.();
+    // Commit the destination logo before removing the moving image.
+    scheduleFrame(() => scheduleFrame(() => finishRef.current()));
+  }, [scheduleFrame]);
+
+  useEffect(() => {
+    if (skipAnimation) finishStartup();
+  }, [finishStartup, skipAnimation]);
 
   useEffect(() => {
     revealRef.current = onRevealHeaderLogo;
@@ -95,10 +130,7 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
 
   useEffect(() => {
     textWidthRef.current = textWidth;
-    if (!lockupShiftStartedRef.current) {
-      iconTranslateX.setValue((ICON_TEXT_GAP + textWidth) / 2);
-    }
-  }, [textWidth, iconTranslateX]);
+  }, [textWidth]);
 
   useEffect(() => {
     targetLogoRectRef.current = targetLogoRect;
@@ -106,17 +138,16 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
   }, [targetLogoRect, targetLogoNodeRef]);
 
   const measureOverlay = useCallback(() => {
-    requestAnimationFrame(() => {
+    scheduleFrame(() => {
       measureNodeInWindow(overlayRef.current, (rect) => {
-        overlayRectRef.current = rect;
+        if (mountedRef.current) overlayRectRef.current = rect;
       });
     });
-  }, []);
+  }, [scheduleFrame]);
 
   const prepareTargetAnchoredFlight = useCallback(
     (
       liveOverlay: HeaderLogoRect,
-      slotRect: HeaderLogoRect,
       measuredTarget: HeaderLogoRect | null
     ) => {
       const target =
@@ -134,32 +165,21 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
                 height: HEADER_ICON_SIZE,
               };
 
-      const slotCenterX = slotRect.x + slotRect.width / 2;
-      const slotCenterY = slotRect.y + slotRect.height / 2;
       const targetCenterX = target.x + target.width / 2;
       const targetCenterY = target.y + target.height / 2;
-
-      // Pin flyer at exact target (left, top, width, height) so t=1 settles at translate(0, 0) & scale(1)
-      flightTranslateX.setValue(slotCenterX - targetCenterX);
-      flightTranslateY.setValue(slotCenterY - targetCenterY);
-      flightScale.setValue(SHRUNK_ICON_SIZE / target.width);
-      flightCornerProgress.setValue(0);
-
-      setFlightSpec({
-        left: target.x - liveOverlay.x,
-        top: target.y - liveOverlay.y,
-        width: target.width,
-        height: target.height,
-        startCornerRadius: (28 * target.width) / HERO_ICON_SIZE,
-        endCornerRadius: target.width / 2,
+      if (!mountedRef.current) return;
+      setFlightDestination({
+        translateX: targetCenterX - liveOverlay.x - liveOverlay.width / 2,
+        translateY: targetCenterY - liveOverlay.y - liveOverlay.height / 2,
+        scale: target.width / HERO_ICON_SIZE,
       });
     },
-    [flightCornerProgress, flightScale, flightTranslateX, flightTranslateY]
+    []
   );
 
   useEffect(() => {
-    if (!flightSpec || flightStartedRef.current) return;
-    flightStartedRef.current = true;
+    if (!flightDestination || startupPreloaderCompleted) return;
+    let active = true;
 
     const anim = Animated.parallel([
       Animated.timing(wordmarkOpacity, {
@@ -181,25 +201,25 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
         easing: Easing.out(Easing.cubic),
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
-      Animated.timing(flightTranslateX, {
-        toValue: 0,
+      Animated.timing(iconTranslateX, {
+        toValue: flightDestination.translateX,
         duration: 540,
         easing: Easing.bezier(0.22, 1, 0.36, 1),
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
-      Animated.timing(flightTranslateY, {
-        toValue: 0,
+      Animated.timing(iconTranslateY, {
+        toValue: flightDestination.translateY,
         duration: 540,
         easing: Easing.bezier(0.22, 1, 0.36, 1),
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
-      Animated.timing(flightScale, {
-        toValue: 1,
+      Animated.timing(iconScale, {
+        toValue: flightDestination.scale,
         duration: 540,
         easing: Easing.bezier(0.22, 1, 0.36, 1),
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
-      Animated.timing(flightCornerProgress, {
+      Animated.timing(cornerProgress, {
         toValue: 1,
         duration: 440,
         easing: Easing.out(Easing.cubic),
@@ -208,32 +228,31 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
     ]);
 
     anim.start(({ finished }) => {
-      if (!finished) return;
-      revealRef.current?.();
-      // Let target avatar commit at exact 1:1 scale & coordinates underneath, then unmount overlay atomically
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          finishRef.current();
-        });
-      });
+      if (active && finished) finishStartup();
     });
+    const finishTimer = setTimeout(() => {
+      if (active) finishStartup();
+    }, 1400);
 
     return () => {
+      active = false;
       anim.stop();
+      clearTimeout(finishTimer);
     };
   }, [
     backdropOpacity,
-    flightCornerProgress,
-    flightScale,
-    flightSpec,
-    flightTranslateX,
-    flightTranslateY,
+    cornerProgress,
+    iconScale,
+    flightDestination,
+    iconTranslateX,
+    iconTranslateY,
+    finishStartup,
     wordmarkOpacity,
     wordmarkTranslateX,
   ]);
 
   const triggerExit = useCallback(() => {
-    if (exitedRef.current) return;
+    if (!mountedRef.current || exitedRef.current || startupPreloaderCompleted) return;
     if (!readyRef.current) {
       exitRequestedRef.current = true;
       return;
@@ -255,12 +274,12 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
       }
       let settled = false;
       measureNodeInWindow(node, (rect) => {
-        if (!settled) {
+        if (!settled && mountedRef.current) {
           settled = true;
           cb(rect);
         }
       });
-      requestAnimationFrame(() => {
+      scheduleFrame(() => {
         if (!settled) {
           settled = true;
           cb(fallback);
@@ -272,42 +291,29 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
     // Account hydration may switch the destination from onboarding to home.
     // Read the latest node without restarting the intro effect and its timers.
     const targetNode = targetLogoNodeRefRef.current?.current ?? null;
-    const slotNode = iconSlotRef.current;
 
     measureSafe(overlayRef.current, cachedOverlay, (measuredOverlay) => {
       const liveOverlay = measuredOverlay || cachedOverlay;
       overlayRectRef.current = liveOverlay;
 
-      const fallbackSlot: HeaderLogoRect = {
-        x:
-          liveOverlay.x +
-          liveOverlay.width / 2 -
-          (ICON_TEXT_GAP + textWidthRef.current) / 2 -
-          SHRUNK_ICON_SIZE / 2,
-        y: liveOverlay.y + liveOverlay.height / 2 - SHRUNK_ICON_SIZE / 2,
-        width: SHRUNK_ICON_SIZE,
-        height: SHRUNK_ICON_SIZE,
-      };
-
-      measureSafe(slotNode, fallbackSlot, (measuredSlot) => {
-        const slotRect = measuredSlot || fallbackSlot;
-        measureSafe(targetNode, targetLogoRectRef.current ?? null, (liveTargetRect) => {
-          prepareTargetAnchoredFlight(liveOverlay, slotRect, liveTargetRect);
-        });
+      measureSafe(targetNode, targetLogoRectRef.current ?? null, (liveTargetRect) => {
+        prepareTargetAnchoredFlight(liveOverlay, liveTargetRect);
       });
     });
-  }, [iconScale, iconTranslateX, prepareTargetAnchoredFlight]);
+  }, [iconScale, iconTranslateX, prepareTargetAnchoredFlight, scheduleFrame]);
 
   useEffect(() => {
     readyRef.current = ready;
     if (!ready || !exitRequestedRef.current) return;
     // Keep the finished lockup visible while the account hydrates, then fly to
     // its mounted destination rather than revealing a second loading screen.
-    const frame = requestAnimationFrame(triggerExit);
+    const frame = scheduleFrame(triggerExit);
     return () => cancelAnimationFrame(frame);
-  }, [ready, triggerExit]);
+  }, [ready, triggerExit, scheduleFrame]);
 
   useEffect(() => {
+    if (startupPreloaderCompleted) return;
+    let shrinkAnim: Animated.CompositeAnimation | null = null;
     // Stage 1: Pop hero app icon into screen center
     const introAnim = Animated.parallel([
       Animated.timing(introOpacity, {
@@ -329,7 +335,7 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
     // Stage 2: Shrink icon smoothly & glide left, revealing "SplitTrack" out from the logo
     const shrinkTimer = setTimeout(() => {
       lockupShiftStartedRef.current = true;
-      Animated.parallel([
+      shrinkAnim = Animated.parallel([
         Animated.timing(iconScale, {
           toValue: SHRUNK_SCALE,
           duration: 500,
@@ -337,12 +343,13 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(iconTranslateX, {
-          toValue: 0,
+          toValue: -(ICON_TEXT_GAP + textWidthRef.current) / 2,
           duration: 500,
           easing: Easing.bezier(0.22, 1, 0.36, 1),
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
-      ]).start();
+      ]);
+      shrinkAnim.start();
     }, 430);
 
     const textTimer = setTimeout(() => {
@@ -356,6 +363,7 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
 
     return () => {
       introAnim.stop();
+      shrinkAnim?.stop();
       clearTimeout(shrinkTimer);
       clearTimeout(textTimer);
       clearTimeout(fallbackTimer);
@@ -363,7 +371,9 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
   }, [iconScale, iconTranslateX, introOpacity, triggerExit]);
 
   const handleLetterAnimationComplete = useCallback(() => {
-    setTimeout(() => {
+    if (!mountedRef.current || letterExitTimerRef.current !== null || exitedRef.current) return;
+    letterExitTimerRef.current = setTimeout(() => {
+      letterExitTimerRef.current = null;
       triggerExit();
     }, 320);
   }, [triggerExit]);
@@ -373,19 +383,14 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
     outputRange: [28, HERO_ICON_SIZE / 2],
   });
 
-  const flightCornerRadius = flightSpec
-    ? flightCornerProgress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [flightSpec.startCornerRadius, flightSpec.endCornerRadius],
-      })
-    : 0;
-
   const bgColor = isDark ? '#000000' : '#FFFFFF';
   const textColor = isDark ? '#FFFFFF' : '#09090B';
   const iconSurfaceBg = isDark ? '#000000' : '#FFFFFF';
   const iconSource = isDark
     ? require('../../../assets/icon-dark.png')
     : require('../../../assets/icon-light.png');
+
+  if (skipAnimation) return null;
 
   return (
     <View
@@ -422,39 +427,7 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
       </Text>
 
       <View style={styles.lockupRow}>
-        {/* Fixed slot matching shrunk icon center before handing off to target-anchored flyer */}
-        <View ref={iconSlotRef} collapsable={false} style={styles.iconSlot}>
-          {!flightSpec ? (
-            <Animated.View
-              style={[
-                styles.heroTransformWrap,
-                {
-                  opacity: introOpacity,
-                  transform: [
-                    { translateX: iconTranslateX },
-                    { scale: iconScale },
-                  ],
-                },
-              ]}
-            >
-              <Animated.View
-                style={[
-                  styles.heroIconMask,
-                  {
-                    backgroundColor: iconSurfaceBg,
-                    borderRadius: animatedCornerRadius,
-                  },
-                ]}
-              >
-                <Image
-                  source={iconSource}
-                  resizeMode="cover"
-                  style={styles.heroIconImage}
-                />
-              </Animated.View>
-            </Animated.View>
-          ) : null}
-        </View>
+        <View pointerEvents="none" style={styles.iconSlot} />
 
         {/* Wordmark emerges from the logo edge and slides smoothly to the right */}
         <Animated.View
@@ -488,33 +461,28 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
         </Animated.View>
       </View>
 
-      {/* Target-anchored 1:1 flyer settles at exact target frame (translate 0, scale 1) */}
-      {flightSpec ? (
+      {/* Keep the same decoded image mounted through intro, shrink and flight. */}
+      <View pointerEvents="none" style={styles.iconAnchor}>
         <Animated.View
           pointerEvents="none"
           style={[
-            styles.flightAnchor,
+            styles.heroTransformWrap,
             {
-              left: flightSpec.left,
-              top: flightSpec.top,
-              width: flightSpec.width,
-              height: flightSpec.height,
+              opacity: introOpacity,
               transform: [
-                { translateX: flightTranslateX },
-                { translateY: flightTranslateY },
-                { scale: flightScale },
+                { translateX: iconTranslateX },
+                { translateY: iconTranslateY },
+                { scale: iconScale },
               ],
             },
           ]}
         >
           <Animated.View
             style={[
-              styles.flightMask,
+              styles.heroIconMask,
               {
-                width: flightSpec.width,
-                height: flightSpec.height,
                 backgroundColor: iconSurfaceBg,
-                borderRadius: flightCornerRadius,
+                borderRadius: animatedCornerRadius,
               },
             ]}
           >
@@ -525,7 +493,7 @@ export const PreloaderSplash: React.FC<PreloaderSplashProps> = ({
             />
           </Animated.View>
         </Animated.View>
-      ) : null}
+      </View>
     </View>
   );
 };
@@ -562,10 +530,13 @@ const styles = StyleSheet.create({
     overflow: 'visible',
     zIndex: 4,
   },
+  iconAnchor: {
+    position: 'absolute', top: 0, bottom: 0, left: 0, right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
   heroTransformWrap: {
-    position: 'absolute',
-    left: (SHRUNK_ICON_SIZE - HERO_ICON_SIZE) / 2,
-    top: (SHRUNK_ICON_SIZE - HERO_ICON_SIZE) / 2,
     width: HERO_ICON_SIZE,
     height: HERO_ICON_SIZE,
     alignItems: 'center',
@@ -581,17 +552,6 @@ const styles = StyleSheet.create({
   heroIconImage: {
     width: '100%',
     height: '100%',
-  },
-  flightAnchor: {
-    position: 'absolute',
-    zIndex: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  flightMask: {
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   wordmarkSlot: {
     marginLeft: ICON_TEXT_GAP,

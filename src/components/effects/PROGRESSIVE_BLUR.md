@@ -1,14 +1,31 @@
-Android edge blur uses the masked `BlurView` approach from
-[rit3zh/expo-progressive-blur](https://github.com/rit3zh/expo-progressive-blur/blob/f1f32e86b8fc33ca05b29af3b4ad5a7391f4e9d0/app/index.tsx).
+Native progressive backdrop blur
 
-The upstream repository is an Expo SDK 54 demo application. `NativeFadeBlur.android.tsx`
-adapts its gradient mask and Reanimated reveal to SDK 58's `BlurTargetView` and
-`blurMethod` API. One blur surface replaces the previous six native surfaces per
-edge. The existing eased mask runs in all four directions with transparent inner
-endpoints; it is static so Android can keep hardware rendering during scrolling.
-The demo's black background gradient and forced dark theme are omitted. Expo's
-material intensity is kept low, with its reduction factor preserving the desired
-blur radius. Android versions before API 31 remain transparent.
+The app uses Expo 58, React Native 0.88.1, Hermes, and Fabric. Native code is
+generated through Expo Prebuild; platform-specific autolinking keeps only the
+blur implementation used by each binary.
 
-iOS continues using the local native gradual-radius implementation. The browser
-continues using React Bits.
+Android uses expo-backdrop 0.1.3. Its ProgressiveBlurView renders eight native
+radius levels from a shared live capture, using RenderNode/RenderEffect on API
+31+. It does not stack React Native uniform BlurViews. Older Android uses the
+library's native CPU fallback. scripts/patch-expo-backdrop.mjs is a versioned,
+idempotent postinstall fix: explicit transparent tint is honored, and app-owned
+scene/scroll reveal replaces automatic discovery of retained inactive tabs.
+
+iOS uses @sbaiahmed1/react-native-blur 6.0.3. Its variable-radius backdrop filter
+avoids the custom UIKit blur stack. The library uses private CAFilter API; a
+future iOS change can fall back to uniform blur, and App Store review can flag
+that API. Android's implementation of this library is uniform masked blur, so it
+is not linked into the APK. expo-backdrop's iOS implementation is also uniform
+masked blur with ancestor mask/alpha issues, so it is not linked into the IPA.
+
+Both paths sample the native backdrop rather than rerendering images in JS.
+Android captures TextureView through getBitmap and SurfaceView through PixelCopy;
+SurfaceView video can trail by one or two frames. This app has no video player
+to exercise that path. No frame-rate or exact video synchronization guarantee is
+made. Limit depth and the number of simultaneously visible effects.
+
+SpotlightCard renders its image, bottom blur, then controls. The shared edge
+wrapper leaves touch events to content. The browser retains React Bits through
+GradualBlur.web.tsx. Native left/right on iOS rotate the single library view;
+physical-device checks should cover those edges, light/dark themes, scrolling,
+foreground return, and image highlight transitions.

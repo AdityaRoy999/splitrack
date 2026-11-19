@@ -128,8 +128,14 @@ if not callbacks.issubset({method['name'] for method in gl['methods'] if method[
     raise RuntimeError('GLView surface callbacks missing')
 if not constructor(target):
     raise RuntimeError('ExpoBlurTargetView constructor missing')
-if 'RNCMaskedView' not in all_strings:
-    raise RuntimeError('New Android masked-view component missing')
+progressive = classes.get('Lexpo/modules/blurview/views/ProgressiveBlurView;')
+if not progressive or not any(method['parameters'] == expected_parameters and method['code'] for method in constructor(progressive)):
+    raise RuntimeError('expo-backdrop ProgressiveBlurView reflective constructor missing')
+qm = classes.get('Lcom/qmdeve/blurview/BlurNative;')
+if not qm or not any(method['name'] == 'blur' and method['public'] and method['static'] and method['native'] and method['parameters'] == ['Ljava/lang/Object;', 'I', 'I', 'I', 'I', 'I'] and method['returns'] == 'V' for method in qm['methods']):
+    raise RuntimeError('Qm blur JNI binding missing or renamed')
+if 'RNCMaskedView' in all_strings:
+    raise RuntimeError('Replaced Android masked blur remains packaged')
 if 'Lexpo/modules/gradualblur/GradualBlurView;' in classes:
     raise RuntimeError('Replaced Android gradual blur implementation still packaged')
 if 'RNGoogleSignin' not in all_strings:
@@ -138,4 +144,4 @@ if not bundle_present:
     raise RuntimeError('Hermes JS bundle missing')
 with package.open('rb') as stream:
     sha256 = hashlib.file_digest(stream, 'sha256').hexdigest()
-print(json.dumps({'glClassPreserved': True, 'glReflectiveConstructorPreserved': True, 'glContextFlushJniCallbackPreserved': True, 'exglNativeBindingsPreserved': True, 'constructorParameters': expected_parameters, 'glSurfaceCallbacksPreserved': True, 'expoBlurViewPreserved': True, 'expoBlurTargetViewPreserved': True, 'androidGradientMaskPackaged': True, 'oldAndroidGradualBlurRemoved': True, 'nativeGoogleModule': True, 'jsBundlePresent': True, 'bytes': package.stat().st_size, 'sha256': sha256}, indent=2))
+print(json.dumps({'glClassPreserved': True, 'glReflectiveConstructorPreserved': True, 'glContextFlushJniCallbackPreserved': True, 'exglNativeBindingsPreserved': True, 'constructorParameters': expected_parameters, 'glSurfaceCallbacksPreserved': True, 'expoBlurViewPreserved': True, 'expoBackdropProgressiveBlurPreserved': True, 'qmBlurJniPreserved': True, 'oldAndroidMaskRemoved': True, 'oldAndroidGradualBlurRemoved': True, 'nativeGoogleModule': True, 'jsBundlePresent': True, 'bytes': package.stat().st_size, 'sha256': sha256}, indent=2))

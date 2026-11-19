@@ -1,7 +1,7 @@
-import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
+import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { errorMessage } from './src/services/api';
-import { BlurTargetView } from 'expo-blur';
+import * as SplashScreen from 'expo-splash-screen';
 import {
   ScrollView,
   ActivityIndicator,
@@ -63,7 +63,7 @@ import { CalendarDatePickerModal, formatDisplayDate } from './src/components/com
 import { BottomBubble, type BubbleNotice } from './src/components/common/BottomBubble';
 import { FormError } from './src/hooks/useAsyncAction';
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
-import { PreloaderSplash } from './src/components/common/PreloaderSplash';
+import { PreloaderSplash, hasCompletedStartupPreloader } from './src/components/common/PreloaderSplash';
 import { OnboardingAuthScreen, type AuthLogoRect } from './src/components/auth/OnboardingAuthScreen';
 import { OnboardingUsernameScreen } from './src/components/auth/OnboardingUsernameScreen';
 import { AnimatedPressable } from './src/components/common/MotionPrimitives';
@@ -73,6 +73,8 @@ import { CloudStatus } from './src/components/common/CloudStatus';
 import { ExpenseCategory, Friend, Transaction } from './src/types';
 
 type ExpenseFilter = 'All' | 'Expenses' | 'Splits' | 'Income';
+
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function getLedgerIcon(
   tx: Transaction,
@@ -103,7 +105,6 @@ function MainAppContent({
 }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const screenBlurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   const { palette, themeMode, formatAmount, isLiquidGlassEnabled } = useLiquidGlass();
   const {
     totalIncome,
@@ -1030,8 +1031,8 @@ function MainAppContent({
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <CloudStatus />
 
-      <View style={styles.mainViewport}>
-        <BlurTargetView ref={screenBlurTarget} style={[styles.tabPagesContainer, { backgroundColor: rootBg }]}>
+      <View collapsable={false} style={[styles.mainViewport, { backgroundColor: rootBg }]}>
+        <View style={[styles.tabPagesContainer, { backgroundColor: rootBg }]}>
           {showSettings ? (
             <View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
               <SettingsPage
@@ -1076,15 +1077,13 @@ function MainAppContent({
             </View>
           )}
 
-        </BlurTargetView>
+        </View>
         <GradualBlur
           position="top"
-          renderMode="page"
           height={Math.max(32, insets.top + 12)}
           strength={0.6}
           layers={6}
           curve="bezier"
-          blurTarget={screenBlurTarget}
           zIndex={45}
         />
         <GradualBlur
@@ -1093,7 +1092,6 @@ function MainAppContent({
           strength={0.6}
           layers={6}
           curve="bezier"
-          blurTarget={screenBlurTarget}
           zIndex={45}
         />
       </View>
@@ -1192,14 +1190,14 @@ function AppContent() {
   const userDisplayName = profile?.displayName ?? user?.displayName ?? '';
   const userHandle = profile?.handle ?? '';
   const [sessionError, setSessionError] = useState('');
-  const [showPreloader, setShowPreloader] = useState(true);
-  const [hideHeaderLogo, setHideHeaderLogo] = useState(true);
+  const [showPreloader, setShowPreloader] = useState(() => !hasCompletedStartupPreloader());
+  const [hideHeaderLogo, setHideHeaderLogo] = useState(() => !hasCompletedStartupPreloader());
   const [headerLogoRect, setHeaderLogoRect] = useState<HeaderLogoRect | null>(null);
   const headerLogoNodeRef = useRef<ViewRefNode | null>(null);
   const handleHeaderLogoNode = useCallback((node: ViewRefNode | null) => {
     headerLogoNodeRef.current = node;
   }, []);
-  const [hideOnboardingLogo, setHideOnboardingLogo] = useState(true);
+  const [hideOnboardingLogo, setHideOnboardingLogo] = useState(() => !hasCompletedStartupPreloader());
   const [onboardingLogoRect, setOnboardingLogoRect] = useState<AuthLogoRect | null>(null);
   const onboardingLogoNodeRef = useRef<ViewRefNode | null>(null);
   const handleSignOut = async () => {
@@ -1211,7 +1209,7 @@ function AppContent() {
   const activeTargetNodeRef = isAuthenticated ? headerLogoNodeRef : onboardingLogoNodeRef;
 
   return (
-            <View style={styles.appRoot}>
+            <View style={styles.appRoot} onLayout={() => { void SplashScreen.hideAsync().catch(() => {}); }}>
               {loading ? (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#09090B' }}><ActivityIndicator color="#FFFFFF" /><Text style={{ color: '#A1A1AA', marginTop: 16 }}>Loading your account…</Text></View>
               ) : user && profileError ? (

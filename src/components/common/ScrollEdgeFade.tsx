@@ -1,7 +1,7 @@
-import React, { useCallback, useRef, useState, type ComponentRef } from 'react';
-import { Platform, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
-import { BlurTargetView } from 'expo-blur';
+import React, { useCallback, useRef, useState } from 'react';
+import { processColor, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
 import { GradualBlur } from '../effects/GradualBlur';
+import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 
 interface ScrollEdgeFadeProps {
   children: React.ReactNode;
@@ -18,6 +18,12 @@ interface HorizontalEdgeFadeProps {
   width?: number;
   left?: boolean;
   right?: boolean;
+}
+
+function captureBackground(tint: string | undefined, fallback: string): string {
+  const color = tint ? processColor(tint) : null;
+  if (typeof color !== 'number') return fallback;
+  return `rgb(${color >>> 16 & 255},${color >>> 8 & 255},${color & 255})`;
 }
 
 function useScrollEdges(horizontal: boolean) {
@@ -59,14 +65,15 @@ export function useHorizontalScrollEdges() {
 }
 
 // Keep the gradient mask at the clipping edge and animate the blur's reveal.
-export function HorizontalEdgeFade({ children, style, width = 24, left = true, right = true }: HorizontalEdgeFadeProps) {
-  const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
+export function HorizontalEdgeFade({ children, style, tint, width = 24, left = true, right = true }: HorizontalEdgeFadeProps) {
+  const { themeMode } = useLiquidGlass();
+  const background = captureBackground(tint, themeMode === 'dark' ? '#17171C' : '#F4F5F8');
   return (
-    <View style={[styles.horizontal, style]}>
-      {Platform.OS === 'android' ? <BlurTargetView ref={blurTarget} style={styles.horizontalTarget}>{children}</BlurTargetView> : children}
+    <View collapsable={false} style={[styles.horizontal, { backgroundColor: background }, style]}>
+      {children}
       {width > 0 ? <>
-        <GradualBlur position="left" active={left} width={width} strength={0.5} curve="bezier" layers={6} blurTarget={blurTarget} />
-        <GradualBlur position="right" active={right} width={width} strength={0.5} curve="bezier" layers={6} blurTarget={blurTarget} />
+        <GradualBlur position="left" active={left} width={width} strength={0.5} curve="bezier" />
+        <GradualBlur position="right" active={right} width={width} strength={0.5} curve="bezier" />
       </> : null}
     </View>
   );
@@ -74,8 +81,9 @@ export function HorizontalEdgeFade({ children, style, width = 24, left = true, r
 
 // A single scrollable child fills the bounded viewport. Preserve its handlers,
 // and only enable a fade where content is actually being clipped.
-export function ScrollEdgeFade({ children, style, top = 24, bottom = 28 }: ScrollEdgeFadeProps) {
-  const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
+export function ScrollEdgeFade({ children, style, tint, top = 24, bottom = 28 }: ScrollEdgeFadeProps) {
+  const { themeMode } = useLiquidGlass();
+  const background = captureBackground(tint, themeMode === 'dark' ? '#09090B' : '#FFFFFF');
   const edges = useScrollEdges(false);
   const scroller = React.isValidElement<ScrollViewProps>(children) ? React.cloneElement(children, {
     style: [styles.content, children.props.style],
@@ -89,10 +97,10 @@ export function ScrollEdgeFade({ children, style, top = 24, bottom = 28 }: Scrol
     onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => { edges.onScroll(event); children.props.onScroll?.(event); },
   }) : children;
   return (
-    <View style={[styles.viewport, style]}>
-      {Platform.OS === 'android' ? <BlurTargetView ref={blurTarget} style={styles.content}>{scroller}</BlurTargetView> : scroller}
-      {top > 0 ? <GradualBlur position="top" active={edges.left} height={top} strength={0.5} curve="bezier" layers={6} blurTarget={blurTarget} /> : null}
-      {bottom > 0 ? <GradualBlur position="bottom" active={edges.right} height={bottom} strength={0.5} curve="bezier" layers={6} blurTarget={blurTarget} /> : null}
+    <View collapsable={false} style={[styles.viewport, { backgroundColor: background }, style]}>
+      {scroller}
+      {top > 0 ? <GradualBlur position="top" active={edges.left} height={top} strength={0.5} curve="bezier" /> : null}
+      {bottom > 0 ? <GradualBlur position="bottom" active={edges.right} height={bottom} strength={0.5} curve="bezier" /> : null}
     </View>
   );
 }
@@ -101,5 +109,4 @@ const styles = StyleSheet.create({
   viewport: { position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' },
   content: { flex: 1, minHeight: 0 },
   horizontal: { position: 'relative', overflow: 'hidden' },
-  horizontalTarget: { flexShrink: 1, minWidth: 0, width: '100%' },
 });

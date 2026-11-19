@@ -1,28 +1,20 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { View, type ViewStyle } from 'react-native';
 import { Easing, ReduceMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
-import { NativeFadeBlur } from './NativeFadeBlur';
-import { createBlurStack, createBlurTintFalloff } from './blurFalloff';
+import { NativeProgressiveBlur } from './NativeProgressiveBlur';
 import type { GradualBlurProps } from './gradualBlurTypes';
 import { useSceneActive } from '../common/SceneActivityContext';
 
 export type { GradualBlurProps, GradualBlurPosition } from './gradualBlurTypes';
 export type { GradualBlurCurve } from './blurFalloff';
 
-const GRADIENT_AXIS = {
-  top: { start: { x: 0.5, y: 1 }, end: { x: 0.5, y: 0 } },
-  bottom: { start: { x: 0.5, y: 0 }, end: { x: 0.5, y: 1 } },
-  left: { start: { x: 1, y: 0.5 }, end: { x: 0, y: 0.5 } },
-  right: { start: { x: 0, y: 0.5 }, end: { x: 1, y: 0.5 } },
-};
-
-// Metro selects React Bits on web, the native radius stack on iOS, and the
-// expo-progressive-blur gradient-mask approach on Android.
+// Platform adapters use the libraries' native backdrop implementations. The
+// browser keeps the React Bits component through GradualBlur.web.tsx.
 export const GradualBlur = React.memo(function GradualBlur({
-  position = 'bottom', renderMode = 'edge', height = 48, width, strength = 1.6, layers = 8,
-  curve = 'bezier', exponential = true, opacity = 1, tint = 'transparent',
-  zIndex = 20, active = true, blurTarget, style,
+  position = 'bottom', height = 48, width, strength = 1.6,
+  intensity, startOffset = 0.05, opacity = 1, tint = 'transparent',
+  zIndex = 20, active = true, style,
 }: GradualBlurProps) {
   const { themeMode } = useLiquidGlass();
   const sceneActive = useSceneActive();
@@ -35,11 +27,7 @@ export const GradualBlur = React.memo(function GradualBlur({
   }, [enabled, reveal]);
   const vertical = position === 'top' || position === 'bottom';
   const depth = vertical ? height : (width ?? 24);
-  const alpha = Math.min(1, Math.max(0, opacity));
-  const stack = useMemo(() => createBlurStack(layers, curve, strength, exponential), [curve, exponential, layers, strength]);
-  const falloff = useMemo(() => createBlurTintFalloff(curve), [curve]);
-  const locations = useMemo(() => falloff.map(stop => stop.position) as [number, number, ...number[]], [falloff]);
-  const alphas = useMemo(() => falloff.map(stop => stop.alpha * alpha), [alpha, falloff]);
+  const amount = Math.min(100, Math.max(0, intensity ?? strength * 55)) * Math.min(1, Math.max(0, opacity));
   const edgeStyle: ViewStyle = {
     position: 'absolute', zIndex,
     top: position === 'bottom' ? undefined : 0,
@@ -51,13 +39,12 @@ export const GradualBlur = React.memo(function GradualBlur({
     overflow: 'hidden',
   };
 
-  if (depth <= 0 || strength <= 0 || alpha <= 0) return null;
+  if (depth <= 0 || amount <= 0) return null;
   return (
-    <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[edgeStyle, style]}>
-      <NativeFadeBlur
-        position={position} renderMode={renderMode} stack={stack} falloff={alphas} locations={locations}
-        axis={GRADIENT_AXIS[position]} opacity={alpha} reveal={reveal}
-        dark={themeMode === 'dark'} tint={tint} blurTarget={blurTarget}
+    <View collapsable={false} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[edgeStyle, style]}>
+      <NativeProgressiveBlur
+        position={position} intensity={amount} startOffset={Math.min(1, Math.max(0, startOffset))}
+        reveal={reveal} dark={themeMode === 'dark'} tint={tint}
       />
     </View>
   );
