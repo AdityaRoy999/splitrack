@@ -37,7 +37,7 @@ export function useSheetMotion(distance: number, layoutReady = true) {
     enabled: open && ready,
     activeOffsetY: 6,
     failOffsetX: [-24, 24],
-    onBegin: () => {
+    onActivate: () => {
       'worklet';
       cancelAnimation(translateY);
       dragStart.set(translateY.get());

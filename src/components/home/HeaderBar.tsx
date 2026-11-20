@@ -11,6 +11,7 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassSurface } from '../glass/GlassSurface';
 import { NativeGlassContainer } from '../common/AppleNativeControls';
+import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP, COMPACT_ICON_BUTTON_STYLE } from '../../constants/buttonSizes';
 
 export type HeaderLogoRect = WindowRect;
 
@@ -93,9 +94,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           onPress={handleToggleTheme}
           scaleTo={0.9}
           accessibilityLabel="Toggle theme mode"
+          hitSlop={COMPACT_BUTTON_HIT_SLOP}
         >
           <GlassSurface
-            borderRadius={19}
+            borderRadius={COMPACT_BUTTON_HEIGHT / 2}
             glassStyle="regular"
             interactive
             intensity={45}
@@ -114,9 +116,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           onPress={handleSettings}
           scaleTo={0.9}
           accessibilityLabel="Open settings"
+          hitSlop={COMPACT_BUTTON_HIT_SLOP}
         >
           <GlassSurface
-            borderRadius={19}
+            borderRadius={COMPACT_BUTTON_HEIGHT / 2}
             glassStyle="regular"
             interactive
             intensity={45}
@@ -178,11 +181,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: COMPACT_BUTTON_HEIGHT / 2,
     borderWidth: 0, // completely borderless
   },
 });

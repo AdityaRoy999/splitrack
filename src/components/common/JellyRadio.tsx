@@ -14,6 +14,7 @@ import { triggerSelection } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { HorizontalEdgeFade, useHorizontalScrollEdges } from './ScrollEdgeFade';
 import { DropdownSelect } from './DropdownSelect';
+import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -298,6 +299,7 @@ const JellyChip: React.FC<JellyChipProps> = ({
         accessibilityState={{ checked: isSelected, disabled: isDisabled }}
         aria-checked={isSelected}
         aria-disabled={isDisabled}
+        hitSlop={variant === 'chip' ? COMPACT_BUTTON_HIT_SLOP : undefined}
         style={[
           styles.chip,
           columns && columns > 1 ? { width: '100%' } : null,
@@ -310,6 +312,7 @@ const JellyChip: React.FC<JellyChipProps> = ({
             gap: metrics.iconGap,
           },
           variant === 'tile' ? styles.tile : null,
+          variant === 'chip' ? { minHeight: COMPACT_BUTTON_HEIGHT, paddingVertical: 0 } : null,
           variant === 'swatch' ? { width: swatchSize, height: swatchSize, minHeight: swatchSize, paddingHorizontal: 0, paddingVertical: 0, opacity: isSelected ? 1 : 0.65 } : null,
         ]}
       >

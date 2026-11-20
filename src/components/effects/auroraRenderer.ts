@@ -33,6 +33,7 @@ export function createNativeAuroraRenderer(
   let width = 0;
   let height = 0;
   let disposed = false;
+  let lastDraw: { clock: number; reveal: number; settingsKey: string; width: number; height: number } | undefined;
 
   gl.useProgram(program.program);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -81,6 +82,10 @@ export function createNativeAuroraRenderer(
       const fullWidth = gl.drawingBufferWidth;
       const fullHeight = gl.drawingBufferHeight;
       if (fullWidth < 1 || fullHeight < 1) return;
+      // Parent/store renders can request the same frame between scheduled GL
+      // ticks. Present it once; settings changes and resize still redraw.
+      if (lastDraw?.clock === clock && lastDraw.reveal === reveal && lastDraw.settingsKey === settingsKey
+        && lastDraw.width === fullWidth && lastDraw.height === fullHeight) return;
       // Soft curtains do not need a full 3x Retina noise pass. Upscale on the GPU.
       const density = Math.min(pixelRatio, clamp(settings.dpr ?? 1.5, 0.5, 2));
       const nextWidth = Math.max(1, Math.round(fullWidth * density / pixelRatio));
@@ -106,6 +111,7 @@ export function createNativeAuroraRenderer(
       gl.blitFramebuffer(0, 0, width, height, 0, 0, fullWidth, fullHeight, gl.COLOR_BUFFER_BIT, gl.LINEAR);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.endFrameEXP();
+      lastDraw = { clock, reveal, settingsKey, width: fullWidth, height: fullHeight };
     },
     dispose() {
       if (disposed) return;

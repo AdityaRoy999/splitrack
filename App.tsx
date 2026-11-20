@@ -1,6 +1,6 @@
 import { BackdropBlurTargetProvider } from './src/components/common/BackdropBlurTarget';
 import { TransactionSwipeRow } from './src/components/transactions/TransactionSwipeRow';
-import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { startTransition, useCallback, useMemo, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { errorMessage } from './src/services/api';
 import * as SplashScreen from 'expo-splash-screen';
@@ -75,6 +75,7 @@ import { JellyRadio } from './src/components/common/JellyRadio';
 import { CloudStatus } from './src/components/common/CloudStatus';
 import { TransactionActionsProvider, useTransactionActions } from './src/components/transactions/TransactionActions';
 import { ExpenseCategory, Friend, Transaction } from './src/types';
+import { COMPACT_ICON_BUTTON_STYLE, COMPACT_BUTTON_HIT_SLOP } from './src/constants/buttonSizes';
 
 type ExpenseFilter = 'All' | 'Expenses' | 'Splits' | 'Income';
 
@@ -110,7 +111,7 @@ function MainAppContent({
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const transactionActions = useTransactionActions();
-  const { palette, themeMode, formatAmount, isLiquidGlassEnabled } = useLiquidGlass();
+  const { palette, themeMode, formatAmount } = useLiquidGlass();
   const {
     totalIncome,
     totalExpenses,
@@ -167,6 +168,12 @@ function MainAppContent({
     undefined
   );
   const [showAddExpense, setShowAddExpense] = useState(false);
+  const [retainExpenseEditor, setRetainExpenseEditor] = useState(false);
+  const openExpenseEditor = useCallback(() => {
+    setRetainExpenseEditor(true);
+    setShowAddExpense(true);
+  }, []);
+  const finishExpenseExit = useCallback(() => setRetainExpenseEditor(false), []);
   const [showAddTrip, setShowAddTrip] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -176,13 +183,14 @@ function MainAppContent({
   const [showAnalyticsInfo, setShowAnalyticsInfo] = useState(false);
   const [selectedFriendForSettle, setSelectedFriendForSettle] = useState<Friend | null>(null);
   const [editingFriend, setEditingFriend] = useState<Friend | null>(null);
-  const effectsActive = !(showAddExpense || showAddTrip || showAddMember || showAddCategory || showSettle || showAnalyticsInfo || showCalendarModal);
+  const expenseEditorMounted = showAddExpense || retainExpenseEditor;
+  const effectsActive = !(expenseEditorMounted || transactionActions.modalVisible || showAddTrip || showAddMember || showAddCategory || showSettle || showAnalyticsInfo || showCalendarModal);
 
   const navigateTab = useCallback((tab: TabKey) => {
     if (tab === 'split') {
       setExpenseDefaultTripId(undefined);
       setExpenseDefaultFriendIds(undefined);
-      setShowAddExpense(true);
+      openExpenseEditor();
       return;
     }
     // Mount the destination and select it in one commit, without a blank frame.
@@ -190,14 +198,14 @@ function MainAppContent({
       setVisitedTabs((prev) => prev[tab] ? prev : { ...prev, [tab]: true });
       setCurrentTab(tab);
     });
-  }, []);
+  }, [openExpenseEditor]);
 
   const openQuickExpense = useCallback(() => {
     setShowSettings(false);
     setExpenseDefaultTripId(undefined);
     setExpenseDefaultFriendIds(undefined);
-    setShowAddExpense(true);
-  }, []);
+    openExpenseEditor();
+  }, [openExpenseEditor]);
 
   const closeExpense = useCallback(() => {
     setShowAddExpense(false);
@@ -283,7 +291,7 @@ function MainAppContent({
               onSplitWithFriend={(f) => {
                 setExpenseDefaultTripId(undefined);
                 setExpenseDefaultFriendIds([f.id]);
-                setShowAddExpense(true);
+                openExpenseEditor();
               }}
               onOpenTrip={(tripId) => {
                 setSelectedTripId(tripId);
@@ -397,7 +405,7 @@ function MainAppContent({
       </ScrollView>
     );
   }, [dynamicScrollContent, formatAmount, friends, handleSelectFriend, hideHeaderLogo,
-    homeView, isDark, navigateTab, onHeaderLogoLayout, onHeaderLogoNode, openQuickExpense,
+    homeView, isDark, navigateTab, onHeaderLogoLayout, onHeaderLogoNode, openQuickExpense, openExpenseEditor,
     selectedMemberId, textColor, totalExpenses, totalIncome, totalOwedToYou,
     totalYouOwe, userDisplayName]);
 
@@ -697,7 +705,7 @@ function MainAppContent({
               onAddTripExpense={(tId) => {
                 setExpenseDefaultTripId(tId);
                 setExpenseDefaultFriendIds(undefined);
-                setShowAddExpense(true);
+                openExpenseEditor();
               }}
               onOpenSettle={() => setShowSettle(true)}
               onSelectTransaction={(tx) => {
@@ -784,12 +792,14 @@ function MainAppContent({
                   accessibilityLabel={removalMode ? 'Finish removing trips' : 'Remove trips'}
                   accessibilityState={{ selected: removalMode }}
                   contentStyle={[styles.tripRemoveToggle, { backgroundColor: removalMode ? (isDark ? '#18181D' : '#EFEFF4') : '#E5484D' }]}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                 >
                   {removalMode ? <CheckCircleIcon size={20} color="#10B981" /> : <MinusCircleIcon size={20} color="#FFFFFF" />}
                 </AnimatedPressable> : null}
                 <AnimatedPressable
                   accessibilityLabel="Add a trip or group"
                   contentStyle={[styles.tripRemoveToggle, { backgroundColor: isDark ? '#242428' : '#EFEFF4' }]}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                   onPress={() => { setRemovingTrips(false); setShowAddTrip(true); }}
                 ><AddCircleIcon size={20} color={textColor} /></AnimatedPressable>
               </View>
@@ -982,7 +992,7 @@ function MainAppContent({
   }, [categories, dividerColor, dynamicScrollContent, formatAmount, friends,
     getSimplifiedDebts, isDark, mutedText, selectedTripId, textColor,
     totalOwedToYou, totalYouOwe, transactions, trips, removalMode, removableTrips.length,
-    removeTrip, tripRemovalError, user?.uid, transactionActions]);
+    removeTrip, tripRemovalError, user?.uid, transactionActions, openExpenseEditor]);
 
   const renderAnalyticsTab = useCallback(() => (
     <ScrollView
@@ -1101,8 +1111,8 @@ function MainAppContent({
       <BottomBubble notice={tripNotice} onDismiss={dismissTripNotice} />
 
       <View
-        pointerEvents={showAddExpense || showAddTrip || showAddMember ? 'none' : 'box-none'}
-        style={showAddExpense || showAddTrip || showAddMember ? { display: 'none' } : undefined}
+        pointerEvents={expenseEditorMounted || showAddTrip || showAddMember ? 'none' : 'box-none'}
+        style={expenseEditorMounted || showAddTrip || showAddMember ? { display: 'none' } : undefined}
       >
         <GlassDock
           currentTab={currentTab}
@@ -1111,13 +1121,14 @@ function MainAppContent({
         />
       </View>
 
-      <AddExpenseModal
+      {expenseEditorMounted ? <AddExpenseModal
         key={`${expenseDefaultTripId || 'general'}-${expenseDefaultFriendIds?.join(',') || 'all'}`}
         visible={showAddExpense}
         defaultTripId={expenseDefaultTripId}
         defaultFriendIds={expenseDefaultFriendIds}
         onClose={closeExpense}
-      />
+        onExitComplete={finishExpenseExit}
+      /> : null}
 
       <AddTripModal
         visible={showAddTrip}
@@ -1277,7 +1288,7 @@ function AppContent() {
 
 const styles = StyleSheet.create({
   tripActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tripRemoveToggle: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 0 },
+  tripRemoveToggle: { ...COMPACT_ICON_BUTTON_STYLE, borderRadius: 12, borderWidth: 0 },
   tripRemovalHint: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
   appRoot: {
     flex: 1,
@@ -1572,11 +1583,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   infoIconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: 18,
     borderWidth: 0,
   },
 });

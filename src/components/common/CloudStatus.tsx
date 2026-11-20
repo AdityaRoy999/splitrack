@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassPill } from '../glass/GlassPill';
@@ -8,11 +9,25 @@ import { SheetModal } from './SheetModal';
 import { ModalBackdrop } from './ModalBackdrop';
 import { GlassModalSheet } from './GlassModalSheet';
 import { ScrollEdgeFade } from './ScrollEdgeFade';
+import { BottomBubble, useNoticeTopReservation, type BubbleNotice } from './BottomBubble';
 
-// Offline status and duplicate confirmation reuse the existing connection
-// banner and transaction sheet styling on both mobile platforms.
+// Connection notices and transaction review retain the shared mobile styling.
 export function CloudStatus() {
-  const { loading, syncing, syncError, refresh, friends, trips, pendingDuplicate, resolveDuplicate, queuedTransactionCount, pendingFailure, discardQueuedTransaction } = useSplitTrack();
+  const { syncing, syncError, isOffline, refresh, friends, trips, pendingDuplicate, resolveDuplicate, pendingFailure, discardQueuedTransaction } = useSplitTrack();
+  const insets = useSafeAreaInsets();
+  const showBanner = Boolean(syncError && !isOffline);
+  const onBannerLayout = useNoticeTopReservation(showBanner);
+  const [notice, setNotice] = useState<BubbleNotice | null>(null);
+  const wasOffline = useRef(false);
+  const dismissNotice = useCallback(() => setNotice(null), []);
+  useEffect(() => {
+    if (isOffline && !wasOffline.current) {
+      setNotice({ id: Date.now(), message: 'You’re in offline mode. Your data will sync when you’re back online.', durationMs: 10000, tone: 'info' });
+    } else if (!isOffline && wasOffline.current) {
+      setNotice(null);
+    }
+    wasOffline.current = isOffline;
+  }, [isOffline]);
   const { run, pending, error, setError } = useAsyncAction();
   const { themeMode, formatAmount } = useLiquidGlass();
   const dark = themeMode === 'dark';
@@ -35,14 +50,11 @@ export function CloudStatus() {
     }
   };
   const closeWarning = () => { if (pendingDuplicate) decide(false); };
-  const queuedMessage = queuedTransactionCount
-    ? `${queuedTransactionCount} transaction${queuedTransactionCount === 1 ? '' : 's'} saved on this device. ${syncing ? 'Syncing…' : 'Will sync when connected.'}`
-    : '';
   return <>
-    {loading || syncError || queuedMessage ? <View style={styles.banner}>
-      <Text accessibilityLiveRegion="polite" style={styles.bannerText}>{syncError || queuedMessage || 'Loading your saved records…'}</Text>
-      {syncError && queuedMessage ? <Text style={styles.bannerText}>{queuedMessage}</Text> : null}
-      {syncError ? <GlassPill label={pending || syncing ? 'Connecting…' : 'Retry connection'} disabled={pending || syncing} onPress={() => { void run(refresh); }} /> : null}
+    <BottomBubble notice={notice} onDismiss={dismissNotice} />
+    {showBanner ? <View onLayout={onBannerLayout} style={[styles.banner, { paddingTop: insets.top + 10 }]}>
+      <Text accessibilityLiveRegion="polite" style={styles.bannerText}>{syncError}</Text>
+      <GlassPill label={pending || syncing ? 'Connecting…' : 'Retry connection'} disabled={pending || syncing} onPress={() => { void run(refresh); }} />
     </View> : null}
     <SheetModal visible={Boolean(pendingDuplicate || pendingFailure)} onRequestClose={closeWarning}>
       <View style={styles.fill}>

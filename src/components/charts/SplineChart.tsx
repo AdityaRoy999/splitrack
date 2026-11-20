@@ -29,6 +29,7 @@ import {
 import { useChartTransition } from '../../hooks/useChartTransition';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { FormError } from '../../hooks/useAsyncAction';
+import { COMPACT_ICON_BUTTON_STYLE, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
 
 
 type CashFlowGranularity = 'Date' | 'Month' | 'Year';
@@ -323,6 +324,7 @@ export const SplineChart: React.FC = () => {
               scaleTo={0.92}
               onPress={() => setShowCalendar(true)}
               accessibilityLabel="Open calendar date picker for cash flow"
+              hitSlop={COMPACT_BUTTON_HIT_SLOP}
               contentStyle={[
                 styles.calendarIconBtn,
                 {
@@ -680,11 +682,8 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   calendarIconBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: 18,
     borderWidth: 0,
   },
   statSublabel: {

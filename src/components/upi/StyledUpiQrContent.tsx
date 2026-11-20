@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useId, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import QRCode from 'qrcode';
 import Svg, {
@@ -12,6 +12,7 @@ import { UpiAccount } from '../../types';
 import { getUpiBrandMeta } from './upiBrandLogo';
 import { buildUpiPaymentUri, formatUpiAmount, type UpiPaymentDetails } from '../../utils/upi';
 import { BrandEmblemIcon } from '../common/BrandEmblemIcon';
+import { resolveReceivingUpiBrand } from '../../utils/upiBrand';
 
 export interface StyledUpiQrProps extends UpiPaymentDetails {
   account: UpiAccount;
@@ -43,7 +44,10 @@ const roundedRectPath = (x: number, y: number, w: number, h: number, r: number):
 
 
 export const StyledUpiQr: React.FC<StyledUpiQrProps> = ({ account, size = 216, amount, note }) => {
-  const meta = getUpiBrandMeta(account.provider, account.bankBrand);
+  const instanceId = useId();
+  const gradientId = `upiQrGrad${instanceId.replace(/[^a-z0-9]/gi, '')}`;
+  const brand = resolveReceivingUpiBrand(account);
+  const meta = getUpiBrandMeta(brand.provider, brand.bankBrand);
   const value = buildUpiPaymentUri(account, { amount, note });
   const centerSize = Math.round(size * 0.24);
 
@@ -100,7 +104,7 @@ export const StyledUpiQr: React.FC<StyledUpiQrProps> = ({ account, size = 216, a
     <View accessibilityRole="image" accessibilityLabel={`UPI QR Code for ${account.upiId}${amount === undefined ? '' : `, ${formatUpiAmount(amount)} INR`}`} style={[styles.qrFrame, { width: size, height: size }]}>
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <Defs>
-          <LinearGradient id="upiQrGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
             <Stop offset="0%" stopColor={meta.qrGradientStart} />
             <Stop offset="100%" stopColor={meta.qrGradientEnd} />
           </LinearGradient>
@@ -108,7 +112,7 @@ export const StyledUpiQr: React.FC<StyledUpiQrProps> = ({ account, size = 216, a
 
         <Rect width={size} height={size} rx={18} fill="#FFFFFF" />
 
-        {qrLayout.pathD ? <Path d={qrLayout.pathD} fill="url(#upiQrGrad)" /> : null}
+        {qrLayout.pathD ? <Path d={qrLayout.pathD} fill={`url(#${gradientId})`} /> : null}
 
         {qrLayout.finders.map((finder, idx) => (
           <React.Fragment key={idx}>
@@ -151,7 +155,7 @@ export const StyledUpiQr: React.FC<StyledUpiQrProps> = ({ account, size = 216, a
           },
         ]}
       >
-        <BrandEmblemIcon id={account.provider === 'bank' ? account.bankBrand : account.provider} name={meta.label} accentColor={meta.primary} size={centerSize} borderRadius={Math.round(centerSize * 0.22)} />
+        <BrandEmblemIcon id={brand.provider === 'bank' ? brand.bankBrand ?? 'bank' : brand.provider} name={meta.label} accentColor={meta.primary} size={centerSize} borderRadius={Math.round(centerSize * 0.22)} />
       </View>
     </View>
   );

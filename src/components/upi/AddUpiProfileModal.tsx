@@ -29,6 +29,7 @@ import { UpiAppPickerModal } from './UpiAppPickerModal';
 import { BankItem, BANKS_CATALOG } from '../../constants/banksCatalog';
 import { UpiAppItem, UPI_APPS_CATALOG } from '../../constants/upiAppsCatalog';
 import { isValidUpiId } from '../../utils/upi';
+import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP, COMPACT_ICON_BUTTON_STYLE } from '../../constants/buttonSizes';
 
 interface AddUpiProfileModalProps {
   visible: boolean;
@@ -250,6 +251,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
             onPress={onClose}
             scaleTo={0.9}
             accessibilityLabel="Close profile modal"
+            hitSlop={COMPACT_BUTTON_HIT_SLOP}
             contentStyle={[styles.closeBtn, { backgroundColor: cardBg }]}
           >
             <CloseCircleIcon size={20} color={textColor} />
@@ -344,6 +346,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
                       onPress={() => setShowAppPicker(true)}
                       style={[styles.searchIconButton, { backgroundColor: inputBg }]}
                       accessibilityLabel="Search all UPI apps"
+                      hitSlop={COMPACT_BUTTON_HIT_SLOP}
                     >
                       <MagnifierIcon size={14} color={textColor} />
                     </TouchableOpacity>
@@ -381,6 +384,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
                       onPress={() => setShowBankPicker(true)}
                       style={[styles.searchIconButton, { backgroundColor: inputBg }]}
                       accessibilityLabel="Search all banks"
+                      hitSlop={COMPACT_BUTTON_HIT_SLOP}
                     >
                       <MagnifierIcon size={14} color={textColor} />
                     </TouchableOpacity>
@@ -600,11 +604,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: COMPACT_BUTTON_HEIGHT / 2,
   },
   scrollAreaWrap: {
     position: 'relative',
@@ -636,11 +637,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   searchIconButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: COMPACT_BUTTON_HEIGHT / 2,
     borderWidth: 0,
   },
   textInput: {

@@ -7,7 +7,7 @@ import { uploadImage } from '../services/media';
 import type { UpiAccount, Friend, Trip, Transaction, CategoryMetric, ChartDataPoint, ExpenseCategory, DebtSimplification, ThemeMode, SelectionStyle } from '../types';
 import type { MemberDraft, MemberProfile } from '../utils/memberProfiles';
 import { getReceivingUpiAccount } from '../utils/upi';
-import { preserveOpenedHistory } from './cloudSnapshot';
+import { preserveOpenedHistory, retainUnchanged } from './cloudSnapshot';
 import { TransactionOutbox, encodeOfflineCheckpoint, optimisticSnapshot, validateOfflineTransaction, type DuplicateTransaction } from './transactionOutbox';
 
 export interface CloudSettings { selectedAccountId: string; receivingAccountId?: string; themeMode: ThemeMode; currency: 'INR'; hideAmounts: boolean; isLiquidGlassEnabled: boolean; selectionStyle?: SelectionStyle; notificationDirection?: 'top' | 'bottom' }
@@ -53,7 +53,7 @@ interface SplitTrackContextType {
   categoryMetrics: CategoryMetric[]; chartData: ChartDataPoint[];
   totalBalance: number; totalIncome: number; totalExpenses: number; monthlyExpenses: number;
   netFriendBalance: number; totalOwedToYou: number; totalYouOwe: number;
-  selectedAccountId: string; settings: CloudSettings; loading: boolean; syncing: boolean; syncError: string; preferencesReady: boolean;
+  selectedAccountId: string; settings: CloudSettings; loading: boolean; syncing: boolean; syncError: string; isOffline: boolean; preferencesReady: boolean;
   revision: number;
   queuedTransactionCount: number;
   pendingDuplicate: { requestId: string; existingTransaction: DuplicateTransaction } | null;
@@ -93,6 +93,7 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
   const [state, setState] = useState<Snapshot>(() => empty(uid));
   const stateRef = useRef(state), baseRef = useRef(state), uidRef = useRef(uid);
   const [loading, setLoading] = useState(true), [syncing, setSyncing] = useState(false), [syncError, setSyncError] = useState('');
+  const [isOffline, setIsOffline] = useState(false);
   const [preferencesReady, setPreferencesReady] = useState(() => !uid || appearances.has(uid));
   const [outboxVersion, setOutboxVersion] = useState(0);
   const outbox = useMemo(() => new TransactionOutbox(uid, AsyncStorage, () => setOutboxVersion(value => value + 1)), [uid]);
@@ -101,9 +102,15 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
   const serverSnapshot = useRef(false), historyCount = useRef(50), loadingHistory = useRef(false);
   const cacheWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSnapshotAt = useRef(0), hydration = useRef<Promise<void>>(Promise.resolve());
+  const recordConnectionError = useCallback((error: unknown, requestedUid: string) => {
+    if (uidRef.current !== requestedUid || !(error instanceof ApiError)) return;
+    // Configuration, validation and authentication failures are separate from
+    // connectivity, including when the API returned an HTTP error response.
+    setIsOffline(error.status === 0 && error.code === 'NETWORK_ERROR');
+  }, []);
   const publish = useCallback(() => {
     if (uidRef.current !== uid) return;
-    const next = optimisticSnapshot(baseRef.current, outbox.entries, knownCommitted.current);
+    const next = retainUnchanged(stateRef.current, optimisticSnapshot(baseRef.current, outbox.entries, knownCommitted.current));
     stateRef.current = next; setState(next);
   }, [uid, outbox]);
   useEffect(() => { publish(); }, [outboxVersion, publish]);
@@ -118,13 +125,15 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
       || !Array.isArray(next.categories)) throw new Error('Saved records could not be read. Reconnect to refresh them.');
     if (!fromServer && serverSnapshot.current) return;
     if (baseRef.current.userId === requestedUid && next.revision < baseRef.current.revision) return;
-    if (fromServer) { serverSnapshot.current = true; lastSnapshotAt.current = Date.now(); }
+    if (fromServer) { serverSnapshot.current = true; lastSnapshotAt.current = Date.now(); setIsOffline(false); }
+    const previousBase = baseRef.current;
     const retained = preserveOpenedHistory(next, baseRef.current, historyCount.current);
-    const normalized = { ...retained, settings: { ...next.settings, selectionStyle: next.settings.selectionStyle ?? 'chips', notificationDirection: next.settings.notificationDirection ?? 'bottom', ...(!fromServer ? appearances.get(requestedUid) : undefined) } };
+    const normalized = retainUnchanged(baseRef.current, { ...retained, settings: { ...next.settings, selectionStyle: next.settings.selectionStyle ?? 'chips', notificationDirection: next.settings.notificationDirection ?? 'bottom', ...(!fromServer ? appearances.get(requestedUid) : undefined) } });
     baseRef.current = normalized; publish();
     const appearance = appearanceOf(normalized.settings), previousAppearance = appearances.get(requestedUid);
     appearances.set(requestedUid, appearance); setPreferencesReady(true);
     if (JSON.stringify(previousAppearance) !== JSON.stringify(appearance)) void AsyncStorage.setItem(appearanceKey(requestedUid), JSON.stringify(appearance)).catch(() => {});
+    if (normalized === previousBase) return;
     if (cacheWrite.current) clearTimeout(cacheWrite.current);
     cacheWrite.current = setTimeout(() => {
       if (uidRef.current === requestedUid) {
@@ -164,6 +173,7 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
         knownCommitted.current.delete(entry.requestId);
       } catch (error) {
         if (uidRef.current !== requestedUid) return;
+        recordConnectionError(error, requestedUid);
         if (error instanceof ApiError && error.code === 'DUPLICATE_TRANSACTION' && error.details?.existingTransaction) {
           const existingTransaction = error.details.existingTransaction as DuplicateTransaction;
           await outbox.update(entries => entries.map(item => item.requestId === entry.requestId ? { ...item, status: 'duplicate', existingTransaction, error: error.message } : item));
@@ -177,7 +187,7 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
         throw error;
       }
     }
-  }, [outbox, accept]);
+  }, [outbox, accept, recordConnectionError]);
   const reconcile = useCallback((silent = false): Promise<void> => {
     if (!ready || pending.current) return Promise.resolve();
     if (refreshPromise.current) return refreshPromise.current;
@@ -194,6 +204,7 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
         ? (await api<{ changed: boolean; state?: Snapshot }>(`/state?after=${baseRef.current.revision}`, { expectedUid: requestedUid, attempts: 1, timeoutMs: 8000 })).state
         : await api<Snapshot>('/state', { expectedUid: requestedUid, attempts: 1, timeoutMs: 8000 });
       if (uidRef.current !== requestedUid) return;
+      setIsOffline(false);
       const failure = outbox.entries.find(entry => entry.status === 'failed');
       setSyncError(failure ? `A saved transaction needs attention: ${failure.error}` : '');
       if (!next) return;
@@ -203,6 +214,7 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
         if (uidRef.current === requestedUid && baseRef.current.revision === next.revision) accept(expanded, requestedUid);
       }
     }).catch(error => {
+      recordConnectionError(error, requestedUid);
       if (uidRef.current === requestedUid) setSyncError(errorMessage(error));
       throw error;
     }).finally(() => {
@@ -211,7 +223,7 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
     });
     queue.current = work; refreshPromise.current = work;
     return work;
-  }, [uid, ready, outbox, flushOutbox, accept, restoreHistory]);
+  }, [uid, ready, outbox, flushOutbox, accept, restoreHistory, recordConnectionError]);
   const refresh = useCallback(() => reconcile(false), [reconcile]);
 
   useEffect(() => {
@@ -295,12 +307,12 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
       if (result.state.transactionCursor && historyCount.current > result.state.transactions.length) {
         void restoreHistory(result.state, requestedUid).then(expanded => {
           if (uidRef.current === requestedUid && baseRef.current.revision === result.state.revision) accept(expanded, requestedUid);
-        }).catch(error => { if (uidRef.current === requestedUid) setSyncError(`Saved. Older history could not be refreshed. ${errorMessage(error)}`); });
+        }).catch(error => { recordConnectionError(error, requestedUid); if (uidRef.current === requestedUid) setSyncError(`Saved. Older history could not be refreshed. ${errorMessage(error)}`); });
       }
       return result;
-    }).catch(error => { if (uidRef.current === requestedUid) setSyncError(errorMessage(error)); throw error; }).finally(() => { pending.current--; });
+    }).catch(error => { recordConnectionError(error, requestedUid); if (uidRef.current === requestedUid) setSyncError(errorMessage(error)); throw error; }).finally(() => { pending.current--; });
     queue.current = work; return work;
-  }, [uid, accept, restoreHistory, flushOutbox]);
+  }, [uid, accept, restoreHistory, flushOutbox, recordConnectionError]);
   useEffect(() => {
     if (!ready || !state.ledgerResetId) return;
     let stopped = false, attempts = 0;
@@ -449,19 +461,24 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
       const items = [...new Map([...baseRef.current.transactions, ...page.items].map(tx => [tx.id, tx])).values()];
       historyCount.current = Math.max(historyCount.current, items.length);
       accept({ ...baseRef.current, transactions: items, transactionCursor: page.cursor }, uid);
-    }).finally(() => { loadingHistory.current = false; });
+    }).catch(error => { recordConnectionError(error, uid); throw error; }).finally(() => { loadingHistory.current = false; });
     queue.current = work;
     await work;
-  }, [uid, accept, flushOutbox]);
+  }, [uid, accept, flushOutbox, recordConnectionError]);
   const getTripTransactions = useCallback(async (id: string, cursor?: string) => {
-    try { return await api<{ items: Transaction[]; cursor: string | null; profiles: (MemberProfile & { id: string })[] }>(`/api/trips/${encodeURIComponent(id)}/transactions${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, { expectedUid: uid, attempts: 1, timeoutMs: 8000 }); }
+    try {
+      const result = await api<{ items: Transaction[]; cursor: string | null; profiles: (MemberProfile & { id: string })[] }>(`/api/trips/${encodeURIComponent(id)}/transactions${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, { expectedUid: uid, attempts: 1, timeoutMs: 8000 });
+      if (uidRef.current === uid) setIsOffline(false);
+      return result;
+    }
     catch (error) {
+      recordConnectionError(error, uid);
       if (uidRef.current !== uid || !(error instanceof ApiError) || error.status > 0 && error.status < 500) throw error;
       const snapshot = stateRef.current;
       const profiles = snapshot.friends.map(friend => ({ id: friend.id, name: friend.name, handle: friend.handle, avatar: friend.avatar, phone: friend.phone }));
       return { items: snapshot.transactions.filter(tx => tx.tripId === id), cursor: null, profiles };
     }
-  }, [uid]);
+  }, [uid, recordConnectionError]);
 
   const metrics = useMemo(() => {
     const totalOwedToYou = rounded(state.friends.reduce((sum, friend) => sum + Math.max(0, friend.netBalance), 0));
@@ -489,7 +506,7 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
     return entry ? { requestId: entry.requestId, title: (JSON.parse(entry.bodyJson) as TransactionDraft).title, error: entry.error || 'This transaction could not be saved.' } : null;
   }, [outboxEntries]);
   const queuedTransactionCount = outbox.entries.length;
-  const value = useMemo(() => ({ ...metrics, queuedTransactionCount, pendingDuplicate, pendingFailure, resolveDuplicate, discardQueuedTransaction, revision: state.revision, accounts: state.accounts, friends: state.friends, trips: state.trips, transactions: state.transactions, categories: state.categories, settings: state.settings, selectedAccountId: state.settings.selectedAccountId, loading, syncing, syncError, preferencesReady, refresh, loadMoreTransactions, hasMoreTransactions: Boolean(state.transactionCursor), getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, editTransaction, restoreTransaction, getTransactionBin, settleTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData }), [metrics, queuedTransactionCount, pendingDuplicate, pendingFailure, resolveDuplicate, discardQueuedTransaction, state, loading, syncing, syncError, preferencesReady, refresh, loadMoreTransactions, getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, editTransaction, restoreTransaction, getTransactionBin, settleTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData]);
+  const value = useMemo(() => ({ ...metrics, queuedTransactionCount, pendingDuplicate, pendingFailure, resolveDuplicate, discardQueuedTransaction, revision: state.revision, accounts: state.accounts, friends: state.friends, trips: state.trips, transactions: state.transactions, categories: state.categories, settings: state.settings, selectedAccountId: state.settings.selectedAccountId, loading, syncing, syncError, isOffline, preferencesReady, refresh, loadMoreTransactions, hasMoreTransactions: Boolean(state.transactionCursor), getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, editTransaction, restoreTransaction, getTransactionBin, settleTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData }), [metrics, queuedTransactionCount, pendingDuplicate, pendingFailure, resolveDuplicate, discardQueuedTransaction, state, loading, syncing, syncError, isOffline, preferencesReady, refresh, loadMoreTransactions, getTripTransactions, saveSettings, setSelectedAccountId, addTransaction, deleteTransaction, editTransaction, restoreTransaction, getTransactionBin, settleTransaction, importTransactions, addFriend, updateFriend, addMemberToTrip, removeMemberFromTrip, addTrip, deleteTrip, addUpiAccount, updateUpiAccount, deleteUpiAccount, addCategory, updateCategory, deleteCategory, settleWithFriend, getSimplifiedDebts, eraseAllData]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export function useSplitTrack() { const value = useContext(Context); if (!value) throw new Error('SplitTrackProvider is missing.'); return value; }

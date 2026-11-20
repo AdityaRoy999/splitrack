@@ -20,6 +20,7 @@ import { AppleGraphicalCalendar } from './AppleNativeControls';
 import { SheetModal } from './SheetModal';
 import { ModalBackdrop } from './ModalBackdrop';
 import { usePopupMotion } from './usePopupMotion';
+import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP, COMPACT_ICON_BUTTON_STYLE } from '../../constants/buttonSizes';
 
 interface CalendarDatePickerModalProps {
   visible: boolean;
@@ -290,6 +291,7 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
           </View>
           <AnimatedPressable
             onPress={onClose}
+            hitSlop={COMPACT_BUTTON_HIT_SLOP}
             scaleTo={0.9}
             accessibilityLabel="Close calendar modal"
             contentStyle={[styles.closeBtn, { backgroundColor: surfaceBg }]}
@@ -334,6 +336,7 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
             </View>
             <AnimatedPressable
               onPress={onClose}
+              hitSlop={COMPACT_BUTTON_HIT_SLOP}
               scaleTo={0.9}
               accessibilityLabel="Close calendar modal"
               contentStyle={[styles.closeBtn, { backgroundColor: surfaceBg }]}
@@ -348,6 +351,7 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
           <View style={styles.monthBar}>
             <AnimatedPressable
               onPress={handlePrevNav}
+              hitSlop={COMPACT_BUTTON_HIT_SLOP}
               scaleTo={0.9}
               accessibilityLabel="Previous period"
               contentStyle={[styles.navBtn, { backgroundColor: surfaceBg }]}
@@ -358,6 +362,7 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
             <View style={styles.periodSelectorsRow}>
               <AnimatedPressable
                 onPress={toggleMonthMenu}
+                hitSlop={COMPACT_BUTTON_HIT_SLOP}
                 scaleTo={0.94}
                 accessibilityLabel="Open month picker"
                 contentStyle={[
@@ -382,6 +387,7 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
 
               <AnimatedPressable
                 onPress={toggleYearMenu}
+                hitSlop={COMPACT_BUTTON_HIT_SLOP}
                 scaleTo={0.94}
                 accessibilityLabel="Open year picker"
                 contentStyle={[
@@ -407,6 +413,7 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
 
             <AnimatedPressable
               onPress={handleNextNav}
+              hitSlop={COMPACT_BUTTON_HIT_SLOP}
               scaleTo={0.9}
               accessibilityLabel="Next period"
               contentStyle={[styles.navBtn, { backgroundColor: surfaceBg }]}
@@ -549,6 +556,7 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
             <AnimatedPressable
               scaleTo={0.94}
               onPress={handleToday}
+              hitSlop={COMPACT_BUTTON_HIT_SLOP}
               contentStyle={[styles.footerPill, { backgroundColor: surfaceBg }]}
             >
               <Text style={[styles.footerPillText, { color: textColor }]}>Today</Text>
@@ -558,6 +566,7 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
               <AnimatedPressable
                 scaleTo={0.94}
                 onPress={handleClear}
+                hitSlop={COMPACT_BUTTON_HIT_SLOP}
                 contentStyle={[styles.footerPill, { backgroundColor: activeBg }]}
               >
                 <Text style={[styles.footerPillText, { color: activeText }]}>All Dates</Text>
@@ -626,11 +635,8 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: COMPACT_BUTTON_HEIGHT / 2,
     borderWidth: 0,
   },
   hairline: {
@@ -645,11 +651,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   navBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: COMPACT_BUTTON_HEIGHT / 2,
     borderWidth: 0,
   },
   periodSelectorsRow: {
@@ -658,11 +661,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   periodChip: {
+    height: COMPACT_BUTTON_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 5,
     paddingHorizontal: 12,
-    paddingVertical: 7,
     borderRadius: 999,
     borderWidth: 0,
   },
@@ -728,8 +732,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   footerPill: {
+    height: COMPACT_BUTTON_HEIGHT,
     paddingHorizontal: 16,
-    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 999,
     borderWidth: 0,
   },

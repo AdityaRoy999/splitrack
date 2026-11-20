@@ -28,6 +28,7 @@ import {
 import { useChartTransition } from '../../hooks/useChartTransition';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { FormError } from '../../hooks/useAsyncAction';
+import { COMPACT_ICON_BUTTON_STYLE, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
 
 type DistributionGranularity = 'All' | 'Date' | 'Month' | 'Year';
 
@@ -152,7 +153,9 @@ export const DonutPieChart: React.FC = () => {
 
   const size = Math.min(windowWidth - 108, 192);
   const strokeWidth = 17;
-  const radius = (size - strokeWidth) / 2;
+  const selectedStrokeWidth = strokeWidth + 3;
+  // Keep the thickest stroke and its antialiased edge inside the SVG viewport.
+  const radius = (size - selectedStrokeWidth) / 2 - 1;
   const circumference = 2 * Math.PI * radius;
 
   // Round caps add strokeWidth total (strokeWidth/2 on each end).
@@ -343,6 +346,7 @@ export const DonutPieChart: React.FC = () => {
               scaleTo={0.92}
               onPress={() => setShowCalendar(true)}
               accessibilityLabel="Open calendar date picker for category distribution"
+              hitSlop={COMPACT_BUTTON_HIT_SLOP}
               contentStyle={[
                 styles.calendarIconBtn,
                 {
@@ -505,7 +509,7 @@ export const DonutPieChart: React.FC = () => {
                       const isSelected = activeId === seg.id;
                       const visibleLen = seg.segmentLength;
                       const activeStrokeWidth = isSelected
-                        ? strokeWidth + 3
+                        ? selectedStrokeWidth
                         : strokeWidth;
 
                       return (
@@ -690,11 +694,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   calendarIconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: 18,
     borderWidth: 0,
   },
   gestureHintPill: {

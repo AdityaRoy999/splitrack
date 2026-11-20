@@ -1,4 +1,5 @@
 import type { DebtSimplification, Friend, UpiAccount } from '../types';
+import { resolveReceivingUpiBrand } from './upiBrand';
 
 export interface UpiPaymentDetails {
   /** Amount in INR, before any display-currency conversion. */
@@ -37,9 +38,12 @@ export function getDebtReceivingAccount(debt: DebtSimplification, accounts: UpiA
   if (debt.toId === 'user') return getReceivingUpiAccount(accounts, selectedAccountId);
   const friend = friends.find(item => item.id === debt.toId);
   if (!friend?.upiId || !isValidUpiId(friend.upiId)) return null;
+  const brand = resolveReceivingUpiBrand({
+    provider: friend.receivingProvider, bankBrand: friend.receivingBankBrand, upiId: friend.upiId,
+  });
   return {
     id: `receiving-${friend.id}`, title: friend.paymentName || friend.name, kind: 'upi',
-    provider: 'bank', upiId: friend.upiId, cardHolder: '', cardNumber: '', expiry: '', cardType: 'RuPay',
+    ...brand, upiId: friend.upiId, cardHolder: '', cardNumber: '', expiry: '', cardType: 'RuPay',
     accentColor: '#6366F1', secondaryColor: '#8B5CF6', balance: 0, totalSpent: 0,
   };
 }

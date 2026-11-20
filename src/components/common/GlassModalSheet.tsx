@@ -62,15 +62,20 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
     setMeasurements(previous => previous[id] !== undefined && Math.abs(previous[id] - height) < 1 ? previous : { ...previous, [id]: height });
   }, []);
   const measured = sections.every(section => measurements[section.id] !== undefined);
-  const [measuredOnce, setMeasuredOnce] = useState(false);
-  if (measured && !measuredOnce) setMeasuredOnce(true);
+  const [laidOut, setLaidOut] = useState(false);
+  const onSheetLayout = useCallback((event: LayoutChangeEvent) => {
+    if (event.nativeEvent.layout.height > 0) setLaidOut(true);
+  }, []);
   const paddingTop = StyleSheet.flatten([styles.sheetBase, style])?.paddingTop ?? 10;
   const contentHeight = sections.reduce((sum, section) => sum + (measurements[section.id] ?? 0), 0);
   const sheetHeight = measured ? Math.min(maxSheetHeight, Math.ceil(contentHeight + (typeof paddingTop === 'number' ? paddingTop : 10) + bottomPadding)) : maxSheetHeight;
-  const { animatedStyle, gesture, close } = useSheetMotion(windowHeight, measured || measuredOnce);
+  // Empty sections (for example a hidden FormError) may never dispatch a native
+  // layout event. They must not leave an otherwise laid-out sheet offscreen.
+  const { animatedStyle, gesture, close } = useSheetMotion(windowHeight, laidOut);
 
   return (
     <Animated.View
+      onLayout={onSheetLayout}
       style={[
         styles.animWrap,
         {

@@ -10,6 +10,7 @@ import { Friend } from '../../types';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { HorizontalEdgeFade, useHorizontalScrollEdges } from '../common/ScrollEdgeFade';
 import { UserAvatar } from '../common/UserAvatar';
+import { COMPACT_ICON_BUTTON_STYLE, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
 
 const AVATAR_SIZE = 54;
 const CHECK_ICON_SIZE = 16;
@@ -76,6 +77,7 @@ export const QuickSendTray: React.FC<QuickSendTrayProps> = ({
         <AnimatedPressable
           onPress={handlePressAdd}
           scaleTo={0.9}
+          hitSlop={COMPACT_BUTTON_HIT_SLOP}
           contentStyle={[
             styles.addBtn,
             { backgroundColor: isDark ? '#18181D' : '#FFFFFF' },
@@ -181,11 +183,8 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   addBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: 18,
     borderWidth: 0,
   },
   horizontalBlurWrap: {

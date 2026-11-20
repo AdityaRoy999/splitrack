@@ -28,6 +28,7 @@ import {
 import { BrandEmblemIcon } from '../common/BrandEmblemIcon';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { ImpactStyle, triggerImpact } from '../../utils/haptics';
+import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
 
 interface UpiAppPickerModalProps {
   visible: boolean;
@@ -143,6 +144,7 @@ export const UpiAppPickerModal: React.FC<UpiAppPickerModalProps> = ({
             scaleTo={0.92}
             onPress={onClose}
             accessibilityLabel="Back to profile form"
+            hitSlop={COMPACT_BUTTON_HIT_SLOP}
             contentStyle={[styles.backBtn, { backgroundColor: cardBg }]}
           >
             <AltArrowLeftIcon size={18} color={textColor} />
@@ -338,12 +340,14 @@ export const UpiAppPickerModal: React.FC<UpiAppPickerModalProps> = ({
                 <TouchableOpacity
                   onPress={() => setShowCustomAppForm(false)}
                   style={[styles.cancelBtn, { backgroundColor: chipBg }]}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                 >
                   <Text style={[styles.cancelBtnText, { color: mutedText }]}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleCreateCustom}
                   style={[styles.saveCustomBtn, { backgroundColor: activeBg }]}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                 >
                   <Text style={[styles.saveCustomBtnText, { color: activeText }]}>
                     Save Custom App
@@ -355,6 +359,7 @@ export const UpiAppPickerModal: React.FC<UpiAppPickerModalProps> = ({
             <TouchableOpacity
               onPress={() => setShowCustomAppForm(true)}
               style={styles.openCustomTrigger}
+              hitSlop={COMPACT_BUTTON_HIT_SLOP}
             >
               <AddCircleIcon size={16} color="#38BDF8" />
               <Text style={[styles.openCustomText, { color: '#38BDF8' }]}>
@@ -387,7 +392,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    height: COMPACT_BUTTON_HEIGHT,
     borderRadius: 999,
     borderWidth: 0,
   },
@@ -515,7 +520,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    height: COMPACT_BUTTON_HEIGHT,
     borderRadius: 999,
   },
   addCustomText: {
@@ -531,7 +536,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 6,
+    minHeight: COMPACT_BUTTON_HEIGHT,
   },
   openCustomText: {
     fontSize: 13,
@@ -558,7 +563,9 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    height: COMPACT_BUTTON_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 999,
   },
   cancelBtnText: {
@@ -567,7 +574,9 @@ const styles = StyleSheet.create({
   },
   saveCustomBtn: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    height: COMPACT_BUTTON_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 999,
   },
   saveCustomBtnText: {

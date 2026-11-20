@@ -82,6 +82,24 @@ test('offline expense rebases exact own expense, cash, group and friend totals w
   assert.deepEqual(base, snapshot());
   assert.deepEqual(optimisticSnapshot(base, box.entries), next);
 });
+
+test('offline rebase retains immutable opened history while copying mutable balance branches', async () => {
+  const { box } = await saved({ ...draft, tripId: 'trip' }), base = snapshot();
+  const oldTransaction = { ...draft, id: 'older', notes: 'Opened history' };
+  base.transactions.push(oldTransaction);
+  base.summary.months['2026-11'] = { income: 0, expense: 0 };
+  const before = structuredClone(base);
+  const freeze = value => { if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); } };
+  freeze(base);
+  const next = optimisticSnapshot(base, box.entries);
+  assert.equal(next.transactions[1], oldTransaction);
+  assert.equal(next.settings, base.settings);
+  assert.equal(next.trips[0].members, base.trips[0].members);
+  assert.notEqual(next.accounts[0], base.accounts[0]);
+  assert.notEqual(next.summary.months['2026-11'], base.summary.months['2026-11']);
+  assert.equal(next.summary.months['2026-11'].expense, 35.15);
+  assert.deepEqual(base, before);
+});
 test('split rounding and multiple payers preserve whole paise and caller debt direction', async () => {
   const tx = { ...draft, amount: -35.15, paidBy: 'bob', splits: [{ friendId: 'user', paidAmount: 0 }, { friendId: 'bob', paidAmount: 35.15 }, { friendId: 'charlie', paidAmount: 0 }] };
   const { box } = await saved(tx), next = optimisticSnapshot(snapshot(), box.entries);

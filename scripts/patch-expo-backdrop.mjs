@@ -130,6 +130,23 @@ patchOnce(
 // released its bitmap fields. Accept Java's nullable platform arguments and
 // reject stale captures before accessing input.width or invoking native blur.
 target = layerFile;
+// Qm 1.3.0's pre-draw listener only tests isShown(), which stays true for cards
+// scrolled outside the clipped viewport and retained translated scenes. Skip
+// their software capture and eight blur passes before prepare allocates/draws.
+// Keep the last bitmap so the normal capture refreshes it upon re-entry.
+patchOnce(
+  'offscreen capture culling',
+  '  override fun blur(input: Bitmap',
+  `  private val captureVisibleRect = Rect()
+
+  override fun prepare(): Boolean {
+    if (!getGlobalVisibleRect(captureVisibleRect) || captureVisibleRect.isEmpty) return false
+    return super.prepare()
+  }
+
+  override fun blur(input: Bitmap`,
+);
+
 patchOnce(
   'late capture lifecycle',
   `  override fun blur(input: Bitmap, output: Bitmap) {

@@ -5,6 +5,7 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassSurface } from './GlassSurface';
 import { useModalVisual } from '../common/ModalVisualContext';
+import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
 
 interface GlassPillProps {
   label?: string;
@@ -76,9 +77,9 @@ export const GlassPill: React.FC<GlassPillProps> = ({
   };
 
   const sizePadding = {
-    sm: { paddingVertical: 6, paddingHorizontal: 12, height: 32 },
-    md: { paddingVertical: 8, paddingHorizontal: 12, height: 38 },
-    lg: { paddingVertical: 12, paddingHorizontal: 22, height: 48 },
+    sm: { paddingHorizontal: 12, height: COMPACT_BUTTON_HEIGHT },
+    md: { paddingHorizontal: 12, height: COMPACT_BUTTON_HEIGHT },
+    lg: { paddingHorizontal: 22, height: COMPACT_BUTTON_HEIGHT },
   }[size];
 
   const useTranslucentGlass = isLiquidGlassEnabled && !modal && (variant === 'glass' || variant === 'dark') && !active;
@@ -106,6 +107,8 @@ export const GlassPill: React.FC<GlassPillProps> = ({
       disabled={disabled}
       scaleTo={0.95}
       onPress={handlePress}
+      hitSlop={COMPACT_BUTTON_HIT_SLOP}
+      accessibilityLabel={label}
       style={style}
       contentStyle={
         useTranslucentGlass

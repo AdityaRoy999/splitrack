@@ -57,6 +57,8 @@ export interface Friend {
   avatar: string;
   upiId?: string;
   paymentName?: string;
+  receivingProvider?: UpiProvider;
+  receivingBankBrand?: BankBrand;
   phone?: string;
   netBalance: number; // Positive = friend owes you, Negative = you owe friend
   avatarRef?: string;

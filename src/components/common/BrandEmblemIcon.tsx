@@ -149,6 +149,18 @@ export const BrandEmblemIcon: React.FC<BrandEmblemIconProps> = ({
     );
   }
 
+  // A generic bank identity has no app metadata; use an offline bank emblem.
+  if (normId === 'bank') {
+    return (
+      <View style={[styles.box, { width: size, height: size, borderRadius, backgroundColor: accentColor }]}>
+        <Svg width={size * 0.7} height={size * 0.7} viewBox="0 0 24 24">
+          <Path d="M3 9l9-6 9 6H3zM3 20h18" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <Path d="M6 12v5m6-5v5m6-5v5" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" />
+        </Svg>
+      </View>
+    );
+  }
+
   // 2. High-precision vector graphics for key UPI brands
   if (normId === 'gpay' || normId === 'googlepay') {
     return (

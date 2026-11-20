@@ -51,10 +51,12 @@ import { ExpenseCategory, SplitMemberShare, SplitType, Transaction } from '../..
 import { allocateSplitAmounts } from '../../utils/splitAmounts';
 import { useAuth } from '../../auth/AuthContext';
 import { UserAvatar } from '../common/UserAvatar';
+import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP, COMPACT_ICON_BUTTON_STYLE } from '../../constants/buttonSizes';
 
 interface AddExpenseModalProps {
   visible: boolean;
   onClose: () => void;
+  onExitComplete?: () => void;
   defaultTripId?: string;
   defaultFriendIds?: string[];
   transactionToEdit?: Transaction;
@@ -63,6 +65,7 @@ interface AddExpenseModalProps {
 export const AddExpenseModal = memo(function AddExpenseModal({
   visible,
   onClose,
+  onExitComplete,
   defaultTripId,
   defaultFriendIds,
   transactionToEdit,
@@ -731,6 +734,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   {[-50, -10, 10, 50].map((delta) => (
                     <AnimatedPressable
                       key={delta}
+                      hitSlop={COMPACT_BUTTON_HIT_SLOP}
                       scaleTo={0.92}
                       onPress={() => handleShiftExact(id, delta)}
                       contentStyle={[styles.marginChip, { backgroundColor: chipBg }]}
@@ -777,6 +781,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   {[-10, -5, 5, 10].map((delta) => (
                     <AnimatedPressable
                       key={delta}
+                      hitSlop={COMPACT_BUTTON_HIT_SLOP}
                       scaleTo={0.92}
                       onPress={() => handleShiftPercentage(id, delta)}
                       contentStyle={[styles.marginChip, { backgroundColor: chipBg }]}
@@ -797,6 +802,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                 <View style={styles.sharesStepperWrap}>
                   <AnimatedPressable
                     scaleTo={0.9}
+                    hitSlop={COMPACT_BUTTON_HIT_SLOP}
                     onPress={() => handleShiftShare(id, -1)}
                     contentStyle={[styles.shareStepBtn, { backgroundColor: chipBg }]}
                   >
@@ -809,6 +815,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   </View>
                   <AnimatedPressable
                     scaleTo={0.9}
+                    hitSlop={COMPACT_BUTTON_HIT_SLOP}
                     onPress={() => handleShiftShare(id, 1)}
                     contentStyle={[styles.shareStepBtn, { backgroundColor: chipBg }]}
                   >
@@ -837,6 +844,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
       presentationStyle="overFullScreen"
       statusBarTranslucent
       onRequestClose={onClose}
+      onExitComplete={onExitComplete}
     >
       <View style={styles.modalOverlay}>
         <ModalBackdrop onClose={onClose} />
@@ -860,6 +868,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
             </View>
             <AnimatedPressable
               onPress={onClose}
+              hitSlop={COMPACT_BUTTON_HIT_SLOP}
               scaleTo={0.9}
               accessibilityLabel="Close expense modal"
               contentStyle={[styles.closeBtn, { backgroundColor: cardBg }]}
@@ -925,6 +934,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   {category ? (
                     <AnimatedPressable
                       scaleTo={0.94}
+                      hitSlop={COMPACT_BUTTON_HIT_SLOP}
                       onPress={() => {
                         const match = categories.find(
                           (c) => c.name.toLowerCase() === category.toLowerCase()
@@ -945,6 +955,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   ) : null}
                   <AnimatedPressable
                     scaleTo={0.94}
+                    hitSlop={COMPACT_BUTTON_HIT_SLOP}
                     onPress={() => {
                       setCategoryToEdit(null);
                       setShowAddCategory(true);
@@ -1022,6 +1033,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   <AnimatedPressable
                     scaleTo={0.9}
                     onPress={() => setLocation('')}
+                    hitSlop={COMPACT_BUTTON_HIT_SLOP}
                     contentStyle={styles.clearLocationBtn}
                     accessibilityLabel="Clear location"
                   >
@@ -1030,6 +1042,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                 )}
                 <AnimatedPressable
                   scaleTo={0.88}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                   onPress={handleAutoLocate}
                   disabled={isLocating}
                   contentStyle={styles.locateBtn}
@@ -1094,6 +1107,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                 <AnimatedPressable
                   scaleTo={0.9}
                   onPress={togglePaidBySearch}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                   accessibilityLabel="Search payer"
                   contentStyle={[
                     styles.searchIconBtn,
@@ -1155,6 +1169,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                       <AnimatedPressable
                         scaleTo={0.9}
                         onPress={() => setPaidBySearchQuery('')}
+                        hitSlop={COMPACT_BUTTON_HIT_SLOP}
                         contentStyle={styles.clearLocationBtn}
                       >
                         <CloseCircleIcon size={14} color={mutedText} />
@@ -1257,6 +1272,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   <AnimatedPressable
                     scaleTo={0.9}
                     onPress={toggleFriendSearch}
+                    hitSlop={COMPACT_BUTTON_HIT_SLOP}
                     accessibilityLabel="Search friends"
                     contentStyle={[
                       styles.searchIconBtn,
@@ -1355,6 +1371,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   {!splitCalculations.isBalanced && splitCalculations.remaining !== 0 && (
                     <AnimatedPressable
                       scaleTo={0.96}
+                      hitSlop={COMPACT_BUTTON_HIT_SLOP}
                       onPress={handleDistributeRemaining}
                       contentStyle={[styles.distributeBtn, { backgroundColor: activeBg }]}
                     >
@@ -1420,6 +1437,8 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                       <AnimatedPressable
                         scaleTo={0.9}
                         onPress={() => setFriendSearchQuery('')}
+                        hitSlop={COMPACT_BUTTON_HIT_SLOP}
+                        contentStyle={styles.clearSearchBtn}
                         accessibilityLabel="Clear friend search"
                       >
                         <CloseCircleIcon size={16} color={mutedText} />
@@ -1530,11 +1549,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: COMPACT_BUTTON_HEIGHT / 2,
     borderWidth: 0,
   },
   scrollAreaWrap: {
@@ -1596,10 +1612,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   newCategoryMiniBtn: {
+    height: COMPACT_BUTTON_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 5,
     borderRadius: 999,
     gap: 4,
     borderWidth: 0,
@@ -1634,11 +1651,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   searchIconBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: COMPACT_BUTTON_HEIGHT / 2,
     borderWidth: 0,
   },
   friendSearchBox: {
@@ -1769,13 +1783,17 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   clearLocationBtn: {
-    padding: 2,
+    ...COMPACT_ICON_BUTTON_STYLE,
+    marginVertical: -9,
+  },
+  clearSearchBtn: {
+    ...COMPACT_ICON_BUTTON_STYLE,
+    marginVertical: -10,
   },
   locateBtn: {
-    padding: 4,
+    ...COMPACT_ICON_BUTTON_STYLE,
+    marginVertical: -6,
     borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   locationChipsScroll: {
     marginTop: 8,
@@ -1822,10 +1840,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   distributeBtn: {
+    height: COMPACT_BUTTON_HEIGHT,
     borderRadius: 999,
-    paddingVertical: 7,
     paddingHorizontal: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   distributeBtnText: {
     fontSize: 11,
@@ -1879,8 +1898,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   marginChip: {
+    height: COMPACT_BUTTON_HEIGHT,
+    minWidth: COMPACT_BUTTON_HEIGHT,
     paddingHorizontal: 8,
-    paddingVertical: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 8,
   },
   marginChipText: {
@@ -1903,11 +1925,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   shareStepBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: COMPACT_BUTTON_HEIGHT / 2,
   },
   shareStepBtnText: {
     fontSize: 16,

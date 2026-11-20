@@ -63,4 +63,17 @@ The workflow generates Android with Expo Prebuild, builds `assembleRelease`, ver
 
 Native Google sign-in is included through the existing Google config plugin with callback scheme `com.googleusercontent.apps.828945864022-hg0dlg1ghp116ft9j3dg96a2r1jn9aih`. Google sign-in needs a rebuilt native app on both platforms; Expo Go does not contain this native module.
 
+## Verify UI and performance on both platforms
+
+Use release builds with the same records and theme on Android and iOS. The UI fixes share chart geometry, compact controls, QR branding, notification motion and transaction-sheet motion. Android blur capture skips surfaces outside visible bounds; it does not depend on phone manufacturer or refresh rate. Native iOS configuration and its blur implementation remain unchanged.
+
+1. Select every donut segment and clear it. The thicker selected stroke must retain a rounded curve at the top, bottom and sides.
+2. Compare the trip add/remove buttons, header actions, filters and QR actions. Compact actions use 36px visuals with additional touch space; labels may have different widths.
+3. View the same recipient's own QR and settlement QR from a linked account. App logo/color and payment identity should match. An unidentified bank handle uses a bank symbol rather than inventing an app logo.
+4. Disconnect while signed in. One dismissible offline notice should appear below the status bar and leave after about 10 seconds in its entry direction. Repeated failed refreshes must not keep bringing it back. Notices must remain visible above an open sheet. Reconnect and check that the notice is removed and saved entries sync once.
+5. Swipe an owned, synced transaction left. Edit/Delete should animate into view. Tap Edit, change a draft, close by swipe or button, then reopen it repeatedly. The sheet should enter promptly and the screen must remain responsive. Unsynced transactions still require reconnecting before server editing or deletion.
+6. Scroll through photo cards and expanded payment profiles, switch tabs and repeat transaction gestures. Compare app frame times rather than the display's selected refresh rate. A 90/120Hz display setting alone does not measure application FPS.
+
+For Android profiling, capture a System Trace/Perfetto recording from a release or profiling build and inspect main-thread work around `BlurView.captureDecorView`, `BlurView.compositeSpecialViews`, `BlurView.blur` and `BlurView.prepare`. Active progressive blur still captures GL surfaces on the UI thread; these traces can identify any remaining device-dependent cost. Automated checks verify data and lifecycle behavior, but do not replace native frame-time measurements.
+
 References: [Expo Google authentication](https://docs.expo.dev/guides/google-authentication/), [Firebase JS configuration](https://docs.expo.dev/guides/using-firebase/#using-firebase-js-sdk).

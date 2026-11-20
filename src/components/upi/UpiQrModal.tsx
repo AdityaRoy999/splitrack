@@ -26,6 +26,7 @@ import { ModalBackdrop } from '../common/ModalBackdrop';
 import { usePopupMotion } from '../common/usePopupMotion';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { buildUpiPaymentUri, formatUpiAmount, type UpiPaymentDetails } from '../../utils/upi';
+import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP, COMPACT_ICON_BUTTON_STYLE } from '../../constants/buttonSizes';
 
 interface UpiQrModalProps extends UpiPaymentDetails {
   visible: boolean;
@@ -133,7 +134,7 @@ function QrModalContent({ account, amount, note }: { account: UpiAccount } & Upi
             matteColor={isDark ? '#111114' : '#FFFFFF'}
             style={styles.contentCard}
           >
-            <TouchableOpacity onPress={handleSmoothClose} style={[styles.closeBtn, { backgroundColor: pillBg }]}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close QR code" hitSlop={COMPACT_BUTTON_HIT_SLOP} onPress={handleSmoothClose} style={[styles.closeBtn, { backgroundColor: pillBg }]}>
               <CloseCircleIcon size={20} color={textColor} />
             </TouchableOpacity>
 
@@ -153,8 +154,8 @@ function QrModalContent({ account, amount, note }: { account: UpiAccount } & Upi
             {rupeeAmount ? <Text style={[styles.paymentHint, { color: mutedText }]}>Amount is filled in. Confirm the payment in your UPI app.</Text> : null}
 
             {/* UPI ID Pill */}
-            <TouchableOpacity onPress={handleCopy} activeOpacity={0.8} style={[styles.upiPill, { backgroundColor: pillBg }]}>
-              <Text style={[styles.upiText, { color: textColor }]}>{account.upiId}</Text>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Copy UPI ID" hitSlop={COMPACT_BUTTON_HIT_SLOP} onPress={handleCopy} activeOpacity={0.8} style={[styles.upiPill, { backgroundColor: pillBg }]}>
+              <Text numberOfLines={1} style={[styles.upiText, { color: textColor }]}>{account.upiId}</Text>
               {copied ? (
                 <CheckCircleIcon size={16} color="#10B981" />
               ) : (
@@ -220,11 +221,11 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   closeBtn: {
+    ...COMPACT_ICON_BUTTON_STYLE,
     position: 'absolute',
     top: 16,
     right: 16,
     zIndex: 20,
-    padding: 6,
     borderRadius: 14,
     backgroundColor: '#F3F4F6',
     borderWidth: 0,
@@ -260,7 +261,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F3F4F6',
-    paddingVertical: 10,
+    height: COMPACT_BUTTON_HEIGHT,
+    maxWidth: '100%',
     paddingHorizontal: 16,
     borderRadius: 14,
     gap: 8,
@@ -268,6 +270,7 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   upiText: {
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: '500',
     color: '#000000',

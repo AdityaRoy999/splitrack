@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Animated, Image, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CopyIcon } from '@solar-icons/react-native/bold/copy';
@@ -22,6 +22,7 @@ import { GlassPill } from '../glass/GlassPill';
 import { GlassSurface } from '../glass/GlassSurface';
 import { AddUpiProfileModal } from './AddUpiProfileModal';
 import { UpiQrModal } from './UpiQrModal';
+import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP, COMPACT_ICON_BUTTON_STYLE } from '../../constants/buttonSizes';
 
 const CARD_HEIGHT = 152;
 const STACK_PEEK = 24;
@@ -247,6 +248,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
                 scaleTo={0.93}
                 onPress={() => onMakeDefault(acc)}
                 accessibilityLabel={`Make ${acc.title} default`}
+                hitSlop={COMPACT_BUTTON_HIT_SLOP}
                 contentStyle={[styles.makeDefaultPill, { backgroundColor: primaryPillBg }]}
               >
                 <Text style={[styles.makeDefaultText, { color: primaryPillText }]}>
@@ -261,6 +263,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
                   scaleTo={0.9}
                   onPress={() => onEdit(acc)}
                   accessibilityLabel={`Edit ${acc.title}`}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                   contentStyle={[styles.cardActionIconBtn, { backgroundColor: actionGlassBg }]}
                 >
                   <Pen2Icon size={13} color={textColor} />
@@ -270,6 +273,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
                   scaleTo={0.9}
                   onPress={() => onDelete(acc)}
                   accessibilityLabel={`Delete ${acc.title}`}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                   contentStyle={[styles.cardActionIconBtn, { backgroundColor: actionGlassBg }]}
                 >
                   <TrashBinTrashIcon size={13} color="#EF4444" />
@@ -317,6 +321,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
                   scaleTo={0.93}
                   onPress={() => onCopy(acc)}
                   accessibilityLabel={`Copy ${acc.title}`}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                   contentStyle={[styles.actionPill, { backgroundColor: actionGlassBg }]}
                 >
                   <CopyIcon size={13} color={isCopied ? '#10B981' : textColor} />
@@ -351,6 +356,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
                   scaleTo={0.93}
                   onPress={() => onCopy(acc)}
                   accessibilityLabel={`Copy ${acc.upiId}`}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                   contentStyle={[styles.actionPill, { backgroundColor: actionGlassBg }]}
                 >
                   <CopyIcon size={14} color={isCopied ? '#10B981' : textColor} />
@@ -371,6 +377,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
                     onOpenQr(acc);
                   }}
                   accessibilityLabel={`Open QR for ${acc.upiId}`}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                   contentStyle={[styles.actionPill, { backgroundColor: primaryPillBg }]}
                 >
                   <QrCodeIcon size={14} color={primaryPillText} />
@@ -403,15 +410,21 @@ export const UpiProfilesSection: React.FC = () => {
     ? selectedAccountId
     : accounts[0]?.id;
 
-  const rankMap = new Map<string, number>();
-  let nextRank = 1;
-  for (const acc of accounts) {
-    if (acc.id === activeId) {
-      rankMap.set(acc.id, 0);
-    } else {
-      rankMap.set(acc.id, nextRank++);
+  const rankMap = useMemo(() => {
+    const ranks = new Map<string, number>();
+    let nextRank = 1;
+    for (const acc of accounts) {
+      ranks.set(acc.id, acc.id === activeId ? 0 : nextRank++);
     }
-  }
+    return ranks;
+  }, [accounts, activeId]);
+  const spendByAccount = useMemo(() => {
+    const spending = new Map<string, number>();
+    for (const transaction of transactions) {
+      spending.set(transaction.upiAccountId, (spending.get(transaction.upiAccountId) ?? 0) + Math.abs(transaction.amount));
+    }
+    return spending;
+  }, [transactions]);
 
   const count = Math.max(1, accounts.length);
   const targetDeckHeight = isExpanded
@@ -477,6 +490,7 @@ export const UpiProfilesSection: React.FC = () => {
                 setIsExpanded((prev) => !prev);
               }}
               accessibilityLabel={isExpanded ? 'Collapse UPI stack' : 'Expand UPI stack'}
+              hitSlop={COMPACT_BUTTON_HIT_SLOP}
               contentStyle={[styles.stackToggleBtn, { backgroundColor: pillSurface }]}
             >
               <Text style={[styles.stackToggleText, { color: textColor }]}>
@@ -499,9 +513,7 @@ export const UpiProfilesSection: React.FC = () => {
       <Animated.View style={[styles.deckContainer, { height: deckHeightAnim }]}>
         {accounts.map((acc, mapIndex) => {
           const rank = rankMap.get(acc.id) ?? mapIndex;
-          const linkedTx = transactions.filter((t) => t.upiAccountId === acc.id);
-          const trackedSpend =
-            linkedTx.reduce((sum, t) => sum + Math.abs(t.amount), 0) || acc.totalSpent || 0;
+          const trackedSpend = spendByAccount.get(acc.id) || acc.totalSpent || 0;
 
           return (
             <ProfileDeckCard
@@ -573,6 +585,7 @@ export const UpiProfilesSection: React.FC = () => {
                 <TouchableOpacity
                   onPress={() => setAccountToDelete(null)}
                   style={[styles.deleteCancelBtn, { backgroundColor: pillSurface }]}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                 >
                   <Text style={[styles.deleteCancelText, { color: textColor }]}>Cancel</Text>
                 </TouchableOpacity>
@@ -586,6 +599,7 @@ export const UpiProfilesSection: React.FC = () => {
                   }}
                   disabled={pending}
                   style={styles.deleteConfirmBtn}
+                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
                 >
                   <Text style={styles.deleteConfirmText}>{pending ? 'Removing…' : 'Remove'}</Text>
                 </TouchableOpacity>
@@ -623,7 +637,8 @@ const styles = StyleSheet.create({
   },
   stackToggleBtn: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    height: COMPACT_BUTTON_HEIGHT,
+    justifyContent: 'center',
     borderRadius: 999,
     borderWidth: 0,
   },
@@ -701,7 +716,8 @@ const styles = StyleSheet.create({
   },
   makeDefaultPill: {
     paddingHorizontal: 11,
-    paddingVertical: 5,
+    height: COMPACT_BUTTON_HEIGHT,
+    justifyContent: 'center',
     borderRadius: 999,
     borderWidth: 0,
   },
@@ -749,7 +765,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    height: COMPACT_BUTTON_HEIGHT,
+    justifyContent: 'center',
     borderRadius: 999,
     gap: 5,
     borderWidth: 0,
@@ -792,11 +809,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardActionIconBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...COMPACT_ICON_BUTTON_STYLE,
+    borderRadius: COMPACT_BUTTON_HEIGHT / 2,
     borderWidth: 0,
   },
   deleteModalOverlay: {
@@ -832,7 +846,9 @@ const styles = StyleSheet.create({
   },
   deleteCancelBtn: {
     paddingHorizontal: 16,
-    paddingVertical: 9,
+    height: COMPACT_BUTTON_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 999,
   },
   deleteCancelText: {
@@ -841,7 +857,9 @@ const styles = StyleSheet.create({
   },
   deleteConfirmBtn: {
     paddingHorizontal: 18,
-    paddingVertical: 9,
+    height: COMPACT_BUTTON_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 999,
     backgroundColor: '#EF4444',
   },

@@ -4,7 +4,7 @@ import { themePalettes, type ThemePalette } from './colors';
 import { useAuth } from '../auth/AuthContext';
 import { useSplitTrack, type CloudSettings } from '../store/SplitTrackStore';
 import { errorMessage } from '../services/api';
-import { BottomBubble, type BubbleNotice } from '../components/common/BottomBubble';
+import { BottomBubble, BubbleNoticeProvider, type BubbleNotice } from '../components/common/BottomBubble';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 interface LiquidGlassContextType {
@@ -52,11 +52,13 @@ export function LiquidGlassProvider({ children, onPreferencesReady }: { children
   }, [hideAmounts]);
   const value = useMemo(() => ({ themeMode, setThemeMode, toggleTheme, hideAmounts, setHideAmounts, toggleHideAmounts, isLiquidGlassEnabled, setIsLiquidGlassEnabled, selectionStyle, setSelectionStyle, notificationDirection, setNotificationDirection, currency: 'INR' as const, setCurrency, formatAmount, palette: themePalettes[themeMode] }), [themeMode, setThemeMode, toggleTheme, hideAmounts, setHideAmounts, toggleHideAmounts, isLiquidGlassEnabled, setIsLiquidGlassEnabled, selectionStyle, setSelectionStyle, notificationDirection, setNotificationDirection, setCurrency, formatAmount]);
   return <Context.Provider value={value}>
+    <BubbleNoticeProvider themeMode={themeMode} notificationDirection={notificationDirection}>
     {profile?.username && !preferencesReady ? <View style={{ flex: 1, backgroundColor: themePalettes[themeMode].background, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
       <ActivityIndicator color={themeMode === 'dark' ? '#FFFFFF' : '#18181B'} />
       {syncError ? <Text accessibilityRole="button" onPress={() => { void refresh().catch(() => {}); }} style={{ color: themeMode === 'dark' ? '#F4F4F5' : '#18181B', textAlign: 'center' }}>{syncError} Tap to retry.</Text> : null}
     </View> : children}
     <BottomBubble notice={notice} onDismiss={dismiss} />
+    </BubbleNoticeProvider>
   </Context.Provider>;
 }
 export function useLiquidGlass() { const value = useContext(Context); if (!value) throw new Error('LiquidGlassProvider is missing.'); return value; }

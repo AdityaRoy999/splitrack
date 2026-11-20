@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
@@ -16,7 +16,7 @@ import { AddExpenseModal } from '../split/AddExpenseModal';
 import { BottomBubble, type BubbleNotice } from '../common/BottomBubble';
 import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 
-const Context = createContext({ open: (_tx: Transaction) => {}, edit: (_tx: Transaction) => {}, remove: (_tx: Transaction) => {}, openDeleted: () => {}, canManage: (_tx: Transaction): boolean => false, busy: false });
+const Context = createContext({ open: (_tx: Transaction) => {}, edit: (_tx: Transaction) => {}, remove: (_tx: Transaction) => {}, openDeleted: () => {}, canManage: (_tx: Transaction): boolean => false, busy: false, modalVisible: false });
 export const useTransactionActions = () => useContext(Context);
 
 export function TransactionActionsProvider({ children }: { children: React.ReactNode }) {
@@ -28,7 +28,11 @@ export function TransactionActionsProvider({ children }: { children: React.React
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [editingOpen, setEditingOpen] = useState(false);
   const [editSession, setEditSession] = useState(0);
+  const detailPresented = useRef(false);
+  const [detailMounted, setDetailMounted] = useState(false);
+  const queuedExpense = useRef<Transaction | null>(null);
   const [binOpen, setBinOpen] = useState(false);
+  const [binMounted, setBinMounted] = useState(false);
   const [bin, setBin] = useState<Transaction[]>([]);
   const [binLoading, setBinLoading] = useState(false);
   const [binError, setBinError] = useState('');
@@ -47,6 +51,9 @@ export function TransactionActionsProvider({ children }: { children: React.React
     : transactions.find(tx => tx.id === detail.id) || detail);
   const open = useCallback((tx: Transaction) => {
     if (pending) return;
+    queuedExpense.current = null;
+    detailPresented.current = true;
+    setDetailMounted(true);
     setError('');
     setAmounts({}); setEditTitle(tx.title); setEditAmount(String(Math.abs(tx.amount))); setEditDate(tx.date); setDetail(tx);
   }, [pending, setError]);
@@ -66,20 +73,39 @@ export function TransactionActionsProvider({ children }: { children: React.React
     void getTransactionBin().then(items => { if (active) { setBin(items); setBinError(''); } }).catch(e => { if (active) setBinError(errorMessage(e)); }).finally(() => { if (active) setBinLoading(false); });
     return () => { active = false; };
   }, [binOpen, getTransactionBin, revision]);
-  const closeDetail = () => { if (!pending) { setDetail(null); setConfirmDelete(false); setError(''); } };
+  const closeDetail = () => { if (!pending) { queuedExpense.current = null; setDetail(null); setConfirmDelete(false); setError(''); } };
   const toast = (message: string) => setNotice(old => ({ id: (old?.id || 0) + 1, message }));
-  const editExpense = (tx: Transaction) => { setEditing(tx); setEditSession(previous => previous + 1); setEditingOpen(true); };
+  const presentExpenseEditor = useCallback((tx: Transaction) => {
+    setEditing(tx); setEditSession(previous => previous + 1); setEditingOpen(true);
+  }, []);
+  const finishDetailExit = useCallback(() => {
+    detailPresented.current = false;
+    setDetailMounted(false);
+    const tx = queuedExpense.current;
+    queuedExpense.current = null;
+    if (tx) presentExpenseEditor(tx);
+  }, [presentExpenseEditor]);
+  const closeExpenseEditor = useCallback(() => setEditingOpen(false), []);
+  const finishExpenseExit = useCallback(() => setEditing(null), []);
   const edit = useCallback((tx: Transaction) => {
     if (pending || !owner(tx)) return;
     setError('');
     if (tx.type === 'expense') {
-      setEditing(tx); setEditSession(previous => previous + 1); setEditingOpen(true);
+      if (detailPresented.current) {
+        queuedExpense.current = tx;
+        setDetail(null); setConfirmDelete(false);
+      } else presentExpenseEditor(tx);
     } else {
+      detailPresented.current = true;
+      setDetailMounted(true);
       setEditTitle(tx.title); setEditAmount(String(Math.abs(tx.amount))); setEditDate(tx.date); setDetail(tx);
     }
-  }, [owner, pending, setError]);
+  }, [owner, pending, presentExpenseEditor, setError]);
   const requestDelete = useCallback((tx: Transaction) => {
     if (pending || !owner(tx)) return;
+    queuedExpense.current = null;
+    detailPresented.current = true;
+    setDetailMounted(true);
     setError(''); setDetail(tx); setConfirmDelete(true);
   }, [owner, pending, setError]);
   const remove = () => {
@@ -89,11 +115,13 @@ export function TransactionActionsProvider({ children }: { children: React.React
       setDetail(null); setConfirmDelete(false); toast('Transaction deleted. Restore it in Settings within 7 days.');
     });
   };
-  const openDeleted = useCallback(() => { if (!pending) { setError(''); setBinError(''); setBinLoading(true); setBinOpen(true); } }, [pending, setError]);
-  const context = useMemo(() => ({ open, edit, remove: requestDelete, openDeleted, canManage: owner, busy: pending }), [open, edit, requestDelete, openDeleted, owner, pending]);
+  const openDeleted = useCallback(() => { if (!pending) { setError(''); setBinError(''); setBinLoading(true); setBinMounted(true); setBinOpen(true); } }, [pending, setError]);
+  const finishBinExit = useCallback(() => setBinMounted(false), []);
+  const modalVisible = detailMounted || Boolean(editing) || binMounted;
+  const context = useMemo(() => ({ open, edit, remove: requestDelete, openDeleted, canManage: owner, busy: pending, modalVisible }), [open, edit, requestDelete, openDeleted, owner, pending, modalVisible]);
   return <Context.Provider value={context}>
     {children}
-    <SheetModal visible={Boolean(current) || confirmDelete} onRequestClose={closeDetail}>
+    <SheetModal visible={Boolean(current) || confirmDelete} onRequestClose={closeDetail} onExitComplete={finishDetailExit}>
       <View style={styles.fill}><ModalBackdrop onClose={closeDetail} /><GlassModalSheet>
         <View style={styles.handleWrap}><View style={[styles.handle, { backgroundColor: dark ? '#52525B' : '#A1A1AA' }]} /></View>
         <ScrollEdgeFade>
@@ -121,7 +149,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
               </> : null}
             </View>)}
             {owner(current) ? <>
-              {current.type === 'expense' ? <GlassPill label="Edit transaction" onPress={() => { editExpense(current); setDetail(null); }} /> : <>
+              {current.type === 'expense' ? <GlassPill label="Edit transaction" onPress={() => edit(current)} /> : <>
                 <TextInput accessibilityLabel="Transaction title" value={editTitle || current.title} onChangeText={setEditTitle} style={[styles.input, { color, backgroundColor: surface }]} />
                 <TextInput accessibilityLabel="Transaction amount" keyboardType="decimal-pad" value={editAmount} onChangeText={setEditAmount} style={[styles.input, { color, backgroundColor: surface }]} />
                 <TextInput accessibilityLabel="Transaction date YYYY-MM-DD" value={editDate} onChangeText={setEditDate} style={[styles.input, { color, backgroundColor: surface }]} />
@@ -136,7 +164,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
         </ScrollEdgeFade>
       </GlassModalSheet></View>
     </SheetModal>
-    <SheetModal visible={binOpen} onRequestClose={() => !pending && setBinOpen(false)}>
+    <SheetModal visible={binOpen} onRequestClose={() => !pending && setBinOpen(false)} onExitComplete={finishBinExit}>
       <View style={styles.fill}><ModalBackdrop onClose={() => !pending && setBinOpen(false)} /><GlassModalSheet>
         <View style={styles.handleWrap}><View style={[styles.handle, { backgroundColor: dark ? '#52525B' : '#A1A1AA' }]} /></View>
         <View style={styles.header}>
@@ -163,7 +191,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
         </ScrollEdgeFade>
       </GlassModalSheet></View>
     </SheetModal>
-    <AddExpenseModal key={`editing-${editSession}`} visible={editingOpen} transactionToEdit={editing ?? undefined} onClose={() => setEditingOpen(false)} />
+    {editing ? <AddExpenseModal key={`editing-${editSession}`} visible={editingOpen} transactionToEdit={editing} onClose={closeExpenseEditor} onExitComplete={finishExpenseExit} /> : null}
     <BottomBubble notice={notice} onDismiss={() => setNotice(null)} />
   </Context.Provider>;
 }

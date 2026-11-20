@@ -167,7 +167,20 @@ export function optimisticSnapshot<T extends OfflineSnapshot>(base: T, entries: 
   const committedRequests = new Set([...alreadyCommitted, ...base.transactions.map(tx => (tx as Transaction & { clientRequestId?: string }).clientRequestId).filter(Boolean)]);
   const activeEntries = entries.filter(entry => entry.status === 'pending' && entry.generation === (base.generation || 0) && !committedRequests.has(entry.requestId));
   if (!activeEntries.length) return base;
-  const next = JSON.parse(JSON.stringify(base)) as T, localTransactions: Transaction[] = [];
+  // Only balances/totals are changed below. Retain opened transaction history,
+  // settings, profiles and category metadata instead of serializing the entire
+  // ledger on every local save or retry.
+  const next = {
+    ...base,
+    accounts: base.accounts.map(account => ({ ...account })),
+    friends: base.friends.map(friend => ({ ...friend })),
+    trips: base.trips.map(trip => ({ ...trip })),
+    summary: {
+      ...base.summary,
+      categories: { ...base.summary.categories },
+      months: Object.fromEntries(Object.entries(base.summary.months).map(([month, totals]) => [month, { ...totals }])),
+    },
+  } as T, localTransactions: Transaction[] = [];
   for (const entry of activeEntries) {
     const tx = JSON.parse(entry.bodyJson) as TransactionDraft;
     const accountId = tx.upiAccountId || next.settings.selectedAccountId, account = next.accounts.find(item => item.id === accountId);
