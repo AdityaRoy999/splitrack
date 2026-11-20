@@ -21,6 +21,44 @@ test('matching registered APK signer and web client pass', () => {
   assert.equal(result.sha1, sha1);
   assert.equal(result.sha256, sha256);
 });
+
+test('current build-tools V2 signer output accepts the measured release certificate', () => {
+  const measuredSha1 = '5e8f16062ea3cd2c4a0d547876baa6f38cabf625';
+  const measuredSha256 = 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c';
+  const certificateOutput = [
+    'V2 Signer: certificate DN: CN=Android Debug, OU=Android, O=Unknown, L=Unknown, ST=Unknown, C=US',
+    `V2 Signer: certificate SHA-256 digest: ${measuredSha256}`,
+    `V2 Signer: certificate SHA-1 digest: ${measuredSha1}`,
+    'V2 Signer: certificate MD5 digest: 20f46148b72ed8e5e3dca23d37a4f41490',
+  ].join('\n');
+  const result = verifyAndroidGoogle({ ...input, certificateOutput, expectedSha1: measuredSha1.match(/../g).join(':') });
+  assert.equal(result.sha1, measuredSha1.toUpperCase());
+  assert.equal(result.sha256, measuredSha256.toUpperCase());
+  assert.throws(() => verifyAndroidGoogle({ ...input, certificateOutput, expectedSha1: 'C'.repeat(40) }), /APK signer differs/);
+});
+
+test('signature scheme labels and colon-separated digests retain exact fingerprint checks', () => {
+  for (const label of ['V1 Signer:', 'V2 Signer:', 'V3 Signer #1:', 'V3.1 Signer:', 'Signer #1']) {
+    const certificateOutput = `${label} certificate SHA-1 digest: ${sha1.match(/../g).join(':')}\r\n${label} certificate SHA-256 digest: ${sha256.match(/../g).join(' ')}\r\n`;
+    assert.equal(verifyAndroidGoogle({ ...input, certificateOutput, expectedSha1: sha1 }).sha1, sha1);
+  }
+  const repeated = input.certificateOutput + input.certificateOutput.replaceAll('Signer #1', 'V2 Signer:');
+  assert.equal(verifyAndroidGoogle({ ...input, certificateOutput: repeated }).sha1, sha1);
+});
+
+test('multiple app signers or malformed digests cannot silently pass verification', () => {
+  const otherSigner = input.certificateOutput.replaceAll('Signer #1', 'Signer #2').replaceAll(sha1.toLowerCase(), 'c'.repeat(40));
+  assert.throws(() => verifyAndroidGoogle({ ...input, certificateOutput: input.certificateOutput + otherSigner }), /multiple distinct signing certificates/);
+  for (const invalid of ['a'.repeat(39), 'a'.repeat(41), `${sha1}Z`, `${sha1} unexpected`]) {
+    assert.throws(() => verifyAndroidGoogle({ ...input, certificateOutput: input.certificateOutput.replace(sha1.toLowerCase(), invalid) }), /Could not read/);
+  }
+});
+
+test('source stamp certificates are excluded from app signer verification', () => {
+  const stamp = input.certificateOutput.replaceAll('Signer #1', 'Source Stamp Signer').replaceAll(sha1.toLowerCase(), 'c'.repeat(40));
+  assert.equal(verifyAndroidGoogle({ ...input, certificateOutput: input.certificateOutput + stamp }).sha1, sha1);
+  assert.throws(() => verifyAndroidGoogle({ ...input, certificateOutput: stamp }), /Could not read/);
+});
 test('web-only registration identifies missing Android OAuth without blocking existing builds', () => {
   assert.equal(verifyAndroidGoogle({ ...input, registration: registration([web]) }).registered, false);
   assert.equal(verifyAndroidGoogle(input).registered, undefined);

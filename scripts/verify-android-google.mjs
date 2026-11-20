@@ -3,12 +3,31 @@ import { pathToFileURL } from 'node:url';
 
 const fingerprint = value => String(value || '').replace(/[:\s]/g, '').toUpperCase();
 
-export function verifyAndroidGoogle({ certificateOutput, packageName, projectId, projectNumber, webClientId, expectedSha1, registration, iosClientId, iosBundleId, iosUrlScheme }) {
-  const sha1 = fingerprint(certificateOutput.match(/Signer #1 certificate SHA-1 digest:\s*([a-f\d]+)/i)?.[1]);
-  const sha256 = fingerprint(certificateOutput.match(/Signer #1 certificate SHA-256 digest:\s*([a-f\d]+)/i)?.[1]);
-  if (!/^[A-F\d]{40}$/.test(sha1) || !/^[A-F\d]{64}$/.test(sha256)) {
+function signingFingerprints(certificateOutput) {
+  const hashes = { 'SHA-1': new Set(), 'SHA-256': new Set() };
+  for (const line of String(certificateOutput || '').split(/\r?\n/)) {
+    // Build-tools versions label the same certificate either "Signer #1"
+    // or "V2 Signer:". Match only app signers, excluding source stamps.
+    const match = line.match(/^\s*(?:V\d+(?:\.\d+)?\s+)?Signer(?:\s+#\d+)?\s*:?\s+certificate\s+(SHA-1|SHA-256)\s+digest:\s*(.*?)\s*$/i);
+    if (!match) continue;
+    const algorithm = match[1].toUpperCase(), digest = fingerprint(match[2]);
+    const length = algorithm === 'SHA-1' ? 40 : 64;
+    if (!new RegExp(`^[A-F\\d]{${length}}$`).test(digest)) {
+      throw new Error('Could not read the APK signing certificate from apksigner --print-certs.');
+    }
+    hashes[algorithm].add(digest);
+  }
+  if (!hashes['SHA-1'].size || !hashes['SHA-256'].size) {
     throw new Error('Could not read the APK signing certificate from apksigner --print-certs.');
   }
+  if (hashes['SHA-1'].size !== 1 || hashes['SHA-256'].size !== 1) {
+    throw new Error('APK has multiple distinct signing certificates. Verify its signing configuration before distributing it.');
+  }
+  return { sha1: [...hashes['SHA-1']][0], sha256: [...hashes['SHA-256']][0] };
+}
+
+export function verifyAndroidGoogle({ certificateOutput, packageName, projectId, projectNumber, webClientId, expectedSha1, registration, iosClientId, iosBundleId, iosUrlScheme }) {
+  const { sha1, sha256 } = signingFingerprints(certificateOutput);
   if (webClientId && (!/^\d+-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/.test(webClientId) ||
       (projectNumber && !webClientId.startsWith(`${projectNumber}-`)))) {
     throw new Error('Android Google web OAuth client must belong to the configured Firebase project number.');
