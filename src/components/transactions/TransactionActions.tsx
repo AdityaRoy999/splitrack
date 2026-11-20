@@ -154,7 +154,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
           {bin.map(tx => <View key={tx.id} style={[styles.member, { backgroundColor: surface }]}>
             <View style={styles.deletedRow}><Text numberOfLines={2} style={[styles.deletedTitle, { color }]}>{tx.title}</Text><Text style={{ color, fontWeight: '600' }}>{formatAmount(Math.abs(tx.amount))}</Text></View>
             <Text style={[styles.caption, { color: dark ? '#A1A1AA' : '#71717A' }]}>Permanently deleted {new Date((tx.expiresAt || 0) * 1000).toLocaleDateString()}</Text>
-            {tx.canRestore ? <GlassPill label="Restore" size="lg" disabled={pending} onPress={() => { void runWithIntent(tx.id, async (id, intent) => { await restoreTransaction(id, intent); setBin(old => old.filter(item => item.id !== id)); toast('Transaction restored'); }); }} /> : <Text style={{ color }}>The transaction owner can restore this entry.</Text>}
+            {tx.canRestore ? <GlassPill label="Restore" size="lg" variant="success" disabled={pending} onPress={() => { void runWithIntent(tx.id, async (id, intent) => { await restoreTransaction(id, intent); setBin(old => old.filter(item => item.id !== id)); toast('Transaction restored'); }); }} /> : <Text style={{ color }}>The transaction owner can restore this entry.</Text>}
           </View>)}
           <FormError message={binError || error} />
         </ScrollView>

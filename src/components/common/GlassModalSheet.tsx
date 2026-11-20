@@ -1,4 +1,4 @@
-import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -7,6 +7,7 @@ import {
   useWindowDimensions,
   ViewStyle,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
@@ -15,6 +16,22 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassSurface } from '../glass/GlassSurface';
 import { useSheetMotion } from './useSheetMotion';
 import { SheetSizingContext } from './SheetSizingContext';
+import { ScrollEdgeFade } from './ScrollEdgeFade';
+
+// Measure fixed sections directly, including their margins. Scroll sections
+// report their intrinsic content, so sheet height never depends on its viewport.
+function MeasuredSheetSection({ id, scrollable, children, report }: {
+  id: string; scrollable: boolean; children: React.ReactNode;
+  report(id: string, height: number): void;
+}) {
+  const onLayout = useCallback((event: LayoutChangeEvent) => report(id, event.nativeEvent.layout.height), [id, report]);
+  const fitContent = useCallback((_viewport: number, content: number) => {
+    if (content > 0) report(id, content);
+  }, [id, report]);
+  return scrollable
+    ? <SheetSizingContext.Provider value={fitContent}>{children}</SheetSizingContext.Provider>
+    : <View collapsable={false} onLayout={onLayout} style={styles.fixedSection}>{children}</View>;
+}
 
 interface GlassModalSheetProps {
   style?: StyleProp<ViewStyle>;
@@ -34,23 +51,23 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
   const tintGlass = isDark ? 'rgba(18, 18, 24, 0.88)' : 'rgba(255, 255, 255, 0.92)';
 
   const maxSheetHeight = Math.round(Math.min(windowHeight * 0.92, windowHeight - insets.top - 8));
-  const [fittedHeight, setFittedHeight] = useState<number | null>(null);
-  const sheetHeight = Math.min(fittedHeight ?? maxSheetHeight, maxSheetHeight);
-  const measuredHeight = useRef(maxSheetHeight);
-  const chromeHeight = useRef<number | null>(null);
-  useLayoutEffect(() => { measuredHeight.current = sheetHeight; }, [sheetHeight]);
-  const fitContent = useCallback((viewport: number, content: number) => {
-    if (viewport <= 0 || content <= 0) return;
-    // Capture the header/footer once from the initial bounded layout. Reusing
-    // it prevents content-size events racing viewport layout during resizing.
-    const chrome = chromeHeight.current ?? Math.max(0, measuredHeight.current - viewport);
-    chromeHeight.current = chrome;
-    const next = Math.round(Math.min(maxSheetHeight, content + chrome));
-    setFittedHeight(previous => previous !== null && Math.abs(previous - next) < 2 ? previous : next);
-  }, [maxSheetHeight]);
-  const { animatedStyle, gesture, close } = useSheetMotion(windowHeight);
-
   const bottomPadding = Math.max(16, insets.bottom + 8);
+  const sections = React.Children.toArray(children).map((child, index) => {
+    const scrollable = React.isValidElement(child) && child.type === ScrollEdgeFade;
+    return { child, scrollable, id: `${React.isValidElement(child) ? child.key : index}:${scrollable ? 'scroll' : 'fixed'}` };
+  });
+  const [measurements, setMeasurements] = useState<Record<string, number>>({});
+  const report = useCallback((id: string, height: number) => {
+    if (!Number.isFinite(height) || height < 0) return;
+    setMeasurements(previous => previous[id] !== undefined && Math.abs(previous[id] - height) < 1 ? previous : { ...previous, [id]: height });
+  }, []);
+  const measured = sections.every(section => measurements[section.id] !== undefined);
+  const [measuredOnce, setMeasuredOnce] = useState(false);
+  if (measured && !measuredOnce) setMeasuredOnce(true);
+  const paddingTop = StyleSheet.flatten([styles.sheetBase, style])?.paddingTop ?? 10;
+  const contentHeight = sections.reduce((sum, section) => sum + (measurements[section.id] ?? 0), 0);
+  const sheetHeight = measured ? Math.min(maxSheetHeight, Math.ceil(contentHeight + (typeof paddingTop === 'number' ? paddingTop : 10) + bottomPadding)) : maxSheetHeight;
+  const { animatedStyle, gesture, close } = useSheetMotion(windowHeight, measured || measuredOnce);
 
   return (
     <Animated.View
@@ -86,7 +103,7 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
             },
           ]}
         >
-          <SheetSizingContext.Provider value={fitContent}>{children}</SheetSizingContext.Provider>
+          {sections.map(section => <MeasuredSheetSection key={section.id} id={section.id} scrollable={section.scrollable} report={report}>{section.child}</MeasuredSheetSection>)}
         </GlassSurface>
       </KeyboardAvoidingView>
       <GestureDetector gesture={gesture} touchAction="none" userSelect="none">
@@ -97,6 +114,7 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
 };
 
 const styles = StyleSheet.create({
+  fixedSection: { flexShrink: 0, minWidth: 0 },
   dragArea: { position: 'absolute', top: 0, left: 64, right: 64, height: 32, zIndex: 50 },
   keyboardArea: { flex: 1, minHeight: 0, width: '100%' },
   animWrap: {

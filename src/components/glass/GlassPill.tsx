@@ -10,7 +10,7 @@ interface GlassPillProps {
   label?: string;
   icon?: React.ReactNode;
   onPress: () => void;
-  variant?: 'light' | 'glass' | 'accent' | 'dark' | 'danger';
+  variant?: 'light' | 'glass' | 'accent' | 'dark' | 'danger' | 'success';
   size?: 'sm' | 'md' | 'lg';
   style?: ViewStyle;
   textStyle?: TextStyle;
@@ -53,6 +53,8 @@ export const GlassPill: React.FC<GlassPillProps> = ({
         };
       case 'danger':
         return { backgroundColor: '#E5484D' };
+      case 'success':
+        return { backgroundColor: '#BDEBD0' };
       case 'dark':
         return {
           backgroundColor: isDark ? '#1C1C20' : '#E5E5EA',
@@ -68,6 +70,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
   const getTextColor = () => {
     if (variant === 'light') return '#000000';
     if (variant === 'danger') return '#FFFFFF';
+    if (variant === 'success') return '#174C35';
     if (variant === 'accent') return isDark ? '#000000' : '#FFFFFF';
     return isDark ? '#FFFFFF' : '#000000';
   };

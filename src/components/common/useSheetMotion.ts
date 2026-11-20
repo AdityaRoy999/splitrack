@@ -11,8 +11,9 @@ const SHEET_SPRING = {
 
 // Translation and finger tracking both run on the UI thread. React only handles
 // the completed dismissal, so rendering the form cannot stall a sheet's motion.
-export function useSheetMotion(distance: number) {
-  const { open, ready, close, finishExit } = useSheetModal();
+export function useSheetMotion(distance: number, layoutReady = true) {
+  const { open, ready: modalReady, close, finishExit } = useSheetModal();
+  const ready = modalReady && layoutReady;
   const translateY = useSharedValue(distance);
   const dragStart = useSharedValue(0);
   const closing = useSharedValue(false);
