@@ -68,6 +68,14 @@ patchOnce(
   }`,
 );
 
+// The app owns scroll visibility and the patched lookup above always returns
+// null. Retained edges no longer need upstream's per-view 500 ms discovery poll.
+patchOnce(
+  'unused scroll polling',
+  '    mainHandler.postDelayed(scrollViewCheck, SCROLL_VIEW_CHECK_INTERVAL_MS)\n  }\n\n  override fun onDetachedFromWindow()',
+  '    // Splittrack: no discovery timer when scroll ownership belongs to JS.\n  }\n\n  override fun onDetachedFromWindow()',
+);
+
 // QmBlurView defaults to capturing the entire activity decor. The native view
 // is a direct child of GradualBlur's non-collapsible edge wrapper, whose parent
 // is the media/scroll viewport. Scope its normal software capture there so later

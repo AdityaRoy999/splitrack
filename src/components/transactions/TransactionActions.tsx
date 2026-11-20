@@ -41,16 +41,18 @@ export function TransactionActionsProvider({ children }: { children: React.React
   const dark = themeMode === 'dark';
   const color = dark ? '#F4F4F5' : '#18181B';
   const surface = dark ? '#242428' : '#EDEDF1';
-  const owner = useCallback((tx: Transaction) => tx.type === 'expense' ? tx.paidBy === 'user' : tx.creatorId === user?.uid, [user?.uid]);
-  const current = detail && (transactions.find(tx => tx.id === detail.id) || detail);
+  const owner = useCallback((tx: Transaction) => !tx.id.startsWith('offline-') && (tx.type === 'expense' ? tx.paidBy === 'user' : tx.creatorId === user?.uid), [user?.uid]);
+  const current = detail && (detail.id.startsWith('offline-')
+    ? transactions.find(tx => tx.id === detail.id) || transactions.find(tx => (tx as Transaction & { clientRequestId?: string }).clientRequestId === detail.id.slice('offline-'.length))
+    : transactions.find(tx => tx.id === detail.id) || detail);
   const open = useCallback((tx: Transaction) => {
     if (pending) return;
     setError('');
     setAmounts({}); setEditTitle(tx.title); setEditAmount(String(Math.abs(tx.amount))); setEditDate(tx.date); setDetail(tx);
   }, [pending, setError]);
-  const detailId = detail?.id;
+  const detailId = current?.id;
   useEffect(() => {
-    if (!detailId) return;
+    if (!detailId || detailId.startsWith('offline-')) return;
     let active = true;
     // Older trip pages may be outside the store's current snapshot.
     void api<Transaction>(`/transactions/${encodeURIComponent(detailId)}`).then(tx => {
@@ -81,8 +83,8 @@ export function TransactionActionsProvider({ children }: { children: React.React
     setError(''); setDetail(tx); setConfirmDelete(true);
   }, [owner, pending, setError]);
   const remove = () => {
-    if (!detail || !owner(detail)) return;
-    void runWithIntent(detail.id, async (id, intent) => {
+    if (!current || !owner(current)) return;
+    void runWithIntent(current.id, async (id, intent) => {
       await deleteTransaction(id, intent);
       setDetail(null); setConfirmDelete(false); toast('Transaction deleted. Restore it in Settings within 7 days.');
     });
@@ -91,7 +93,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
   const context = useMemo(() => ({ open, edit, remove: requestDelete, openDeleted, canManage: owner, busy: pending }), [open, edit, requestDelete, openDeleted, owner, pending]);
   return <Context.Provider value={context}>
     {children}
-    <SheetModal visible={Boolean(detail) || confirmDelete} onRequestClose={closeDetail}>
+    <SheetModal visible={Boolean(current) || confirmDelete} onRequestClose={closeDetail}>
       <View style={styles.fill}><ModalBackdrop onClose={closeDetail} /><GlassModalSheet>
         <View style={styles.handleWrap}><View style={[styles.handle, { backgroundColor: dark ? '#52525B' : '#A1A1AA' }]} /></View>
         <ScrollEdgeFade>
@@ -102,7 +104,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
             <GlassPill label={pending ? 'Deleting…' : 'Delete transaction'} size="lg" shape="rounded" variant="danger" disabled={pending} onPress={remove} />
           </> : current ? <>
             <Text style={{ color }}>{formatAmount(Math.abs(current.amount))} · {current.date}</Text>
-            <Text style={{ color }}>{current.settled ? 'Settled' : `${formatAmount(current.remainingAmount || 0)} remaining`}</Text>
+            <Text style={{ color }}>{current.id.startsWith('offline-') ? 'Saved on this device. Waiting to sync.' : current.settled ? 'Settled' : `${formatAmount(current.remainingAmount || 0)} remaining`}</Text>
             {current.settlementVector?.map(vector => <View key={vector.memberId} style={[styles.member, { backgroundColor: surface }]}>
               <Text style={{ color }}>{vector.memberId === 'user' ? 'You' : friends.find(f => f.id === vector.memberId)?.name || 'Member'}</Text>
               <Text style={{ color }}>{formatAmount(vector.remainingAmount)} remaining</Text>
@@ -113,7 +115,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
                   const value = Number(amounts[vector.memberId] ?? vector.remainingAmount);
                   void runWithIntent({ id: current.id, memberId: vector.memberId, amount: value }, async (draft, intent) => {
                     if (!Number.isFinite(draft.amount) || draft.amount <= 0) throw new Error('Enter a positive payment amount.');
-                    await settleTransaction(draft.id, draft.memberId, draft.amount, selectedAccountId, intent); toast('Payment recorded; balances updated');
+                    await settleTransaction(draft.id, draft.memberId, draft.amount, selectedAccountId, intent); toast('Payment saved. Balances update after sync.');
                   });
                 }} />
               </> : null}
@@ -126,7 +128,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
                 <GlassPill label="Save changes" disabled={pending} onPress={() => { void runWithIntent({ id: current.id, title: editTitle || current.title, amount: Number(editAmount), date: editDate }, async (draft, intent) => { await editTransaction(draft.id, { title: draft.title, amount: draft.amount, date: draft.date }, intent); setDetail(null); toast('Transaction updated'); }); }} />
               </>}
               <GlassPill label="Delete transaction" size="lg" shape="rounded" variant="danger" onPress={() => setConfirmDelete(true)} />
-            </> : <Text style={{ color }}>Only the transaction owner can edit, delete or mark its members settled.</Text>}
+            </> : <Text style={{ color }}>{current.id.startsWith('offline-') ? 'Reconnect before editing, deleting or settling this transaction.' : 'Only the transaction owner can edit, delete or mark its members settled.'}</Text>}
           </> : null}
           <FormError message={error} />
           <GlassPill label={confirmDelete ? 'Cancel' : 'Close'} size="lg" disabled={pending} onPress={closeDetail} />

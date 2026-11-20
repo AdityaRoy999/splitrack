@@ -39,6 +39,17 @@ yarn-error.*
 *service-account*.json
 GoogleService-Info.plist
 google-services.json
+GoogleService-Info*.plist
+google-services*.json
+*serviceAccount*.json
+*service_account*.json
+firebase-adminsdk*.json
+client_secret*.json
+credentials.json
+.secrets/
+.envrc
+/Access/
+/src/config/firebase.ts
 /sign in with google services/
 
 # typescript
@@ -47,6 +58,14 @@ google-services.json
 # generated native folders
 /ios
 /android
+
+# Signing material and build artifacts stay local or in private CI storage.
+*.keystore
+*.pfx
+*.apk
+*.aab
+*.ipa
+*.log
 
 # Local reference repository, maintained separately from the mobile app.
 /AWS-SplitTrack/

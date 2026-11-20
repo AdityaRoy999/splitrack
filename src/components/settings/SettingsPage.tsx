@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -17,7 +18,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { pickedImageUri } from '../../utils/pickedImage';
 import { File as ExpoFile } from 'expo-file-system';
 import { useAuth } from '../../auth/AuthContext';
+import { authenticationError } from '../../auth/authErrors';
 import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
+import { SheetModal } from '../common/SheetModal';
+import { ModalBackdrop } from '../common/ModalBackdrop';
+import { GlassModalSheet } from '../common/GlassModalSheet';
+import { GlassPill } from '../glass/GlassPill';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
 import { CardSendIcon } from '@solar-icons/react-native/bold/card-send';
@@ -100,7 +106,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     trips,
     friends,
   } = useSplitTrack();
-  const { profile, completeProfile } = useAuth();
+  const { user, profile, completeProfile, googleLinked, linkGoogle, cancelGoogleLink } = useAuth();
+  const { run: runGoogle, pending: googlePending, error: googleError, setError: setGoogleError } = useAsyncAction();
+  const [showGoogleLink, setShowGoogleLink] = useState(false);
+  const [googlePassword, setGooglePassword] = useState('');
+  const [googleNeedsPassword, setGoogleNeedsPassword] = useState(false);
+  const [googleNotice, setGoogleNotice] = useState('');
   const { run, pending, error } = useAsyncAction();
 
   const [chosenAccountId, setTargetAccountId] = useState<string>(
@@ -129,6 +140,31 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+
+  const openGoogleLink = () => {
+    if (googleLinked || googlePending || pending) return;
+    setGoogleError(''); setGooglePassword(''); setGoogleNeedsPassword(false); setGoogleNotice(''); setShowGoogleLink(true);
+  };
+  const closeGoogleLink = () => {
+    if (googlePending) return;
+    cancelGoogleLink(); setShowGoogleLink(false); setGooglePassword(''); setGoogleNeedsPassword(false); setGoogleError('');
+  };
+  const performGoogleLink = () => {
+    if (googleNeedsPassword && !googlePassword) { setGoogleError('Enter your current password.'); return; }
+    void runGoogle(async () => {
+      try {
+        if (await linkGoogle(googleNeedsPassword ? googlePassword : undefined)) {
+          setShowGoogleLink(false); setGooglePassword('');
+          setGoogleNotice('Google is synced. Continue with Google now opens this account and its saved records.');
+          triggerNotification(NotificationType.Success);
+        }
+      } catch (failure) {
+        if ((failure as { code?: string })?.code === 'auth/requires-recent-login') {
+          setGoogleNeedsPassword(true); setGoogleError('Confirm your current password to sync Google.');
+        } else throw new Error(authenticationError(failure));
+      }
+    });
+  };
 
   const handlePickAvatar = async () => {
     void run(async () => {
@@ -315,6 +351,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           <Text style={[styles.profileName, { color: textColor }]}>{userName}</Text>
           <Text style={[styles.profileHandle, { color: mutedText }]}>{userHandle}</Text>
+        </View>
+
+        <View style={[styles.joinedCard, { backgroundColor: cardBg }]}>
+          <View style={styles.joinedSection}><Text style={[styles.sectionHeader, { color: mutedText }]}>ACCOUNT SIGN-IN</Text></View>
+          <TouchableOpacity activeOpacity={0.7} style={styles.navRowItem} onPress={openGoogleLink}
+            disabled={googleLinked || googlePending || pending} accessibilityRole="button" accessibilityLabel={googleLinked ? 'Google account synced' : 'Sync with Google'}>
+            <View style={[styles.navIconBox, { backgroundColor: chipBg }]}>
+              <Image source={require('../../../assets/auth/google-g.png')} style={{ width: 20, height: 20 }} resizeMode="contain" />
+            </View>
+            <View style={styles.navTextCol}>
+              <Text style={[styles.navRowTitle, { color: textColor }]}>{googleLinked ? 'Google synced' : 'Sync with Google'}</Text>
+              <Text style={[styles.navRowSubtitle, { color: mutedText }]}>{googleLinked ? 'Continue with Google opens this account' : 'Use Google to sign in to your existing account'}</Text>
+            </View>
+            {googleLinked ? <CheckCircleIcon size={18} color="#10B981" /> : <AltArrowRightIcon size={14} color={mutedText} />}
+          </TouchableOpacity>
+          {googleNotice ? <Text accessibilityLiveRegion="polite" style={[styles.surfaceCaption, { color: '#10B981', paddingHorizontal: 20, paddingBottom: 16 }]}>{googleNotice}</Text> : null}
         </View>
 
         {/* Quick Management & Navigation Stack Card */}
@@ -801,6 +853,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           {onSignOut && (
             <TouchableOpacity
               onPress={onSignOut}
+              disabled={googlePending}
               style={[styles.resetBtn, { backgroundColor: chipBg }]}
               activeOpacity={0.7}
             >
@@ -878,6 +931,26 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </View>
         </View>
       </Modal>
+      <SheetModal visible={showGoogleLink} onRequestClose={closeGoogleLink}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <ModalBackdrop onClose={closeGoogleLink} />
+          <GlassModalSheet>
+            <View style={{ alignItems: 'center', paddingVertical: 6, marginBottom: 12 }}><View style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: isDark ? '#52525B' : '#A1A1AA' }} /></View>
+            <Text style={{ color: textColor, fontSize: 22, fontWeight: '600', marginBottom: 14 }}>Sync with Google</Text>
+            <Text style={{ color: mutedText, fontSize: 14, lineHeight: 20, marginBottom: 18 }}>
+              Choose the Google account for {user?.email || profile?.email || 'your email'}. Your transactions, groups and password sign-in stay with this account.
+            </Text>
+            {googleNeedsPassword ? <TextInput accessibilityLabel="Current account password" value={googlePassword} onChangeText={setGooglePassword}
+              placeholder="Current password" placeholderTextColor={mutedText} secureTextEntry autoCapitalize="none" autoCorrect={false}
+              editable={!googlePending} style={{ width: '100%', backgroundColor: chipBg, color: textColor, fontSize: 14, borderRadius: 14, paddingHorizontal: 14, minHeight: 48, marginBottom: 12 }} /> : null}
+            <FormError message={googleError} />
+            <View style={{ gap: 12 }}>
+              <GlassPill label={googlePending ? 'Syncing…' : googleNeedsPassword ? 'Confirm password and sync' : 'Continue with Google'} size="lg" shape="rounded" variant="accent" disabled={googlePending} onPress={performGoogleLink} />
+              <GlassPill label="Cancel" size="lg" disabled={googlePending} onPress={closeGoogleLink} />
+            </View>
+          </GlassModalSheet>
+        </View>
+      </SheetModal>
     </View>
   );
 };

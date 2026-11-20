@@ -1,5 +1,7 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
 
+// Local .env and GitHub Actions Secrets supply the public Firebase client
+// configuration. Auth persistence is initialized separately by each platform.
 const config = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -10,8 +12,11 @@ const config = {
 };
 
 export function firebaseApp() {
-  if (!config.apiKey || !config.projectId || !config.appId) {
-    throw new Error('This build is missing its Firebase configuration.');
+  if (Object.values(config).some(value => !value?.trim())) {
+    throw new Error('This build has incomplete Firebase configuration. Set all six Firebase public variables together.');
+  }
+  if (!config.appId?.startsWith(`1:${config.messagingSenderId}:`)) {
+    throw new Error('This build has mismatched Firebase app and project configuration.');
   }
   return getApps().length ? getApp() : initializeApp(config);
 }

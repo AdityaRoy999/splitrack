@@ -68,6 +68,7 @@ import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 import { PreloaderSplash, hasCompletedStartupPreloader } from './src/components/common/PreloaderSplash';
 import { OnboardingAuthScreen, type AuthLogoRect } from './src/components/auth/OnboardingAuthScreen';
 import { OnboardingUsernameScreen } from './src/components/auth/OnboardingUsernameScreen';
+import { GoogleLinkRecovery } from './src/components/auth/GoogleLinkRecovery';
 import { AnimatedPressable } from './src/components/common/MotionPrimitives';
 import { TabScene } from './src/components/common/TabScene';
 import { JellyRadio } from './src/components/common/JellyRadio';
@@ -1249,6 +1250,7 @@ function AppContent() {
                 />
               )}
               {sessionError ? <Text accessibilityLiveRegion="polite" style={{ color: '#F87171', padding: 12 }}>{sessionError}</Text> : null}
+              <GoogleLinkRecovery />
               </LiquidGlassProvider></SplitTrackProvider>
               {showPreloader ? (
                 <PreloaderSplash

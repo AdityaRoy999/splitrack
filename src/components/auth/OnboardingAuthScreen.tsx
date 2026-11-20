@@ -27,6 +27,10 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { ImpactStyle, NotificationType, triggerImpact, triggerNotification } from '../../utils/haptics';
 import { measureNodeInWindow, type ViewRefNode, type WindowRect } from '../../utils/measureWindow';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { SheetModal } from '../common/SheetModal';
+import { ModalBackdrop } from '../common/ModalBackdrop';
+import { GlassModalSheet } from '../common/GlassModalSheet';
+import { GlassPill } from '../glass/GlassPill';
 
 export type AuthLogoRect = WindowRect;
 
@@ -48,7 +52,7 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { themeMode, toggleTheme } = useLiquidGlass();
-  const { resetPassword, authenticateWithGoogle } = useAuth();
+  const { resetPassword, authenticateWithGoogle, pendingGoogleLink, cancelGoogleLink } = useAuth();
   const isDark = themeMode === 'dark';
 
   const [authMode, setAuthMode] = useState<'signup' | 'signin'>('signup');
@@ -61,6 +65,7 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
   const pending = pendingAction !== null;
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [existingAccountEmail, setExistingAccountEmail] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<'name' | 'email' | 'password' | null>(null);
   const [formFadeAnim] = useState(() => new Animated.Value(1));
 
@@ -85,6 +90,7 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
 
   const handleToggleAuthMode = () => {
     triggerImpact(ImpactStyle.Light);
+    cancelGoogleLink(); setExistingAccountEmail(null); setError(''); setNotice('');
     setAuthMode((prev) => (prev === 'signup' ? 'signin' : 'signup'));
     formFadeAnim.setValue(0.65);
     Animated.timing(formFadeAnim, {
@@ -124,10 +130,12 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
     if (isSignUp && !fullName.trim()) { setError('Enter your name.'); return; }
     busy.current = true; setPendingAction('email'); setError(''); setNotice('');
     try {
-      await onAuthenticate({ mode: authMode, name: fullName.trim() || undefined, email: email.trim(), password });
+      await onAuthenticate({ mode: authMode, name: fullName.trim() || undefined, email: email.trim(), password, syncGoogle: !isSignUp && Boolean(pendingGoogleLink) });
       triggerNotification(NotificationType.Success);
     } catch (failure) {
-      setError(authenticationError(failure));
+      if (isSignUp && (failure as { code?: string })?.code === 'auth/email-already-in-use') {
+        setExistingAccountEmail(email.trim()); setError('');
+      } else setError(authenticationError(failure));
     } finally { busy.current = false; setPendingAction(null); }
   };
   const handleGoogleSubmit = async () => {
@@ -136,7 +144,11 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
     try {
       if (await authenticateWithGoogle()) triggerNotification(NotificationType.Success);
     } catch (failure) {
-      setError(authenticationError(failure));
+      if ((failure as { code?: string })?.code === 'auth/account-exists-with-different-credential') {
+        const accountEmail = (failure as { customData?: { email?: string }; email?: string }).customData?.email
+          || (failure as { email?: string }).email || email.trim();
+        setExistingAccountEmail(accountEmail); setError('');
+      } else setError(authenticationError(failure));
     } finally { busy.current = false; setPendingAction(null); }
   };
   const handlePasswordReset = async () => {
@@ -146,6 +158,20 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
     try { await resetPassword(email); setNotice('If this email has an account, a reset link has been sent.'); }
     catch (failure) { setError(authenticationError(failure)); }
     finally { busy.current = false; setPendingAction(null); }
+  };
+  const continueExistingAccount = () => {
+    setAuthMode('signin');
+    setEmail(pendingGoogleLink?.email || existingAccountEmail || email);
+    setPassword(''); setExistingAccountEmail(null); setError('');
+    setNotice(pendingGoogleLink ? 'Sign in once with your password to sync Google with this account.' : 'Sign in with your existing account.');
+  };
+  const chooseDifferentAccount = () => {
+    cancelGoogleLink(); setExistingAccountEmail(null); setAuthMode('signup');
+    setEmail(''); setPassword(''); setError(''); setNotice('');
+  };
+  const dismissExistingAccount = () => {
+    if (pending) return;
+    cancelGoogleLink(); setExistingAccountEmail(null);
   };
 
   return (
@@ -293,7 +319,12 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
                     placeholder="alex@splittrack.app"
                     placeholderTextColor={mutedText}
                     value={email}
-                    onChangeText={setEmail}
+                    onChangeText={value => {
+                      if (pendingGoogleLink && value.trim().toLowerCase() !== pendingGoogleLink.email.toLowerCase()) {
+                        cancelGoogleLink(); setNotice('');
+                      }
+                      setEmail(value);
+                    }}
                     onFocus={() => setFocusedField('email')}
                     onBlur={() => setFocusedField((prev) => (prev === 'email' ? null : prev))}
                     keyboardType="email-address"
@@ -360,7 +391,7 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
               >
                 <View style={styles.ctaSpacer} />
                 <Text style={[styles.primaryPillText, { color: ctaText }]}>
-                  {pendingAction === 'email' ? 'Please wait…' : isSignUp ? 'Create Account' : 'Sign In'}
+                  {pendingAction === 'email' ? 'Please wait…' : isSignUp ? 'Create Account' : pendingGoogleLink ? 'Sign in and sync Google' : 'Sign In'}
                 </Text>
                 <View style={styles.ctaRightArrow}>
                   <AltArrowRightIcon size={17} color={ctaText} />
@@ -398,6 +429,23 @@ export const OnboardingAuthScreen: React.FC<OnboardingAuthScreenProps> = ({
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <SheetModal visible={existingAccountEmail !== null} onRequestClose={dismissExistingAccount}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <ModalBackdrop onClose={dismissExistingAccount} />
+          <GlassModalSheet>
+            <View style={{ alignItems: 'center', paddingVertical: 6, marginBottom: 12 }}><View style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: isDark ? '#52525B' : '#A1A1AA' }} /></View>
+            <Text style={{ color: textColor, fontSize: 22, fontWeight: '600', marginBottom: 14 }}>Account already exists</Text>
+            <Text style={{ color: mutedText, fontSize: 14, lineHeight: 20, marginBottom: 18 }}>
+              {existingAccountEmail ? `${existingAccountEmail} already has an account. ` : 'This email already has an account. '}
+              {pendingGoogleLink ? 'Sign in with your password to sync Google and keep your existing records.' : 'Continue to sign in, or sign up with a different email.'}
+            </Text>
+            <View style={{ gap: 12 }}>
+              <GlassPill label="Continue to sign in" size="lg" shape="rounded" variant="accent" disabled={pending} onPress={continueExistingAccount} />
+              <GlassPill label="Sign up with a different account" size="lg" disabled={pending} onPress={chooseDifferentAccount} />
+            </View>
+          </GlassModalSheet>
+        </View>
+      </SheetModal>
     </View>
   );
 };

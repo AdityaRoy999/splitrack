@@ -67,7 +67,10 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
 
   const tripFriends = friends.filter((f) => trip.members.includes(f.id));
   const removalMode = canManageMembers && removingMembers && tripFriends.length > 0;
-  const tripTransactions = history ?? transactions.filter((tx) => tx.tripId === trip.id);
+  // Loaded server pages remain authoritative; the transaction outbox overlays its
+  // local entries without waiting for a server revision or a network request.
+  const localTransactions = transactions.filter(tx => tx.tripId === trip.id && tx.id.startsWith('offline-'));
+  const tripTransactions = [...new Map([...localTransactions, ...(history ?? transactions.filter(tx => tx.tripId === trip.id))].map(tx => [tx.id, tx])).values()];
 
   const getCategoryMeta = (catName: string, fallbackIcon: string) => {
     const match = categories.find((c) => c.name.toLowerCase() === catName.toLowerCase());

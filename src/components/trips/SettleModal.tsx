@@ -78,7 +78,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
     void runWithIntent({ friendId, amount, accountId: selectedAccountId }, async (draft, intentId) => {
     await settleWithFriend(draft.friendId, draft.amount, draft.accountId, intentId);
     triggerNotification(NotificationType.Success);
-    setNotice((previous) => ({ id: (previous?.id ?? 0) + 1, message: `Settled ${formatAmount(amount)} successfully!` }));
+    setNotice((previous) => ({ id: (previous?.id ?? 0) + 1, message: `${formatAmount(amount)} payment saved. Balances update after sync.` }));
     });
   };
 

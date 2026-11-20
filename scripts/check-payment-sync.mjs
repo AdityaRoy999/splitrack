@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
-import { build } from 'esbuild';
+import { Buffer } from 'node:buffer';
+import { readFile } from 'node:fs/promises';
+import ts from 'typescript';
 
 async function loadUtility(path) {
-  const result = await build({ entryPoints: [path], bundle: true, platform: 'node', format: 'esm', write: false });
-  return import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
+  const source = await readFile(path, 'utf8');
+  const result = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } });
+  return import(`data:text/javascript;base64,${Buffer.from(result.outputText).toString('base64')}`);
 }
 
 const { getDebtReceivingAccount, buildUpiPaymentUri, formatUpiAmount } = await loadUtility('src/utils/upi.ts');
