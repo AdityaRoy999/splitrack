@@ -179,12 +179,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.40",
-      "versionDate": "2026-11-19T22:10:47Z",
-      "versionDescription": "Match deleted-transactions close button to rounded controls",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-40/Splittrack-unsigned.ipa",
-      "size": 27163653,
+      "version": "1.0.41",
+      "versionDate": "2026-11-20T08:49:51Z",
+      "versionDescription": "Fit modal sheets to content and animate transaction swipe cards",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-41/Splittrack-unsigned.ipa",
+      "size": 27168334,
       "versions": [
+        {
+          "version": "1.0.41",
+          "buildVersion": "41",
+          "date": "2026-11-20T08:49:51Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-41/Splittrack-unsigned.ipa",
+          "size": 27168334,
+          "localizedDescription": "Fit modal sheets to content and animate transaction swipe cards"
+        },
         {
           "version": "1.0.40",
           "buildVersion": "40",
