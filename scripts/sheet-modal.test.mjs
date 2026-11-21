@@ -11,8 +11,12 @@ const source = await readFile(new URL('../src/components/common/SheetModal.tsx',
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React } }).outputText;
 const sheetSource = await readFile(new URL('../src/components/common/GlassModalSheet.tsx', import.meta.url), 'utf8');
 const compiledSheet = ts.transpileModule(sheetSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React } }).outputText;
+const pageSource = await readFile(new URL('../src/components/common/ModalPage.tsx', import.meta.url), 'utf8');
+const compiledPage = ts.transpileModule(pageSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React } }).outputText;
 const actionsSource = await readFile(new URL('../src/components/transactions/TransactionActions.tsx', import.meta.url), 'utf8');
 const compiledActions = ts.transpileModule(actionsSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React } }).outputText;
+const statusSource = await readFile(new URL('../src/components/common/CloudStatus.tsx', import.meta.url), 'utf8');
+const compiledStatus = ts.transpileModule(statusSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React } }).outputText;
 
 // Exercise the real component's commits and native callbacks without loading
 // React Native in Node. Descendant views do not need to render for these tests.
@@ -70,7 +74,7 @@ function sheetHarness(platform, code = compiled, componentName = 'SheetModal', e
     throw new Error(`Unexpected import ${name}`);
   };
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require: mockRequire });
+  vm.runInNewContext(code, { module, exports: module.exports, require: mockRequire, React });
   const Component = module.exports[componentName];
   function flush() {
     for (let count = 0; count < 20; count++) {
@@ -124,6 +128,7 @@ function transactionHarness() {
     '../../hooks/useAsyncAction': { useAsyncAction: () => ({ pending: false, error: '', setError() {} }), FormError: 'FormError' },
     '@solar-icons/react-native/bold/close-circle': { CloseCircleIcon: 'CloseCircleIcon' },
     '@solar-icons/react-native/bold/trash-bin-trash': { TrashBinTrashIcon: 'TrashBinTrashIcon' },
+    '@solar-icons/react-native/bold/bill-list': { BillListIcon: 'BillListIcon' },
     '../common/SheetModal': { SheetModal: 'SheetModal' },
     '../common/ModalBackdrop': { ModalBackdrop: 'ModalBackdrop' },
     '../common/GlassModalSheet': { GlassModalSheet: 'GlassModalSheet' },
@@ -131,6 +136,8 @@ function transactionHarness() {
     '../split/AddExpenseModal': { AddExpenseModal: 'AddExpenseModal' },
     '../common/BottomBubble': { BottomBubble: 'BottomBubble' },
     '../common/ScrollEdgeFade': { ScrollEdgeFade: 'ScrollEdgeFade' },
+    '../common/SheetHeader': { SheetHeader: 'SheetHeader' },
+    '../common/UserAvatar': { UserAvatar: 'UserAvatar' },
   });
   actions.update({ children: null });
   return { actions, tx,
@@ -139,6 +146,31 @@ function transactionHarness() {
     get editor() { return React.Children.toArray(actions.output.props.children).find(child => child.type === 'AddExpenseModal'); },
   };
 }
+
+test('sync failures never open an overhead banner or review sheet until Settings requests it', () => {
+  const state = { pendingFailure: { requestId: 'failed-request', title: 'A saved entry', error: 'Review needed' }, queueReviewRequest: 0 };
+  const sheet = sheetHarness('android', compiledStatus, 'CloudStatus', {
+    '../../store/SplitTrackStore': { useSplitTrack: () => state },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark' }) },
+    '../../hooks/useAsyncAction': { useAsyncAction: () => ({ pending: false, error: '', setError() {} }), FormError: 'FormError' },
+    '../glass/GlassPill': { GlassPill: 'GlassPill' },
+    './SheetModal': { SheetModal: 'SheetModal' },
+    './ModalBackdrop': { ModalBackdrop: 'ModalBackdrop' },
+    './GlassModalSheet': { GlassModalSheet: 'GlassModalSheet' },
+    './ScrollEdgeFade': { ScrollEdgeFade: 'ScrollEdgeFade' },
+    './SheetHeader': { SheetHeader: 'SheetHeader' },
+  });
+  sheet.update({});
+  assert.equal(sheet.output.type, 'SheetModal', 'no inline banner pushes the main screen down');
+  assert.equal(sheet.output.props.visible, false);
+  state.queueReviewRequest++;
+  sheet.flush();
+  assert.equal(sheet.output.props.visible, true);
+  sheet.output.props.onRequestClose(); sheet.flush();
+  assert.equal(sheet.output.props.visible, false);
+  sheet.flush();
+  assert.equal(sheet.output.props.visible, false, 'a retained failure cannot reopen itself');
+});
 
 test('transaction detail-to-edit handoff keeps scene effects paused through both retained exits', () => {
   const h = transactionHarness();
@@ -238,4 +270,77 @@ for (const platform of ['android', 'ios', 'web']) {
     sheet.output.props.onLayout({ nativeEvent: { layout: { height: 736 } } }); sheet.flush();
     assert.equal(motionReady, true, 'missing zero-height measurements cannot lock the backdrop over the app');
   });
+
+  test(`${platform} a hidden error section does not keep a short sheet at full height`, () => {
+    const sheet = sheetHarness(platform, compiledSheet, 'GlassModalSheet', {
+      'react-native-reanimated': { default: { View: 'AnimatedView' } },
+      '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'light' }) },
+      '../glass/GlassSurface': { GlassSurface: 'GlassSurface' },
+      './useSheetMotion': { useSheetMotion: () => ({ animatedStyle: {}, gesture: {}, close() {} }) },
+      './SheetSizingContext': { SheetSizingContext: React.createContext(null) },
+      './ScrollEdgeFade': { ScrollEdgeFade: 'ScrollEdgeFade' },
+    });
+    sheet.update({ children: [React.createElement('View', { key: 'header' }), React.createElement('ScrollEdgeFade', { key: 'scroll' }), React.createElement(() => null, { key: 'empty-error' })] });
+    const keyboard = React.Children.toArray(sheet.output.props.children)[0];
+    const [headerGesture, scrollSections] = keyboard.props.children.props.children;
+    const header = React.Children.toArray(headerGesture.props.children.props.children)[0];
+    const scroll = scrollSections[0];
+    header.props.report(header.props.id, 68);
+    scroll.props.report(scroll.props.id, 180);
+    sheet.flush();
+    assert.equal(sheet.output.props.style[1].height, 282, 'only visible content, header and safe-area padding contribute to height');
+  });
 }
+
+test('native app and modal surfaces each install their own Gesture Handler root', async () => {
+  const appSource = await readFile(new URL('../App.tsx', import.meta.url), 'utf8');
+  const app = ts.createSourceFile('App.tsx', appSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const appFunction = app.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'App');
+  const returned = appFunction.body.statements.find(node => ts.isReturnStatement(node));
+  const jsx = returned.expression.expression ?? returned.expression;
+  assert.equal(jsx.openingElement.tagName.getText(app), 'GestureHandlerRootView', 'the app root must own native swipe handlers, not only modal hosts');
+  for (const platform of ['android', 'ios']) {
+    const sheet = sheetHarness(platform);
+    sheet.update({ visible: true });
+    assert.equal(sheet.output.props.children.type, 'GestureRoot', 'native Modal presents into a separate native tree');
+  }
+});
+
+test('sheet title and handle share the pan detector while scroll and buttons stay outside it', () => {
+  const gesture = { name: 'sheet-pan' };
+  const sheet = sheetHarness('android', compiledSheet, 'GlassModalSheet', {
+    'react-native-reanimated': { default: { View: 'AnimatedView' } },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark' }) },
+    '../glass/GlassSurface': { GlassSurface: 'GlassSurface' },
+    './useSheetMotion': { useSheetMotion: () => ({ animatedStyle: {}, gesture }) },
+    './SheetSizingContext': { SheetSizingContext: React.createContext(null) },
+    './ScrollEdgeFade': { ScrollEdgeFade: 'ScrollEdgeFade' },
+  });
+  sheet.update({ children: [React.createElement('View', { key: 'handle' }), React.createElement('View', { key: 'title' }), React.createElement('ScrollEdgeFade', { key: 'scroll' }), React.createElement('View', { key: 'save' })] });
+  const [header, remaining] = sheet.output.props.children.props.children.props.children;
+  assert.equal(header.type, 'GestureDetector');
+  assert.equal(header.props.gesture, gesture);
+  assert.equal(header.props.children.props.collapsable, false, 'Android must retain the gesture target as a native View');
+  const headerSections = React.Children.toArray(header.props.children.props.children);
+  assert.equal(headerSections.length, 2);
+  assert.equal(headerSections[0].props.children.key, '.$handle');
+  assert.equal(headerSections[1].props.children.key, '.$title');
+  assert.equal(remaining[0].props.scrollable, true);
+  assert.equal(remaining[1].props.children.key, '.$save');
+});
+
+test('full-page member menu has a usable handle/title drag target without covering edge controls', () => {
+  const gesture = { name: 'page-pan' };
+  const page = sheetHarness('android', compiledPage, 'ModalPage', {
+    'react-native-reanimated': { default: { View: 'AnimatedView' } },
+    './useSheetMotion': { useSheetMotion: () => ({ animatedStyle: {}, gesture, close() {} }) },
+  });
+  page.update({ children: React.createElement('View', { key: 'content' }) });
+  const detector = page.output.props.children[1];
+  const target = detector.props.children;
+  assert.equal(detector.props.gesture, gesture);
+  assert.equal(target.props.collapsable, false);
+  const { left, right, height } = target.props.style[0];
+  assert.ok(height >= 64, 'drags can start on the page title, not only the tiny handle');
+  assert.ok(left >= 64 && right >= 64, 'header edge buttons keep their own touch regions');
+});

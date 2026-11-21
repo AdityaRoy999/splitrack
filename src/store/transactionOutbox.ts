@@ -5,6 +5,7 @@ export type DuplicateTransaction = Pick<Transaction, 'id' | 'title' | 'amount' |
 export interface OutboxEntry {
   requestId: string; localId: string; bodyJson: string; generation: number;
   status: 'pending' | 'duplicate' | 'failed'; existingTransaction?: DuplicateTransaction; error?: string;
+  errorCode?: string;
 }
 export interface OfflineSnapshot {
   userId: string; generation?: number; accounts: UpiAccount[]; friends: Friend[]; trips: Trip[]; transactions: Transaction[];
@@ -37,13 +38,14 @@ export class TransactionOutbox {
   entries: OutboxEntry[] = [];
   readonly ready: Promise<void>;
   private writes: Promise<unknown> = Promise.resolve();
+  private lastEncoded: string | null = null;
   constructor(readonly uid: string, private storage: Storage, private changed: () => void = () => {}) {
     this.ready = this.restore();
   }
   private async restore(waitForWrites = true) {
     if (waitForWrites) await durableWrites.get(this.uid)?.catch(() => {});
     const raw = await this.storage.getItem(key(this.uid));
-    if (!raw) return;
+    if (!raw || raw === this.lastEncoded) return;
     const envelope = JSON.parse(raw);
     if (envelope.version !== 1 || envelope.uid !== this.uid || !Array.isArray(envelope.entries)) throw new Error('Saved offline transactions could not be read. Your data has been retained.');
     const ids = new Set();
@@ -53,7 +55,7 @@ export class TransactionOutbox {
         || !Number.isInteger(entry.generation) || entry.generation < 0) throw new Error('Saved offline transactions could not be read. Your data has been retained.');
       const body = JSON.parse(entry.bodyJson);
       const date = new Date(`${body.date}T00:00:00Z`);
-      if (!body.duplicateCheck || body.ledgerGeneration !== entry.generation || !Number.isFinite(body.amount)
+      if (!(body.durableRetry === true || body.duplicateCheck === true) || body.ledgerGeneration !== entry.generation || !Number.isFinite(body.amount)
         || !['expense', 'income', 'transfer', 'settlement'].includes(body.type) || typeof body.title !== 'string'
         || !/^\d{4}-\d{2}-\d{2}$/.test(body.date) || !Number.isFinite(date.getTime())
         || date.toISOString().slice(0, 10) !== body.date || !Array.isArray(body.splits)
@@ -76,6 +78,7 @@ export class TransactionOutbox {
       ids.add(entry.requestId);
     }
     this.entries = envelope.entries;
+    this.lastEncoded = raw;
     this.changed();
   }
   update(change: (entries: OutboxEntry[]) => OutboxEntry[]): Promise<void> {
@@ -86,11 +89,13 @@ export class TransactionOutbox {
       // Merge against that latest envelope, never a stale in-memory copy.
       await this.restore(false);
       const next = change(this.entries);
+      if (next === this.entries) return;
       const encoded = JSON.stringify({ version: 1, uid: this.uid, entries: next });
       // Keep even multibyte titles below Android's per-value storage window.
       if (encoded.length > 500_000) throw new Error('Please sync your saved offline transactions before adding more.');
       await this.storage.setItem(key(this.uid), encoded);
       this.entries = next;
+      this.lastEncoded = encoded;
       this.changed();
     });
     this.writes = work;
@@ -99,7 +104,7 @@ export class TransactionOutbox {
   }
   async enqueue(draft: TransactionDraft, requestId: string, generation: number) {
     if (!requestPattern.test(requestId)) throw new Error('This transaction has an invalid save ID. Please reopen the form.');
-    const bodyJson = JSON.stringify({ ...draft, duplicateCheck: true, ledgerGeneration: generation });
+    const bodyJson = JSON.stringify({ ...draft, durableRetry: true, ledgerGeneration: generation });
     await this.update(entries => {
       const previous = entries.find(entry => entry.requestId === requestId);
       if (previous) {
@@ -108,6 +113,27 @@ export class TransactionOutbox {
       }
       return [...entries, { requestId, localId: `offline-${requestId}`, bodyJson, generation, status: 'pending' }];
     });
+  }
+  async resumeRejectedDuplicates(createId: () => string) {
+    await this.ready;
+    if (!this.entries.some(entry => entry.status === 'duplicate')) return;
+    await this.update(entries => entries.map(entry => {
+      if (entry.status !== 'duplicate') return entry;
+      // A definitive old duplicate rejection never committed. Give that draft
+      // a fresh request key; never alter the bytes of an uncertain pending save.
+      const body = JSON.parse(entry.bodyJson);
+      delete body.duplicateCheck; delete body.confirmDuplicate;
+      const requestId = createId();
+      if (!requestPattern.test(requestId)) throw new Error('This transaction has an invalid save ID.');
+      return { ...entry, requestId, localId: `offline-${requestId}`, bodyJson: JSON.stringify({ ...body, durableRetry: true }), status: 'pending', existingTransaction: undefined, error: undefined, errorCode: undefined };
+    }));
+  }
+  async retireBeforeGeneration(generation: number) {
+    await this.ready;
+    if (!Number.isInteger(generation) || generation < 0 || !this.entries.some(entry => entry.generation < generation)) return;
+    // A newer authoritative ledger proves the user already erased these drafts.
+    // Keep current/future generations intact and never repopulate erased data.
+    await this.update(entries => entries.filter(entry => entry.generation >= generation));
   }
 }
 

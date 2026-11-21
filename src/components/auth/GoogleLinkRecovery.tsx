@@ -3,7 +3,6 @@ import { Text, TextInput, View } from 'react-native';
 import { useAuth } from '../../auth/AuthContext';
 import { authenticationError } from '../../auth/authErrors';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
-import { useSplitTrack } from '../../store/SplitTrackStore';
 import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
 import { SheetModal } from '../common/SheetModal';
 import { ModalBackdrop } from '../common/ModalBackdrop';
@@ -15,7 +14,6 @@ import { GlassPill } from '../glass/GlassPill';
 export function GoogleLinkRecovery({ blocked = false }: { blocked?: boolean }) {
   const { googleLinkRecoveryRequired, googleLinkError, pendingGoogleLink, linkGoogle, cancelGoogleLink } = useAuth();
   const { themeMode } = useLiquidGlass();
-  const { pendingDuplicate, pendingFailure } = useSplitTrack();
   const { run, pending, error, setError } = useAsyncAction();
   const [password, setPassword] = useState('');
   const [passwordRequired, setPasswordRequired] = useState(false);
@@ -33,7 +31,7 @@ export function GoogleLinkRecovery({ blocked = false }: { blocked?: boolean }) {
       catch (failure) { throw new Error(authenticationError(failure)); }
     });
   };
-  return <SheetModal visible={googleLinkRecoveryRequired && !blocked && !pendingDuplicate && !pendingFailure} onRequestClose={cancel}>
+  return <SheetModal visible={googleLinkRecoveryRequired && !blocked} onRequestClose={cancel}>
     <View style={{ flex: 1, justifyContent: 'flex-end' }}>
       <ModalBackdrop onClose={cancel} />
       <GlassModalSheet>

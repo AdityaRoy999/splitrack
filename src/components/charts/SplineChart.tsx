@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop, Circle, Line } from 'react-native-svg';
+import Reanimated, { Easing, FadeIn, ReduceMotion, useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { triggerSelection } from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
@@ -61,6 +62,11 @@ const MONTH_SHORT = [
   'Nov',
   'Dec',
 ];
+
+const AnimatedLine = Reanimated.createAnimatedComponent(Line);
+const AnimatedCircle = Reanimated.createAnimatedComponent(Circle);
+const CURSOR_TIMING = { duration: 160, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System };
+const READOUT_ENTER = FadeIn.duration(140).reduceMotion(ReduceMotion.System);
 
 function computeSmoothCurve(points: PointCoord[]): {
   path: string;
@@ -276,6 +282,18 @@ export const SplineChart: React.FC = () => {
 
   const activeExpenseCoord =
     expenseCoords[safeIndex] || { x: width / 2, y: height / 2 };
+  const cursorX = useSharedValue(activeExpenseCoord.x);
+  const cursorY = useSharedValue(activeExpenseCoord.y);
+  useLayoutEffect(() => {
+    cursorX.set(withTiming(activeExpenseCoord.x, CURSOR_TIMING));
+    cursorY.set(withTiming(activeExpenseCoord.y, CURSOR_TIMING));
+  }, [activeExpenseCoord.x, activeExpenseCoord.y, cursorX, cursorY]);
+  const cursorLineProps = useAnimatedProps(() => ({ x1: cursorX.get(), x2: cursorX.get() }));
+  const cursorDotProps = useAnimatedProps(() => ({ cx: cursorX.get(), cy: cursorY.get() }));
+  const tooltipMotion = useAnimatedStyle(() => ({ transform: [
+    { translateX: Math.max(10, Math.min(width - 108, cursorX.get() - 48)) },
+    { translateY: Math.max(0, cursorY.get() - 48) },
+  ] }));
 
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
@@ -295,11 +313,10 @@ export const SplineChart: React.FC = () => {
 
   return (
     <GlassCard borderRadius={24} intensity={20} style={styles.card}>
-      <View {...gestureHandlers}>
+      <View>
       <FormError message={analytics.error} />
-      {analytics.loading ? <Text style={{ color: '#A1A1AA', fontSize: 12, textAlign: 'center' }}>Loading cash flow…</Text> : null}
         {/* Header with Stats on left + Calendar Button & Date/Month/Year Selector on right */}
-        <View style={styles.header}>
+        <View style={styles.header} {...gestureHandlers}>
           <View style={styles.headerLeft}>
             <Text
               numberOfLines={1}
@@ -369,7 +386,7 @@ export const SplineChart: React.FC = () => {
         </View>
 
         {/* Quiet Context & Gesture Hint Line */}
-        <View style={styles.contextLineRow}>
+        <View style={styles.contextLineRow} {...gestureHandlers}>
           <View
             style={[
               styles.gestureHintPill,
@@ -389,7 +406,7 @@ export const SplineChart: React.FC = () => {
                 { color: isMonthHoldReady ? '#10B981' : mutedText },
               ]}
             >
-              {activeScopeSubtitle}
+              {analytics.loading ? 'Loading cash flow…' : activeScopeSubtitle}
             </Text>
           </View>
 
@@ -446,24 +463,27 @@ export const SplineChart: React.FC = () => {
           <View style={styles.chartContainer}>
             {/* Floating Tooltip Pin */}
             {activePoint && (
-              <View
+              <Reanimated.View
                 pointerEvents="none"
                 style={[
                   styles.tooltipPin,
                   {
                     backgroundColor: isDark ? '#FFFFFF' : '#000000',
-                    left: Math.max(10, Math.min(width - 108, activeExpenseCoord.x - 48)),
-                    top: Math.max(0, activeExpenseCoord.y - 48),
+                    left: 0,
+                    top: 0,
                   },
+                  tooltipMotion,
                 ]}
               >
+                <Reanimated.View key={activePoint.key} entering={READOUT_ENTER} style={styles.tooltipContent}>
                 <Text style={[styles.tooltipAmount, { color: isDark ? '#000000' : '#FFFFFF' }]}>
                   {formatAmount(activePoint.expense)}
                 </Text>
                 <Text style={[styles.tooltipDate, { color: isDark ? '#71717A' : '#A1A1AA' }]}>
                   {activePoint.fullLabel}
                 </Text>
-              </View>
+                </Reanimated.View>
+              </Reanimated.View>
             )}
 
             <View style={{ width, height, position: 'relative' }}>
@@ -483,10 +503,9 @@ export const SplineChart: React.FC = () => {
                   </LinearGradient>
                 </Defs>
 
-                <Line
-                    x1={activeExpenseCoord.x}
+                <AnimatedLine
+                    animatedProps={cursorLineProps}
                     y1={paddingTop - 6}
-                    x2={activeExpenseCoord.x}
                     y2={height - paddingBottom + 6}
                     stroke={isDark ? 'rgba(255,255,255,0.16)' : 'rgba(15,23,42,0.14)'}
                     strokeWidth={1.25}
@@ -517,21 +536,13 @@ export const SplineChart: React.FC = () => {
                   />
                 ) : null}
 
-                {expenseCoords.map((pt, idx) => {
-                  const isActive = idx === safeIndex;
-                  if (!isActive) return null;
-                  return (
-                    <Circle
-                      key={`dot-${idx}`}
-                      cx={pt.x}
-                      cy={pt.y}
+                {activePoint ? <AnimatedCircle
+                      animatedProps={cursorDotProps}
                       r={5.5}
                       fill="#FFFFFF"
                       stroke="#F59E0B"
                       strokeWidth={3}
-                    />
-                  );
-                })}
+                    /> : null}
               </Svg>
 
               {/* Transparent Glide / Scrub Overlay */}
@@ -542,7 +553,7 @@ export const SplineChart: React.FC = () => {
                 ]}
                 onStartShouldSetResponder={() => true}
                 onMoveShouldSetResponder={() => true}
-                onResponderTerminationRequest={() => false}
+                onResponderTerminationRequest={() => true}
                 onResponderGrant={(e: GestureResponderEvent) => {
                   e.stopPropagation?.();
                   scrubAtX(e.nativeEvent.locationX);
@@ -748,6 +759,7 @@ const styles = StyleSheet.create({
     elevation: 0,
     borderWidth: 0,
   },
+  tooltipContent: { alignItems: 'center' },
   tooltipAmount: {
     fontSize: 12,
     fontWeight: '500',

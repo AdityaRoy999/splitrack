@@ -12,13 +12,14 @@ const { normalizeAuroraSettings } = await import(settingsUrl);
 const { createNativeAuroraRenderer } = await import(rendererUrl);
 
 function context() {
-  const calls = { presentations: 0, draws: 0 };
+  const calls = { presentations: 0, draws: 0, textureSizes: [] };
   const gl = new Proxy({
     drawingBufferWidth: 400, drawingBufferHeight: 200, FRAMEBUFFER_COMPLETE: 1,
     getShaderParameter: () => true, getProgramParameter: () => true,
     getUniformLocation: (_program, name) => name,
     checkFramebufferStatus: () => 1,
     drawArrays: () => { calls.draws++; }, endFrameEXP: () => { calls.presentations++; },
+    texImage2D: (_target, _level, _format, width, height) => { calls.textureSizes.push([width, height]); },
   }, {
     get(target, key) {
       if (key in target) return target[key];
@@ -53,4 +54,15 @@ test('reveal, palette, size and static-time changes still present the updated fr
   assert.equal(calls.presentations, 5);
   renderer.dispose(); renderer.draw(1, 1);
   assert.equal(calls.presentations, 5);
+});
+
+test('one-pixel-per-point Android target reduces noise shading without reducing display size', () => {
+  const { gl, calls } = context();
+  gl.drawingBufferWidth = 1200; gl.drawingBufferHeight = 600;
+  const renderer = createNativeAuroraRenderer(gl, 3, () => [1, 0, 0]);
+  renderer.update(normalizeAuroraSettings({ dpr: 1 })); renderer.draw(0, 1);
+  assert.deepEqual(calls.textureSizes, [[400, 200]]);
+  assert.equal(gl.drawingBufferWidth, 1200);
+  assert.equal(calls.presentations, 1);
+  renderer.dispose();
 });

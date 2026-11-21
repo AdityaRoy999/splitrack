@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Animated, Image, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CopyIcon } from '@solar-icons/react-native/bold/copy';
 import { QrCodeIcon } from '@solar-icons/react-native/bold/qr-code';
@@ -19,6 +19,13 @@ import { Aurora } from '../effects/Aurora';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { BrandEmblemIcon } from '../common/BrandEmblemIcon';
 import { GlassPill } from '../glass/GlassPill';
+import { SheetModal } from '../common/SheetModal';
+import { GlassModalSheet } from '../common/GlassModalSheet';
+import { ModalBackdrop } from '../common/ModalBackdrop';
+import { SheetHeader } from '../common/SheetHeader';
+import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
+import { ItemActionReveal } from '../common/ItemActionReveal';
+
 import { GlassSurface } from '../glass/GlassSurface';
 import { AddUpiProfileModal } from './AddUpiProfileModal';
 import { UpiQrModal } from './UpiQrModal';
@@ -125,6 +132,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { transactionActionStyle } = useLiquidGlass();
   const targetTop = isExpanded ? rank * (CARD_HEIGHT + EXPAND_GAP) : rank * STACK_PEEK;
   const targetScale = isExpanded ? 1 : Math.max(0.82, 1 - rank * 0.035);
   const targetFooterOpacity = isExpanded || rank === 0 ? 1 : 0;
@@ -170,6 +178,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
         },
       ]}
     >
+      <ItemActionReveal name={acc.title} buttons={false} borderRadius={24} onEdit={() => onEdit(acc)} onDelete={() => onDelete(acc)}>
       <GlassSurface
         borderRadius={24}
         glassStyle="regular"
@@ -257,7 +266,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
               </AnimatedPressable>
             )}
 
-            {isExpanded && (
+            {isExpanded && transactionActionStyle === 'buttons' && (
               <View style={styles.cardEditDeleteRow}>
                 <AnimatedPressable
                   scaleTo={0.9}
@@ -388,7 +397,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
           </View>
         </Animated.View>
         </View>
-      </GlassSurface>
+      </GlassSurface></ItemActionReveal>
     </Animated.View>
   );
 };
@@ -560,54 +569,26 @@ export const UpiProfilesSection: React.FC = () => {
         }}
       />
 
-      {/* Delete Account Confirmation Dialog */}
-      {accountToDelete && (
-        <Modal
-          visible
-          transparent
-          animationType="fade"
-          onRequestClose={() => setAccountToDelete(null)}
-        >
-          <View style={styles.deleteModalOverlay}>
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={() => setAccountToDelete(null)}
-              accessibilityLabel="Dismiss confirmation"
-            />
-            <View style={[styles.deleteDialogCard, { backgroundColor: isDark ? '#141418' : '#FFFFFF' }]}>
-              <Text style={[styles.deleteDialogTitle, { color: textColor }]}>
-                Remove Card &amp; Profile
-              </Text>
-              <Text style={[styles.deleteDialogBody, { color: mutedText }]}>
-                Are you sure you want to remove &quot;{accountToDelete.title}&quot;? Past recorded transactions will not be deleted.
-              </Text>
-              <View style={styles.deleteDialogActions}>
-                <TouchableOpacity
-                  onPress={() => setAccountToDelete(null)}
-                  style={[styles.deleteCancelBtn, { backgroundColor: pillSurface }]}
-                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
-                >
-                  <Text style={[styles.deleteCancelText, { color: textColor }]}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => {
-                    void run(async () => {
-                    await deleteUpiAccount(accountToDelete.id);
-                    triggerNotification(NotificationType.Success);
-                    setAccountToDelete(null);
-                    });
-                  }}
-                  disabled={pending}
-                  style={styles.deleteConfirmBtn}
-                  hitSlop={COMPACT_BUTTON_HIT_SLOP}
-                >
-                  <Text style={styles.deleteConfirmText}>{pending ? 'Removing…' : 'Remove'}</Text>
-                </TouchableOpacity>
+      <SheetModal visible={Boolean(accountToDelete)} onRequestClose={() => !pending && setAccountToDelete(null)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <ModalBackdrop onClose={() => !pending && setAccountToDelete(null)} />
+          <GlassModalSheet>
+            <SheetHeader title="Delete payment profile?" subtitle="Your previous transactions remain in the ledger" onClose={() => !pending && setAccountToDelete(null)} disabled={pending} />
+            <ScrollEdgeFade><ScrollView contentContainerStyle={{ gap: 14, paddingBottom: 4 }}>
+              <View style={{ padding: 18, borderRadius: 22, gap: 10, backgroundColor: isDark ? '#111114' : '#EDEDF1' }}>
+                <Text style={{ color: textColor, fontSize: 17, fontWeight: '600' }}>{accountToDelete?.title}</Text>
+                <Text style={{ color: mutedText, fontSize: 13, lineHeight: 20 }}>Delete this payment profile? Past recorded transactions will remain available.</Text>
               </View>
-            </View>
-          </View>
-        </Modal>
-      )}
+              <FormError message={error} />
+              <GlassPill label={pending ? 'Deleting…' : 'Delete profile'} size="lg" variant="danger" disabled={pending} onPress={() => {
+                if (!accountToDelete) return;
+                void run(async () => { await deleteUpiAccount(accountToDelete.id); setAccountToDelete(null); });
+              }} />
+              <GlassPill label="Cancel" size="lg" variant="dark" disabled={pending} onPress={() => setAccountToDelete(null)} />
+            </ScrollView></ScrollEdgeFade>
+          </GlassModalSheet>
+        </View>
+      </SheetModal>
 
       <UpiQrModal visible={!!qrAccount} onClose={() => setQrAccount(null)} account={qrAccount} />
     </View>

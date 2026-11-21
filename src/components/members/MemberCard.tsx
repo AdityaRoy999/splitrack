@@ -8,6 +8,7 @@ import { Friend } from '../../types';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { SpotlightCard } from '../glass/SpotlightCard';
 import { isPhotoUri, UserAvatar } from '../common/UserAvatar';
+import { ItemActionReveal } from '../common/ItemActionReveal';
 
 interface MemberCardProps {
   friend: Friend;
@@ -25,7 +26,7 @@ export const MemberCard: React.FC<MemberCardProps> = ({
   onPress,
   onEdit,
 }) => {
-  const { formatAmount, themeMode } = useLiquidGlass();
+  const { formatAmount, themeMode, transactionActionStyle } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const textColor = isDark ? '#F4F4F5' : '#09090B';
@@ -59,7 +60,7 @@ export const MemberCard: React.FC<MemberCardProps> = ({
   );
 
   return (
-    <View style={styles.cardWrap}>
+    <ItemActionReveal name={friend.name} onEdit={onEdit} buttons={false} style={styles.cardWrap}>
       <SpotlightCard
         onPress={onPress}
         coverImageUri={isPhotoUri(friend.avatar) ? friend.avatar : undefined}
@@ -83,7 +84,7 @@ export const MemberCard: React.FC<MemberCardProps> = ({
       </SpotlightCard>
 
       {/* Isolated Edit button sibling so tapping Edit never triggers card navigation */}
-      <AnimatedPressable
+      {transactionActionStyle === 'buttons' ? <AnimatedPressable
         scaleTo={0.92}
         onPress={() => {
           triggerImpact(ImpactStyle.Light);
@@ -95,8 +96,8 @@ export const MemberCard: React.FC<MemberCardProps> = ({
       >
         <Pen2Icon size={13} color={textColor} />
         <Text style={[styles.editBtnText, { color: textColor }]}>Edit</Text>
-      </AnimatedPressable>
-    </View>
+      </AnimatedPressable> : null}
+    </ItemActionReveal>
   );
 };
 

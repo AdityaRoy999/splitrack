@@ -12,6 +12,7 @@ import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassSurface } from '../glass/GlassSurface';
 import { NativeGlassContainer } from '../common/AppleNativeControls';
 import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP, COMPACT_ICON_BUTTON_STYLE } from '../../constants/buttonSizes';
+import { useSettingsAvatarTransition } from '../common/SettingsAvatarTransition';
 
 export type HeaderLogoRect = WindowRect;
 
@@ -37,6 +38,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   const logoAnchorRef = useRef<ViewRefNode>(null);
   const { profile } = useAuth();
   const avatarUri = profile?.avatar ?? null;
+  const transition = useSettingsAvatarTransition();
+  const registerSource = transition?.registerSource;
+
+  const reportAvatarLayout = () => {
+    registerSource?.(logoAnchorRef.current);
+    reportLogoLayout();
+  };
 
   const setLogoRef = useCallback(
     (node: ViewRefNode | null) => {
@@ -55,7 +63,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
   const handleSettings = () => {
     triggerImpact(ImpactStyle.Light);
-    onOpenSettings();
+    if (transition) transition.open(logoAnchorRef.current);
+    else onOpenSettings();
   };
 
   const handleToggleTheme = () => {
@@ -70,20 +79,20 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     <View style={styles.container}>
       {/* User Avatar + Greeting */}
       <View style={styles.userSection}>
-        <AnimatedPressable scaleTo={0.94} onPress={handleSettings} style={styles.avatarWrapper}>
+        <AnimatedPressable scaleTo={1} accessibilityLabel="Open profile settings" onPress={handleSettings} style={styles.avatarWrapper}>
           <View
             ref={setLogoRef}
             collapsable={false}
-            onLayout={reportLogoLayout}
-            style={styles.avatarSlot}
+            onLayout={reportAvatarLayout}
+            style={[styles.avatarSlot, transition?.moving && styles.avatarInFlight]}
           >
-            <HeaderAvatar key={avatarUri ?? 'default-avatar'} uri={avatarUri} hidden={hideLogo} dark={isDark} name={userName} />
+            <HeaderAvatar key={avatarUri ?? 'default-avatar'} uri={avatarUri} hidden={hideLogo} dark={isDark} name={profile?.displayName || userName} />
           </View>
         </AnimatedPressable>
         <View style={styles.greetingCol}>
           <Text style={[styles.userName, { color: textColor }]}>{userName}</Text>
           <Text style={[styles.statusText, { color: isDark ? '#71717A' : '#8E8E93' }]}>
-            {isDark ? 'Dark Mode' : 'Light Mode'}
+            {profile?.handle || (profile?.username ? `@${profile.username}` : '')}
           </Text>
         </View>
       </View>
@@ -156,6 +165,7 @@ const styles = StyleSheet.create({
     height: 42,
     borderRadius: 21,
   },
+  avatarInFlight: { opacity: 0 },
   avatar: {
     width: 42,
     height: 42,

@@ -5,7 +5,7 @@ import { ArrowRightUpIcon } from '@solar-icons/react-native/bold/arrow-right-up'
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { Home2Icon } from '@solar-icons/react-native/bold/home-2';
 import { MapPointIcon } from '@solar-icons/react-native/bold/map-point';
-import { MinusCircleIcon } from '@solar-icons/react-native/bold/minus-circle';
+import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { SuitcaseLinesIcon } from '@solar-icons/react-native/bold/suitcase-lines';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
@@ -143,10 +143,10 @@ export const TripCard: React.FC<TripCardProps> = ({ trip, onPress, onRemove }) =
         onPress={remove} disabled={removing} accessibilityLabel={`Remove ${trip.name}`}
         accessibilityState={{ busy: removing, disabled: removing }}
         style={styles.removeAnchor}
-        contentStyle={[styles.removeBadge, { backgroundColor: isDark ? '#3F3F46' : '#E4E4E7' }]}
+        contentStyle={[styles.removeBadge, { backgroundColor: '#E5484D' }]}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        {removing ? <ActivityIndicator size="small" color={textColor} /> : <MinusCircleIcon size={22} color={textColor} />}
+        {removing ? <ActivityIndicator size="small" color="#FFFFFF" /> : <TrashBinTrashIcon size={18} color="#FFFFFF" />}
       </AnimatedPressable> : null}
     </Animated.View>
   );

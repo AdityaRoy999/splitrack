@@ -9,6 +9,7 @@ export interface CurrencyConfig {
 export type ThemeMode = 'dark' | 'light';
 
 export type SelectionStyle = 'chips' | 'dropdown';
+export type TransactionActionStyle = 'swipe' | 'buttons';
 export type NotificationDirection = 'top' | 'bottom';
 
 export type UpiProvider = 'slice' | 'gpay' | 'phonepe' | 'paytm' | 'bank' | 'cred' | string;

@@ -56,12 +56,19 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
     const scrollable = React.isValidElement(child) && child.type === ScrollEdgeFade;
     return { child, scrollable, id: `${React.isValidElement(child) ? child.key : index}:${scrollable ? 'scroll' : 'fixed'}` };
   });
+  // The handle and title form one native gesture surface. The old 32px
+  // invisible overlay missed drags on the title and could cover other controls.
+  // Keep the scroller outside this detector so its vertical gestures stay native.
+  const firstScroll = sections.findIndex(section => section.scrollable);
+  const headerCount = firstScroll < 0 ? Math.min(1, sections.length) : firstScroll;
   const [measurements, setMeasurements] = useState<Record<string, number>>({});
   const report = useCallback((id: string, height: number) => {
     if (!Number.isFinite(height) || height < 0) return;
     setMeasurements(previous => previous[id] !== undefined && Math.abs(previous[id] - height) < 1 ? previous : { ...previous, [id]: height });
   }, []);
-  const measured = sections.every(section => measurements[section.id] !== undefined);
+  // Hidden fixed sections can omit onLayout. Their height is zero until they
+  // report; only scroll content must provide a measurement before fitting.
+  const measured = sections.filter(section => section.scrollable).every(section => measurements[section.id] !== undefined);
   const [laidOut, setLaidOut] = useState(false);
   const onSheetLayout = useCallback((event: LayoutChangeEvent) => {
     if (event.nativeEvent.layout.height > 0) setLaidOut(true);
@@ -71,7 +78,7 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
   const sheetHeight = measured ? Math.min(maxSheetHeight, Math.ceil(contentHeight + (typeof paddingTop === 'number' ? paddingTop : 10) + bottomPadding)) : maxSheetHeight;
   // Empty sections (for example a hidden FormError) may never dispatch a native
   // layout event. They must not leave an otherwise laid-out sheet offscreen.
-  const { animatedStyle, gesture, close } = useSheetMotion(windowHeight, laidOut);
+  const { animatedStyle, gesture } = useSheetMotion(windowHeight, laidOut);
 
   return (
     <Animated.View
@@ -108,19 +115,21 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
             },
           ]}
         >
-          {sections.map(section => <MeasuredSheetSection key={section.id} id={section.id} scrollable={section.scrollable} report={report}>{section.child}</MeasuredSheetSection>)}
+          {headerCount > 0 ? <GestureDetector gesture={gesture} touchAction="none" userSelect="none">
+            <View collapsable={false} style={styles.headerGestureArea}>
+              {sections.slice(0, headerCount).map(section => <MeasuredSheetSection key={section.id} id={section.id} scrollable={false} report={report}>{section.child}</MeasuredSheetSection>)}
+            </View>
+          </GestureDetector> : null}
+          {sections.slice(headerCount).map(section => <MeasuredSheetSection key={section.id} id={section.id} scrollable={section.scrollable} report={report}>{section.child}</MeasuredSheetSection>)}
         </GlassSurface>
       </KeyboardAvoidingView>
-      <GestureDetector gesture={gesture} touchAction="none" userSelect="none">
-        <View collapsable={false} accessibilityLabel="Swipe down to close sheet" onAccessibilityTap={close} style={styles.dragArea} />
-      </GestureDetector>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   fixedSection: { flexShrink: 0, minWidth: 0 },
-  dragArea: { position: 'absolute', top: 0, left: 64, right: 64, height: 32, zIndex: 50 },
+  headerGestureArea: { flexShrink: 0, minWidth: 0 },
   keyboardArea: { flex: 1, minHeight: 0, width: '100%' },
   animWrap: {
     width: '100%',

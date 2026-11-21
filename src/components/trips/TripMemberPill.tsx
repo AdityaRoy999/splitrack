@@ -3,26 +3,31 @@ import { Animated, Easing, LayoutAnimation, Platform, StyleSheet, Text } from 'r
 import type { Friend } from '../../types';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
+import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { UserAvatar } from '../common/UserAvatar';
+import { ItemActionReveal } from '../common/ItemActionReveal';
 
 interface TripMemberPillProps {
   member: Friend;
   removalMode: boolean;
+  canRemove: boolean;
   onRemove: (animate: () => Promise<void>) => Promise<boolean>;
 }
 
-export function TripMemberPill({ member, removalMode, onRemove }: TripMemberPillProps) {
+export function TripMemberPill({ member, removalMode, canRemove, onRemove }: TripMemberPillProps) {
   const { themeMode } = useLiquidGlass();
   const isDark = themeMode === 'dark';
   const textColor = isDark ? '#FFFFFF' : '#09090B';
   const [progress] = useState(() => new Animated.Value(1));
   const removing = useRef(false);
+  const [pending, setPending] = useState(false);
 
   useEffect(() => () => { progress.stopAnimation(); }, [progress]);
 
   const remove = async () => {
     if (removing.current) return;
     removing.current = true;
+    setPending(true);
     const animate = () => new Promise<void>(resolve => {
       Animated.timing(progress, {
       toValue: 0, duration: 180, easing: Easing.inOut(Easing.cubic),
@@ -38,11 +43,13 @@ export function TripMemberPill({ member, removalMode, onRemove }: TripMemberPill
     try { removed = await onRemove(animate); } catch { /* The page shows the failure. */ }
     if (!removed) {
       removing.current = false;
+      setPending(false);
       Animated.spring(progress, { toValue: 1, friction: 10, tension: 150, useNativeDriver: Platform.OS !== 'web', isInteraction: false }).start();
     }
   };
 
   return (
+    <ItemActionReveal name={`${member.name} from trip`} onDelete={canRemove ? () => { void remove(); } : undefined} disabled={pending} buttons={false} compact borderRadius={999}>
     <Animated.View style={[
       styles.pill,
       { backgroundColor: isDark ? '#18181D' : '#EFEFF4', opacity: progress,
@@ -53,15 +60,17 @@ export function TripMemberPill({ member, removalMode, onRemove }: TripMemberPill
       {removalMode ? (
         <AnimatedPressable
           onPress={remove}
+          disabled={pending}
           accessibilityLabel={`Remove ${member.name} from trip`}
           style={styles.badgePosition}
-          contentStyle={[styles.badge, { backgroundColor: isDark ? '#52525B' : '#D4D4D8' }]}
+          contentStyle={[styles.badge, { backgroundColor: '#E5484D' }]}
           hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
         >
-          <Text style={[styles.minus, { color: textColor }]}>−</Text>
+          <TrashBinTrashIcon size={11} color="#FFFFFF" />
         </AnimatedPressable>
       ) : null}
     </Animated.View>
+    </ItemActionReveal>
   );
 }
 
@@ -73,5 +82,4 @@ const styles = StyleSheet.create({
   name: { fontSize: 12, fontWeight: '500' },
   badgePosition: { position: 'absolute', top: -5, right: -5, zIndex: 2 },
   badge: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 0 },
-  minus: { fontSize: 14, lineHeight: 18, fontWeight: '600' },
 });

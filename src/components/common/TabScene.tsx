@@ -10,10 +10,12 @@ interface TabSceneProps {
   render?: () => React.ReactNode;
   children?: React.ReactNode;
   sceneKey?: string;
+  duration?: number;
+  offsetY?: number;
 }
 
 // Keep scroll positions and expensive page trees stable between tab switches.
-export const TabScene = memo(function TabScene({ active, effectsActive = true, render, children, sceneKey }: TabSceneProps) {
+export const TabScene = memo(function TabScene({ active, effectsActive = true, render, children, sceneKey, duration = 150, offsetY = 4 }: TabSceneProps) {
   const content = useMemo(() => render ? render() : children, [render, children]);
   const { width } = useWindowDimensions();
   const { palette } = useLiquidGlass();
@@ -21,10 +23,10 @@ export const TabScene = memo(function TabScene({ active, effectsActive = true, r
 
   useLayoutEffect(() => {
     progress.set(0);
-    if (active) progress.set(withTiming(1, { duration: 150, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System }));
-  }, [active, progress, sceneKey]);
+    if (active) progress.set(withTiming(1, { duration, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System }));
+  }, [active, duration, progress, sceneKey]);
   const motion = useAnimatedStyle(() => ({
-    transform: [{ translateX: active ? 0 : width * 2 }, { translateY: (1 - progress.get()) * 4 }],
+    transform: [{ translateX: active ? 0 : width * 2 }, { translateY: (1 - progress.get()) * offsetY }],
   }));
   // Fade a plain cover instead of a blur ancestor. UIKit backdrop effects
   // keep opacity 1, and cached pages retain their layout while offscreen.

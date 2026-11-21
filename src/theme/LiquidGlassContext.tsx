@@ -1,5 +1,6 @@
-import React, { createContext, useCallback, useContext, useLayoutEffect, useMemo, useState } from 'react';
-import type { CurrencyCode, ThemeMode, SelectionStyle, NotificationDirection } from '../types';
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { CurrencyCode, ThemeMode, SelectionStyle, NotificationDirection, TransactionActionStyle } from '../types';
 import { themePalettes, type ThemePalette } from './colors';
 import { useAuth } from '../auth/AuthContext';
 import { useSplitTrack, type CloudSettings } from '../store/SplitTrackStore';
@@ -14,21 +15,43 @@ interface LiquidGlassContextType {
   hideAmounts: boolean; setHideAmounts(hide: boolean): void; toggleHideAmounts(): void;
   selectionStyle: SelectionStyle; setSelectionStyle(style: SelectionStyle): void;
   notificationDirection: NotificationDirection; setNotificationDirection(direction: NotificationDirection): void;
+  transactionActionStyle: TransactionActionStyle; setTransactionActionStyle(style: TransactionActionStyle): void;
   formatAmount(amount: number, showSign?: boolean): string; palette: ThemePalette;
 }
 const Context = createContext<LiquidGlassContextType | undefined>(undefined);
+const actionStyles = new Map<string, TransactionActionStyle>();
 
 export function LiquidGlassProvider({ children, onPreferencesReady }: { children: React.ReactNode; onPreferencesReady?: (ready: boolean) => void }) {
-  const { profile } = useAuth(), { settings, saveSettings, preferencesReady, syncError, refresh } = useSplitTrack();
+  const { user, profile } = useAuth(), { settings, saveSettings, preferencesReady, syncError, refresh, actionNotice, dismissActionNotice } = useSplitTrack();
   const [overrides, setOverrides] = useState<Partial<CloudSettings>>({});
   const themeMode = overrides.themeMode ?? settings.themeMode;
   const hideAmounts = overrides.hideAmounts ?? settings.hideAmounts;
   const isLiquidGlassEnabled = overrides.isLiquidGlassEnabled ?? settings.isLiquidGlassEnabled;
   const selectionStyle = overrides.selectionStyle ?? settings.selectionStyle ?? 'chips';
   const notificationDirection = overrides.notificationDirection ?? settings.notificationDirection ?? 'bottom';
+  const actionStyleKey = `@splittrack_transaction_actions_v1_${user?.uid ?? 'signed-out'}`;
+  const [actionStyleState, setActionStyleState] = useState(() => ({ key: actionStyleKey, style: actionStyles.get(actionStyleKey) ?? 'swipe', ready: actionStyles.has(actionStyleKey) }));
+  const transactionActionStyle = actionStyleState.key === actionStyleKey ? actionStyleState.style : actionStyles.get(actionStyleKey) ?? 'swipe';
+  const actionStyleReady = actionStyleState.key === actionStyleKey ? actionStyleState.ready : actionStyles.has(actionStyleKey);
+  const actionStyleChanged = useRef(false);
+  useEffect(() => {
+    let active = true;
+    actionStyleChanged.current = false;
+    void AsyncStorage.getItem(actionStyleKey).then(saved => {
+      if (active && !actionStyleChanged.current) {
+        const style = saved === 'buttons' ? 'buttons' : 'swipe';
+        actionStyles.set(actionStyleKey, style);
+        setActionStyleState({ key: actionStyleKey, style, ready: true });
+      }
+    }).catch(() => {
+      if (active && !actionStyleChanged.current) setActionStyleState({ key: actionStyleKey, style: actionStyles.get(actionStyleKey) ?? 'swipe', ready: true });
+    });
+    return () => { active = false; };
+  }, [actionStyleKey]);
   // Let a failed first sync reveal the retry screen instead of trapping the
   // startup animation; application content still waits for saved preferences.
-  useLayoutEffect(() => { onPreferencesReady?.(preferencesReady || Boolean(syncError)); }, [onPreferencesReady, preferencesReady, syncError]);
+  const allPreferencesReady = preferencesReady && actionStyleReady;
+  useLayoutEffect(() => { onPreferencesReady?.(allPreferencesReady || Boolean(syncError)); }, [onPreferencesReady, allPreferencesReady, syncError]);
   const [notice, setNotice] = useState<BubbleNotice | null>(null);
   const dismiss = useCallback(() => setNotice(null), []);
   const persist = useCallback((next: Partial<CloudSettings>) => {
@@ -42,6 +65,13 @@ export function LiquidGlassProvider({ children, onPreferencesReady }: { children
   const setIsLiquidGlassEnabled = useCallback((enabled: boolean) => persist({ isLiquidGlassEnabled: enabled }), [persist]);
   const setSelectionStyle = useCallback((style: SelectionStyle) => persist({ selectionStyle: style }), [persist]);
   const setNotificationDirection = useCallback((direction: NotificationDirection) => persist({ notificationDirection: direction }), [persist]);
+  const setTransactionActionStyle = useCallback((style: TransactionActionStyle) => {
+    actionStyleChanged.current = true;
+    actionStyles.set(actionStyleKey, style);
+    setActionStyleState({ key: actionStyleKey, style, ready: true });
+    void AsyncStorage.setItem(actionStyleKey, style).catch(() => {});
+    setNotice(previous => ({ id: (previous?.id ?? 0) + 1, message: style === 'swipe' ? 'Swipe edit and delete actions enabled' : 'Edit and delete buttons enabled' }));
+  }, [actionStyleKey]);
   const setCurrency = useCallback((currency: CurrencyCode) => { if (currency !== 'INR') setNotice(previous => ({ id: (previous?.id ?? 0) + 1, message: 'Balances and UPI payments are recorded in INR.' })); }, []);
   const toggleTheme = useCallback(() => setThemeMode(themeMode === 'dark' ? 'light' : 'dark'), [themeMode, setThemeMode]);
   const toggleHideAmounts = useCallback(() => setHideAmounts(!hideAmounts), [hideAmounts, setHideAmounts]);
@@ -50,14 +80,15 @@ export function LiquidGlassProvider({ children, onPreferencesReady }: { children
     const sign = showSign ? value > 0 ? '+' : value < 0 ? '-' : '' : '';
     return `${sign}₹${Math.abs(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }, [hideAmounts]);
-  const value = useMemo(() => ({ themeMode, setThemeMode, toggleTheme, hideAmounts, setHideAmounts, toggleHideAmounts, isLiquidGlassEnabled, setIsLiquidGlassEnabled, selectionStyle, setSelectionStyle, notificationDirection, setNotificationDirection, currency: 'INR' as const, setCurrency, formatAmount, palette: themePalettes[themeMode] }), [themeMode, setThemeMode, toggleTheme, hideAmounts, setHideAmounts, toggleHideAmounts, isLiquidGlassEnabled, setIsLiquidGlassEnabled, selectionStyle, setSelectionStyle, notificationDirection, setNotificationDirection, setCurrency, formatAmount]);
+  const value = useMemo(() => ({ themeMode, setThemeMode, toggleTheme, hideAmounts, setHideAmounts, toggleHideAmounts, isLiquidGlassEnabled, setIsLiquidGlassEnabled, selectionStyle, setSelectionStyle, notificationDirection, setNotificationDirection, transactionActionStyle, setTransactionActionStyle, currency: 'INR' as const, setCurrency, formatAmount, palette: themePalettes[themeMode] }), [themeMode, setThemeMode, toggleTheme, hideAmounts, setHideAmounts, toggleHideAmounts, isLiquidGlassEnabled, setIsLiquidGlassEnabled, selectionStyle, setSelectionStyle, notificationDirection, setNotificationDirection, transactionActionStyle, setTransactionActionStyle, setCurrency, formatAmount]);
   return <Context.Provider value={value}>
     <BubbleNoticeProvider themeMode={themeMode} notificationDirection={notificationDirection}>
-    {profile?.username && !preferencesReady ? <View style={{ flex: 1, backgroundColor: themePalettes[themeMode].background, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
+    {profile?.username && !allPreferencesReady ? <View style={{ flex: 1, backgroundColor: themePalettes[themeMode].background, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
       <ActivityIndicator color={themeMode === 'dark' ? '#FFFFFF' : '#18181B'} />
       {syncError ? <Text accessibilityRole="button" onPress={() => { void refresh().catch(() => {}); }} style={{ color: themeMode === 'dark' ? '#F4F4F5' : '#18181B', textAlign: 'center' }}>{syncError} Tap to retry.</Text> : null}
     </View> : children}
     <BottomBubble notice={notice} onDismiss={dismiss} />
+    <BottomBubble notice={actionNotice} onDismiss={dismissActionNotice} />
     </BubbleNoticeProvider>
   </Context.Provider>;
 }

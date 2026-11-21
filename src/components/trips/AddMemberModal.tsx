@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View, type ViewStyle,
@@ -24,7 +24,6 @@ import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { ModalBackdrop } from '../common/ModalBackdrop';
 import { ModalPage } from '../common/ModalPage';
 import { SheetModal } from '../common/SheetModal';
-import { BottomBubble, type BubbleNotice } from '../common/BottomBubble';
 
 interface AddMemberModalProps {
   visible: boolean;
@@ -65,8 +64,6 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
   const originalPhoto = useRef(editingFriend?.avatar ?? '');
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState<BubbleNotice | null>(null);
-  const dismissNotice = useCallback(() => setNotice(null), []);
   const adding = useRef(new Set<string>());
   const [searchResult, setSearchResult] = useState<{ query: string; items: (MemberProfile & { id: string })[] }>({ query: '', items: [] });
   const remoteProfiles = useMemo(() => searchResult.query === query ? searchResult.items : [], [searchResult, query]);
@@ -105,7 +102,6 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
       ? await addMemberToTrip(tripId, profile.friendId ?? profile)
       : await addFriend(profile);
     if (member) {
-      setNotice((previous) => ({ id: (previous?.id ?? 0) + 1, message: `${member.name} added${tripId ? ' to the trip' : ''}` }));
       setError('');
       if (!tripId) triggerNotification(NotificationType.Success);
     } else {
@@ -236,7 +232,6 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
           {isEditing ? <GlassPill label={pendingMember ? 'Saving…' : 'Save Changes'} disabled={Boolean(pendingMember)} variant="accent" size="lg" onPress={() => { void saveDetails(); }} /> : null}
         </View>
       ) : null}
-      <BottomBubble notice={notice} onDismiss={dismissNotice} />
     </KeyboardAvoidingView>
   );
 }

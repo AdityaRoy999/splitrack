@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
-import { MinusCircleIcon } from '@solar-icons/react-native/bold/minus-circle';
+import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { UsersGroupRoundedIcon } from '@solar-icons/react-native/bold/users-group-rounded';
@@ -55,7 +55,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
     void getTripTransactions(trip.id).then(page => { if (active) { setHistory(page.items); setHistoryCursor(page.cursor); setHistoryProfiles(page.profiles); } }).catch(failure => { if (active) setMemberError(errorMessage(failure)); }).finally(() => { if (active) setLoadedHistoryKey(historyKey); });
     return () => { active = false; };
   }, [trip.id, revision, getTripTransactions, historyKey]);
-  const { formatAmount, themeMode } = useLiquidGlass();
+  const { formatAmount, themeMode, transactionActionStyle } = useLiquidGlass();
   const [showAddMember, setShowAddMember] = useState(false);
   const [removingMembers, setRemovingMembers] = useState(false);
   const isDark = themeMode === 'dark';
@@ -66,7 +66,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
 
   const tripFriends = friends.filter((f) => trip.members.includes(f.id));
-  const removalMode = canManageMembers && removingMembers && tripFriends.length > 0;
+  const removalMode = transactionActionStyle === 'buttons' && canManageMembers && removingMembers && tripFriends.length > 0;
   // Loaded server pages remain authoritative; the transaction outbox overlays its
   // local entries without waiting for a server revision or a network request.
   const localTransactions = transactions.filter(tx => tx.tripId === trip.id && tx.id.startsWith('offline-'));
@@ -153,16 +153,16 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
             Members ({trip.members.length})
           </Text>
           {canManageMembers ? <View style={styles.memberControls}>
-            <AnimatedPressable
+            {transactionActionStyle === 'buttons' ? <AnimatedPressable
               scaleTo={0.9}
               disabled={tripFriends.length === 0}
               onPress={() => setRemovingMembers((value) => !value)}
               accessibilityLabel={removalMode ? 'Finish removing trip members' : 'Remove trip members'}
               style={styles.memberControlHitArea}
-              contentStyle={[styles.addMemberBtn, { backgroundColor: removalMode ? (isDark ? '#3F3F46' : '#D4D4D8') : pillSurface }]}
+              contentStyle={[styles.addMemberBtn, { backgroundColor: removalMode ? pillSurface : '#E5484D' }]}
             >
-              <MinusCircleIcon size={18} color={textColor} />
-            </AnimatedPressable>
+              {removalMode ? <CheckCircleIcon size={18} color="#10B981" /> : <TrashBinTrashIcon size={16} color="#FFFFFF" />}
+            </AnimatedPressable> : null}
             <AnimatedPressable
               scaleTo={0.9}
               onPress={() => { setRemovingMembers(false); setShowAddMember(true); }}
@@ -182,7 +182,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
             </View>
 
             {tripFriends.map((member) => (
-              <TripMemberPill key={member.id} member={member} removalMode={removalMode} onRemove={async (animate) => {
+              <TripMemberPill key={member.id} member={member} canRemove={canManageMembers} removalMode={removalMode} onRemove={async (animate) => {
                 try {
                 const removed = await removeMemberFromTrip(trip.id, member.id, animate);
                 if (removed && tripFriends.length === 1) setRemovingMembers(false);
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  memberControls: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  memberControls: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   memberControlHitArea: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   memberPill: {
     flexDirection: 'row',

@@ -79,6 +79,7 @@ function notificationHarness(platform) {
   };
   const module = { exports: {} };
   vm.runInNewContext(compiled, { module, exports: module.exports, require: mockRequire,
+    Date: class extends Date { static now() { return now; } },
     setTimeout: (callback, delay) => { const id = ++nextTimer; timers.set(id, { at: now + delay, callback }); return id; },
     clearTimeout: id => timers.delete(id),
   });
@@ -181,6 +182,23 @@ test('one host follows nested native modals and returns to the root after cleanu
   assert.ok(outer.output); assert.equal(root.output, null);
   outer.unmount(); h.provider.flush(); root.flush();
   assert.ok(root.output);
+});
+
+test('moving a notice from a closing modal to the root does not replay its entrance or restart its lifetime', () => {
+  const h = notificationHarness('ios');
+  h.context.publish('save', { id: 1, message: 'Transaction saved', durationMs: 2600 }, () => {}); h.provider.flush();
+  const modalHost = h.mount(h.BubbleNoticeHost); h.provider.flush(); modalHost.flush();
+  const bubble = h.mount(modalHost.output.type, modalHost.output.props);
+  assert.equal(h.animations.filter(animation => animation.kind === 'spring').length, 1);
+  h.advance(800); bubble.unmount(); modalHost.unmount(); h.provider.flush();
+  const root = h.mount(h.BubbleNoticeHost, { root: true });
+  const moved = h.mount(root.output.type, root.output.props);
+  assert.equal(h.animations.filter(animation => animation.kind === 'spring').length, 1);
+  h.advance(1799);
+  assert.equal(h.animations.filter(animation => animation.kind === 'timing').length, 0);
+  h.advance(1);
+  assert.equal(h.animations.filter(animation => animation.kind === 'timing').length, 1);
+  moved.unmount();
 });
 
 for (const platform of ['android', 'ios', 'web']) {

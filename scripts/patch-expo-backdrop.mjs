@@ -134,7 +134,7 @@ target = layerFile;
 // scrolled outside the clipped viewport and retained translated scenes. Skip
 // their software capture and eight blur passes before prepare allocates/draws.
 // Keep the last bitmap so the normal capture refreshes it upon re-entry.
-patchOnce(
+if (!target.source.includes('  private val captureVisibleRect = Rect()')) patchOnce(
   'offscreen capture culling',
   '  override fun blur(input: Bitmap',
   `  private val captureVisibleRect = Rect()
@@ -145,6 +145,28 @@ patchOnce(
   }
 
   override fun blur(input: Bitmap`,
+);
+
+// getGlobalVisibleRect ignores opacity: a retained tab or a fully faded edge can
+// remain globally laid out while invisible. Do not rasterize its whole viewport
+// or generate the eight blur levels until all its ancestors are visible again.
+patchOnce(
+  'transparent ancestor capture culling',
+  `    if (!getGlobalVisibleRect(captureVisibleRect) || captureVisibleRect.isEmpty) return false
+    return super.prepare()`,
+  `    if (!getGlobalVisibleRect(captureVisibleRect) || captureVisibleRect.isEmpty) return false
+    var ancestor: View? = this
+    while (ancestor != null) {
+      if (ancestor.visibility != View.VISIBLE || ancestor.alpha <= 0.001f) return false
+      ancestor = ancestor.parent as? View
+    }
+    return super.prepare()`,
+);
+
+patchOnce(
+  'capture visibility import',
+  'import android.os.Build',
+  'import android.os.Build\nimport android.view.View',
 );
 
 patchOnce(

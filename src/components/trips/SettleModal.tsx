@@ -8,10 +8,8 @@ import {
   Share,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { ArrowRightIcon } from '@solar-icons/react-native/bold/arrow-right';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { ChatRoundDotsIcon } from '@solar-icons/react-native/bold/chat-round-dots';
@@ -23,8 +21,8 @@ import { GlassPill } from '../glass/GlassPill';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
+import { SheetHeader } from '../common/SheetHeader';
 import { UpiQrModal } from '../upi/UpiQrModal';
-import { BottomBubble, type BubbleNotice } from '../common/BottomBubble';
 import { buildUpiPaymentUri, formatUpiAmount, getReceivingUpiAccount, getDebtReceivingAccount, type UpiPaymentDetails } from '../../utils/upi';
 import type { UpiAccount } from '../../types';
 import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
@@ -42,11 +40,9 @@ export const SettleModal: React.FC<SettleModalProps> = ({
 }) => {
   const { accounts, friends, selectedAccountId, getSimplifiedDebts, settleWithFriend } = useSplitTrack();
   const { runWithIntent, pending, error } = useAsyncAction();
-  const { formatAmount, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
-  const [notice, setNotice] = useState<BubbleNotice | null>(null);
+  const { formatAmount, themeMode } = useLiquidGlass();
   const [paymentAmounts, setPaymentAmounts] = useState<Record<string, string>>({});
   const [qrRequest, setQrRequest] = useState<({ account: UpiAccount } & UpiPaymentDetails) | null>(null);
-  const dismissNotice = useCallback(() => setNotice(null), []);
   const closeQr = useCallback(() => setQrRequest(null), []);
 
   const isDark = themeMode === 'dark';
@@ -78,7 +74,6 @@ export const SettleModal: React.FC<SettleModalProps> = ({
     void runWithIntent({ friendId, amount, accountId: selectedAccountId }, async (draft, intentId) => {
     await settleWithFriend(draft.friendId, draft.amount, draft.accountId, intentId);
     triggerNotification(NotificationType.Success);
-    setNotice((previous) => ({ id: (previous?.id ?? 0) + 1, message: `${formatAmount(amount)} payment saved. Balances update after sync.` }));
     });
   };
 
@@ -94,14 +89,10 @@ export const SettleModal: React.FC<SettleModalProps> = ({
     } catch {}
   };
 
-  const cardSurface = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
-    : (isDark ? '#141418' : '#FFFFFF');
+  const cardSurface = isDark ? '#111114' : '#EDEDF1';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
-  const pillSurface = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
-    : (isDark ? '#1B1B20' : '#F2F2F7');
+  const pillSurface = isDark ? '#1C1C22' : '#E5E5EA';
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
 
   const renderDebtGroup = (
@@ -194,8 +185,8 @@ export const SettleModal: React.FC<SettleModalProps> = ({
                       <GlassPill
                         label={pending ? 'Saving…' : 'Mark Settled'}
                         disabled={pending}
-                        icon={<CheckCircleIcon size={14} color={isDark ? '#000000' : '#FFFFFF'} />}
-                        variant="accent"
+                        icon={<CheckCircleIcon size={14} color="#10B981" />}
+                        variant="dark"
                         size="sm"
                         onPress={() => handleSettle(item.fromId, item.toId, Number(paymentAmounts[item.fromId] ?? item.amount))}
                       />
@@ -230,29 +221,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
       <View style={styles.modalOverlay}>
         <ModalBackdrop onClose={onClose} />
         <GlassModalSheet style={styles.sheetContainer}>
-          <View style={styles.dragHandleWrap}>
-            <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
-          </View>
-          <View style={styles.headerRow}>
-            <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={[styles.title, { color: textColor }]}>
-                {targetFriend ? `Settle with ${targetFriend.name}` : 'Who Needs to Pay Whom'}
-              </Text>
-              <Text style={[styles.subtitle, { color: mutedText }]}>
-                {targetFriend
-                  ? 'Prioritized balances & simplified trip splits'
-                  : 'Auto-simplified expense balances'}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={onClose}
-              accessibilityLabel="Close settle modal"
-              style={[styles.closeBtn, { backgroundColor: isDark ? '#1C1C20' : '#FFFFFF' }]}
-            >
-              <CloseCircleIcon size={20} color={textColor} />
-            </TouchableOpacity>
-          </View>
-
+          <SheetHeader title={targetFriend ? `Settle with ${targetFriend.name}` : 'Who Needs to Pay Whom'} subtitle="Record payments and update shared balances" onClose={onClose} disabled={pending} />
           {receivingAccount ? (
             <View
               style={[
@@ -325,10 +294,9 @@ export const SettleModal: React.FC<SettleModalProps> = ({
             )}
             </ScrollView>
           </ScrollEdgeFade>
+          <FormError message={error} />
         </GlassModalSheet>
 
-        <FormError message={error} />
-        <BottomBubble notice={notice} onDismiss={dismissNotice} />
       </View>
 
       <UpiQrModal visible={Boolean(qrRequest)} onClose={closeQr} account={qrRequest?.account ?? null} amount={qrRequest?.amount} note={qrRequest?.note} />
@@ -351,7 +319,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 32,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    paddingTop: 14,
+    paddingTop: 8,
     paddingHorizontal: 20,
     borderWidth: 0,
     marginBottom: 0,
@@ -421,8 +389,8 @@ const styles = StyleSheet.create({
   },
   debtsList: {
     gap: 10,
-    paddingTop: 14,
-    paddingBottom: 28,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   scrollAreaWrap: {
     position: 'relative',

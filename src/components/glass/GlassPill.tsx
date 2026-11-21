@@ -18,6 +18,7 @@ interface GlassPillProps {
   active?: boolean;
   disabled?: boolean;
   shape?: 'pill' | 'rounded';
+  backgroundColor?: string;
 }
 
 export const GlassPill: React.FC<GlassPillProps> = ({
@@ -31,6 +32,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
   active = false,
   disabled = false,
   shape,
+  backgroundColor,
 }) => {
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
@@ -43,6 +45,8 @@ export const GlassPill: React.FC<GlassPillProps> = ({
   };
 
   const getContainerStyle = () => {
+    if (backgroundColor) return { backgroundColor };
+    if (modal && variant !== 'danger' && variant !== 'success') return { backgroundColor: isDark ? '#1C1C22' : '#E5E5EA' };
     switch (variant) {
       case 'light':
         return {
@@ -69,6 +73,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
   };
 
   const getTextColor = () => {
+    if (modal && variant !== 'danger' && variant !== 'success') return isDark ? '#F4F4F5' : '#18181B';
     if (variant === 'light') return '#000000';
     if (variant === 'danger') return '#FFFFFF';
     if (variant === 'success') return '#174C35';
@@ -79,10 +84,10 @@ export const GlassPill: React.FC<GlassPillProps> = ({
   const sizePadding = {
     sm: { paddingHorizontal: 12, height: COMPACT_BUTTON_HEIGHT },
     md: { paddingHorizontal: 12, height: COMPACT_BUTTON_HEIGHT },
-    lg: { paddingHorizontal: 22, height: COMPACT_BUTTON_HEIGHT },
+    lg: { paddingHorizontal: 22, height: modal ? 48 : COMPACT_BUTTON_HEIGHT },
   }[size];
 
-  const useTranslucentGlass = isLiquidGlassEnabled && !modal && (variant === 'glass' || variant === 'dark') && !active;
+  const useTranslucentGlass = isLiquidGlassEnabled && !modal && !backgroundColor && (variant === 'glass' || variant === 'dark') && !active;
 
   const innerContent = (
     <>

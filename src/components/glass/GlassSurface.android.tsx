@@ -1,10 +1,10 @@
 import React from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { BackdropSurfaceContext } from '../common/BackdropSurfaceContext';
 import { useModalVisual } from '../common/ModalVisualContext';
+import { androidBlurFallbackTint, combineAndroidGlassTints } from './androidGlassTint';
 
 interface GlassSurfaceProps {
   borderRadius?: number;
@@ -59,10 +59,12 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
     ? glassStyle === 'clear' ? 'rgba(255, 255, 255, 0.14)' : 'rgba(22, 22, 28, 0.62)'
     : glassStyle === 'clear' ? 'rgba(255, 255, 255, 0.36)' : 'rgba(255, 255, 255, 0.74)');
   const resolvedIntensity = intensity ?? (glassStyle === 'clear' ? 38 : isDark ? 75 : 85);
+  const fallbackTint = androidBlurFallbackTint(isDark, resolvedIntensity);
+  const materialTint = combineAndroidGlassTints(fallbackTint, resolvedTint);
 
   return <View style={[styles.surfaceContainer, cornerRadii, { backgroundColor: 'transparent' }, style]}>
-    <BlurView pointerEvents="none" intensity={resolvedIntensity} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, cornerRadii]} />
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, cornerRadii, { backgroundColor: resolvedTint }]} />
+    {!materialTint ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, cornerRadii, { backgroundColor: fallbackTint }]} /> : null}
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, cornerRadii, { backgroundColor: materialTint ?? resolvedTint }]} />
     <LinearGradient
       pointerEvents="none"
       colors={isDark

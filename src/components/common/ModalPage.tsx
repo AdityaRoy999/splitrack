@@ -21,5 +21,7 @@ export function ModalPage({ children }: { children: React.ReactNode }) {
 
 const styles = StyleSheet.create({
   page: { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center' },
-  dragArea: { position: 'absolute', left: 90, right: 90, height: 32, zIndex: 50 },
+  // Cover the handle and title, keeping the close button and the search field
+  // outside this surface. A 32px strip was too small to start a reliable drag.
+  dragArea: { position: 'absolute', left: 76, right: 76, height: 80, zIndex: 50 },
 });

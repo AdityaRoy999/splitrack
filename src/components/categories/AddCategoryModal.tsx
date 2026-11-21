@@ -32,6 +32,7 @@ import { GlassModalSheet } from '../common/GlassModalSheet';
 import { JellyRadio } from '../common/JellyRadio';
 import { GlassPill } from '../glass/GlassPill';
 import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
+import { ItemActionReveal } from '../common/ItemActionReveal';
 
 interface AddCategoryModalProps {
   visible: boolean;
@@ -63,7 +64,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
 }) => {
   const { addCategory, updateCategory, deleteCategory } = useSplitTrack();
   const { run, runWithIntent, pending, error } = useAsyncAction();
-  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled, transactionActionStyle } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
   const [name, setName] = useState(() => categoryToEdit?.name || '');
@@ -172,7 +173,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
               </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {categoryToEdit && (
+              {categoryToEdit && transactionActionStyle === 'buttons' && (
                 <AnimatedPressable
                   scaleTo={0.9}
                   onPress={handleDelete}
@@ -196,6 +197,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
           <ScrollEdgeFade style={styles.scrollAreaWrap}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {/* Category Preview + Name Input */}
+            <ItemActionReveal name={categoryToEdit?.name || 'category'} disabled={pending} onDelete={categoryToEdit ? handleDelete : undefined} buttons={false}>
             <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
               <View style={styles.previewRow}>
                 <View style={[styles.previewIconBox, { backgroundColor: `${selectedColor}24` }]}>
@@ -235,6 +237,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                 gap={10}
               />
             </View>
+            </ItemActionReveal>
 
             {/* Solar Bold Icon Menu */}
             <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>

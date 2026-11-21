@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import Reanimated, { Easing, FadeIn, ReduceMotion, useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { triggerSelection } from '../../utils/haptics';
 import { useSplitTrack } from '../../store/SplitTrackStore';
@@ -55,6 +56,23 @@ const MONTH_NAMES_SHORT = [
   'Nov',
   'Dec',
 ];
+
+const AnimatedCircle = Reanimated.createAnimatedComponent(Circle);
+const FOCUS_TIMING = { duration: 180, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System };
+const READOUT_ENTER = FadeIn.duration(160).reduceMotion(ReduceMotion.System);
+
+// Keep segment focus on the UI thread instead of snapping SVG properties on
+// each tap or issuing per-frame React state updates while scrubbing the ring.
+function DonutSegment({ selected, focused, strokeWidth, ...props }: React.ComponentProps<typeof Circle> & { selected: boolean; focused: boolean; strokeWidth: number }) {
+  const width = useSharedValue(strokeWidth + (selected ? 3 : 0));
+  const opacity = useSharedValue(focused && !selected ? 0.28 : 1);
+  useLayoutEffect(() => {
+    width.set(withTiming(strokeWidth + (selected ? 3 : 0), FOCUS_TIMING));
+    opacity.set(withTiming(focused && !selected ? 0.28 : 1, FOCUS_TIMING));
+  }, [focused, opacity, selected, strokeWidth, width]);
+  const animatedProps = useAnimatedProps(() => ({ strokeWidth: width.get(), opacity: opacity.get() }));
+  return <AnimatedCircle {...props} animatedProps={animatedProps} />;
+}
 
 export const DonutPieChart: React.FC = () => {
   const { width: windowWidth } = useWindowDimensions();
@@ -301,9 +319,8 @@ export const DonutPieChart: React.FC = () => {
 
   return (
     <GlassCard borderRadius={24} style={styles.card}>
-      <View style={styles.container} {...gestureHandlers}>
+      <View style={styles.container}>
       <FormError message={analytics.error} />
-      {analytics.loading ? <Text style={{ color: '#A1A1AA', fontSize: 12, textAlign: 'center' }}>Loading expenses…</Text> : null}
         {/* Top Summary Bar */}
         <View style={styles.topRow}>
           <Text style={[styles.topLabel, { color: mutedText }]}>
@@ -340,7 +357,7 @@ export const DonutPieChart: React.FC = () => {
         </View>
 
         {/* Inline Calendar Icon Button + Granularity JellyRadio */}
-        <View style={styles.filterSection}>
+        <View style={styles.filterSection} {...gestureHandlers}>
           <View style={styles.filterInlineRow}>
             <AnimatedPressable
               scaleTo={0.92}
@@ -407,7 +424,7 @@ export const DonutPieChart: React.FC = () => {
                 { color: isMonthHoldReady ? '#10B981' : mutedText },
               ]}
             >
-              {isMonthHoldReady ? 'Month Mode Ready • Swipe Left/Right' : activePeriodLabel}
+              {analytics.loading ? 'Loading expenses…' : isMonthHoldReady ? 'Month Mode Ready • Swipe Left/Right' : activePeriodLabel}
             </Text>
           </View>
         </View>
@@ -452,7 +469,7 @@ export const DonutPieChart: React.FC = () => {
                 onMoveShouldSetResponder={(e: GestureResponderEvent) =>
                   findSegmentAtRingPoint(e.nativeEvent.locationX, e.nativeEvent.locationY) !== null
                 }
-                onResponderTerminationRequest={() => false}
+                onResponderTerminationRequest={() => true}
                 onResponderGrant={(e: GestureResponderEvent) => {
                   const segId = findSegmentAtRingPoint(
                     e.nativeEvent.locationX,
@@ -508,18 +525,16 @@ export const DonutPieChart: React.FC = () => {
                     {segments.map((seg) => {
                       const isSelected = activeId === seg.id;
                       const visibleLen = seg.segmentLength;
-                      const activeStrokeWidth = isSelected
-                        ? selectedStrokeWidth
-                        : strokeWidth;
-
                       return (
-                        <Circle
+                        <DonutSegment
                           key={seg.id}
+                          selected={isSelected}
+                          focused={Boolean(activeId)}
                           cx={size / 2}
                           cy={size / 2}
                           r={radius}
                           stroke={seg.color}
-                          strokeWidth={activeStrokeWidth}
+                          strokeWidth={strokeWidth}
                           strokeDasharray={
                             segments.length === 1
                               ? undefined
@@ -528,7 +543,6 @@ export const DonutPieChart: React.FC = () => {
                           strokeDashoffset={-seg.offset}
                           strokeLinecap={segments.length === 1 ? 'butt' : 'round'}
                           fill="none"
-                          opacity={activeId && !isSelected ? 0.28 : 1}
                         />
                       );
                     })}
@@ -547,6 +561,7 @@ export const DonutPieChart: React.FC = () => {
                 style={styles.centerTouchable}
                 contentStyle={styles.centerContainer}
               >
+                <Reanimated.View key={`${activeId ?? 'total'}:${centerDisplay}`} entering={READOUT_ENTER} style={styles.readout}>
                 <Text style={[styles.centerCaption, { color: mutedText }]}>
                   {selectedSegment ? `${selectedSegment.pct}% OF SPEND` : 'TOTAL SPEND'}
                 </Text>
@@ -556,6 +571,7 @@ export const DonutPieChart: React.FC = () => {
                 <Text style={[styles.centerLabel, { color: mutedText }]} numberOfLines={1}>
                   {centerLabel}
                 </Text>
+                </Reanimated.View>
               </AnimatedPressable>
             </View>
 
@@ -747,6 +763,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 12,
   },
+  readout: { alignItems: 'center', justifyContent: 'center' },
   centerCaption: {
     fontSize: 10,
     fontWeight: '400',

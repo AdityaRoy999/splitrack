@@ -18,7 +18,19 @@ interface BottomBubbleProps {
   onDismiss: () => void;
 }
 
-type QueuedNotice = { source: string; notice: BubbleNotice; onDismiss: () => void };
+function createNoticePresentation() {
+  let saved: { startedAt: number; direction: NotificationDirection } | undefined;
+  return {
+    read: () => saved,
+    start(direction: NotificationDirection) {
+      const alreadyPresented = saved !== undefined;
+      saved ??= { startedAt: Date.now(), direction };
+      return { ...saved, alreadyPresented };
+    },
+  };
+}
+type NoticePresentation = ReturnType<typeof createNoticePresentation>;
+type QueuedNotice = { source: string; notice: BubbleNotice; onDismiss: () => void; presentation: NoticePresentation };
 const NoticeContext = createContext<{
   publish: (source: string, notice: BubbleNotice, onDismiss: () => void) => void;
   remove: (source: string) => void;
@@ -45,7 +57,8 @@ export function BubbleNoticeProvider({ children, themeMode, notificationDirectio
   const queueRef = useRef(queue);
   useLayoutEffect(() => { queueRef.current = queue; }, [queue]);
   const publish = useCallback((source: string, notice: BubbleNotice, onDismiss: () => void) => {
-    setQueue(current => [...current.filter(entry => entry.source !== source), { source, notice, onDismiss }]);
+    setQueue(current => current.some(entry => entry.source === source && entry.notice.id === notice.id)
+      ? current : [...current.filter(entry => entry.source !== source), { source, notice, onDismiss, presentation: createNoticePresentation() }]);
   }, []);
   const remove = useCallback((source: string) => {
     setQueue(current => current.some(entry => entry.source === source) ? current.filter(entry => entry.source !== source) : current);
@@ -98,6 +111,7 @@ export function BubbleNoticeHost({ root = false }: { root?: boolean }) {
   return <BubbleView
     key={`${entry.source}:${entry.notice.id}`}
     notice={entry.notice}
+    presentation={entry.presentation}
     themeMode={context.themeMode}
     notificationDirection={context.notificationDirection}
     topObstruction={root ? context.topObstruction : 0}
@@ -121,16 +135,17 @@ export function BottomBubble({ notice, onDismiss }: BottomBubbleProps) {
   return null;
 }
 
-function BubbleView({ notice, onDismiss, themeMode, notificationDirection, topObstruction = 0 }: BottomBubbleProps & {
+function BubbleView({ notice, onDismiss, themeMode, notificationDirection, topObstruction = 0, presentation }: BottomBubbleProps & {
   themeMode: ThemeMode;
   notificationDirection: NotificationDirection;
   topObstruction?: number;
+  presentation?: NoticePresentation;
 }) {
   const insets = useSafeAreaInsets();
-  const [progress] = useState(() => new Animated.Value(0));
+  const [progress] = useState(() => new Animated.Value(presentation?.read() ? 1 : 0));
   const [bubbleHeight, setBubbleHeight] = useState(72);
   // The keyed host keeps the entry direction fixed for the entire notice.
-  const [entryDirection] = useState(notificationDirection);
+  const [entryDirection] = useState(presentation?.read()?.direction ?? notificationDirection);
   const noticeId = notice?.id;
   const durationMs = notice?.durationMs ?? 2600;
   const dismissRef = useRef(onDismiss);
@@ -144,10 +159,14 @@ function BubbleView({ notice, onDismiss, themeMode, notificationDirection, topOb
     let exiting = false;
     const useNativeDriver = Platform.OS !== 'web';
     progress.stopAnimation();
-    progress.setValue(0);
-    Animated.spring(progress, {
-      toValue: 1, friction: 8, tension: 85, useNativeDriver, isInteraction: false,
-    }).start();
+    const { startedAt, alreadyPresented } = presentation?.start(entryDirection) ?? { startedAt: Date.now(), alreadyPresented: false };
+    if (alreadyPresented) progress.setValue(1);
+    else {
+      progress.setValue(0);
+      Animated.spring(progress, {
+        toValue: 1, friction: 8, tension: 85, useNativeDriver, isInteraction: false,
+      }).start();
+    }
     const exit = () => {
       if (cancelled || exiting) return;
       exiting = true;
@@ -160,7 +179,7 @@ function BubbleView({ notice, onDismiss, themeMode, notificationDirection, topOb
         if (finished && !cancelled) dismissRef.current();
       });
     };
-    const timer = setTimeout(exit, durationMs);
+    const timer = setTimeout(exit, Math.max(0, startedAt + durationMs - Date.now()));
     exitRef.current = exit;
     return () => {
       cancelled = true;
@@ -168,7 +187,7 @@ function BubbleView({ notice, onDismiss, themeMode, notificationDirection, topOb
       progress.stopAnimation();
       if (exitRef.current === exit) exitRef.current = null;
     };
-  }, [durationMs, noticeId, progress]);
+  }, [durationMs, entryDirection, noticeId, presentation, progress]);
 
   if (!notice) return null;
 

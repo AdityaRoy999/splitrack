@@ -24,9 +24,42 @@ test('durable retry retains exact submitted payload/key after relaunch and isola
   const { box, disk } = await saved();
   const restored = new TransactionOutbox('alice', disk); await restored.ready;
   assert.deepEqual(restored.entries, box.entries);
-  assert.equal(restored.entries[0].bodyJson, JSON.stringify({ ...draft, duplicateCheck: true, ledgerGeneration: 0 }));
+  assert.equal(restored.entries[0].bodyJson, JSON.stringify({ ...draft, durableRetry: true, ledgerGeneration: 0 }));
   const other = new TransactionOutbox('bob', disk); await other.ready;
   assert.deepEqual(other.entries, []);
+});
+
+test('legacy rejected duplicates resume as separate drafts while uncertain requests keep their exact bytes', async () => {
+  const { box, disk } = await saved();
+  const original = box.entries[0].bodyJson;
+  await box.enqueue(draft, request(2), 0);
+  await box.update(entries => entries.map(entry => entry.requestId === request(2) ? {
+    ...entry, bodyJson: JSON.stringify({ ...draft, duplicateCheck: true, ledgerGeneration: 0 }), status: 'duplicate',
+    existingTransaction: { id: 'different-entry', title: draft.title, amount: draft.amount, date: draft.date, paidBy: 'user' },
+  } : entry));
+  await box.resumeRejectedDuplicates(() => request(3));
+  assert.equal(box.entries[0].requestId, request(1));
+  assert.equal(box.entries[0].bodyJson, original);
+  assert.equal(box.entries[1].requestId, request(3));
+  assert.equal(box.entries[1].status, 'pending');
+  assert.equal(JSON.parse(box.entries[1].bodyJson).durableRetry, true);
+  assert.equal(JSON.parse(box.entries[1].bodyJson).duplicateCheck, undefined);
+  const restored = new TransactionOutbox('alice', disk); await restored.ready;
+  assert.equal(restored.entries.length, 2);
+});
+
+test('retiring an erased ledger removes old drafts only after a durable generation change', async () => {
+  const { box, disk } = await saved();
+  await box.enqueue(draft, request(2), 1);
+  const before = box.entries;
+  disk.fail = true;
+  await assert.rejects(box.retireBeforeGeneration(1), /Disk full/);
+  assert.deepEqual(box.entries, before, 'failed persistence cannot silently drop drafts');
+  disk.fail = false;
+  await box.retireBeforeGeneration(1);
+  assert.deepEqual(box.entries.map(entry => entry.requestId), [request(2)]);
+  const restored = new TransactionOutbox('alice', disk); await restored.ready;
+  assert.equal(restored.entries[0].generation, 1);
 });
 test('a failed durable save is never acknowledged or published, then can be retried', async () => {
   const disk = storage(), box = new TransactionOutbox('alice', disk); await box.ready;
@@ -68,6 +101,26 @@ test('malformed or mismatched outbox data is retained and blocks overwriting', a
   await assert.rejects(box.ready, /retained/);
   await assert.rejects(box.enqueue(draft, request(1), 0), /retained/);
   assert.equal(disk.values.get(key), before);
+});
+
+test('unchanged outbox reads and no-op retries do not republish or rewrite every queued draft', async () => {
+  const disk = storage();
+  let published = 0, writes = 0;
+  const write = disk.setItem.bind(disk);
+  disk.setItem = async (...args) => { writes++; await write(...args); };
+  const box = new TransactionOutbox('alice', disk, () => published++);
+  await box.ready;
+  await box.enqueue(draft, request(1), 0);
+  assert.equal(writes, 1);
+  assert.equal(published, 1);
+  await box.enqueue(draft, request(1), 0);
+  assert.equal(writes, 1, 'same request is already durable');
+  assert.equal(published, 1, 're-reading identical persisted content is silent');
+  const second = new TransactionOutbox('alice', disk); await second.ready;
+  await second.enqueue({ ...draft, title: 'A separate transaction' }, request(2), 0);
+  await box.update(entries => entries.filter(entry => entry.requestId !== request(1)));
+  assert.equal(box.entries.length, 1);
+  assert.equal(box.entries[0].requestId, request(2), 'a different provider write is still merged');
 });
 test('offline expense rebases exact own expense, cash, group and friend totals without mutating base', async () => {
   const { box } = await saved({ ...draft, tripId: 'trip' }), base = snapshot();

@@ -10,6 +10,10 @@ radius levels from a shared live capture, using RenderNode/RenderEffect on API
 library's native CPU fallback. scripts/patch-expo-backdrop.mjs is a versioned,
 idempotent postinstall fix: explicit transparent tint is honored, and app-owned
 scene/scroll reveal replaces automatic discovery of retained inactive tabs.
+The native capture is also skipped when clipped offscreen or hidden by an
+ancestor's opacity. Android reveal animates only the finished backdrop's alpha;
+the native radius stays fixed so eight RenderEffects are not rebuilt each frame.
+Completely hidden edges use display:none and resume live capture on reveal.
 
 iOS uses @sbaiahmed1/react-native-blur 6.0.3. Its variable-radius backdrop filter
 avoids the custom UIKit blur stack. The library uses private CAFilter API; a
@@ -38,3 +42,24 @@ modal content. QR/calendar backdrops use dimming without blur. Sheets retain
 their content and backdrop through the exit animation.
 Physical-device checks should cover those edges, light/dark themes, scrolling,
 foreground return, and image highlight transitions.
+
+Android performance note
+
+The QmBlurView dependency draws its capture viewport into a software bitmap on
+the Android UI thread before processing the eight progressive levels, even on
+API 31+ where those levels use RenderEffect. Retained hidden screens therefore
+must not keep capturing. Animated GL backgrounds also continuously invalidate
+that viewport; their Android noise target now defaults to one pixel per point
+instead of 1.5 (56% fewer shader fragments on high-density devices). These are
+code-level workload reductions, not measured device frame-rate guarantees.
+Android also measures card visibility at most four times a second on the UI
+thread and suspends offscreen shader ticks. A 64-point overscan wakes the effect
+before re-entry. Never-visible cards defer GL context/shader allocation; already
+initialized contexts retain their last frame and phase while offscreen.
+
+Android's ordinary GlassSurface previously mounted Expo BlurView without a
+blurTarget or blurMethod, which SDK 58 renders as a translucent tint rather than
+blur. It now source-over composes those same tints in one plain View, retaining
+the material appearance and sheen while removing unused native blur controllers
+and extra layers from every button/card. Live progressive edge blur is separate
+and unchanged by this material optimization.

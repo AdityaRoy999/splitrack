@@ -71,18 +71,14 @@ export function useHorizontalScrollEdges() {
   return useScrollEdges(true);
 }
 
-// Keep the gradient mask at the clipping edge and animate the blur's reveal.
-export function HorizontalEdgeFade({ children, style, tint, width = 24, left = true, right = true }: HorizontalEdgeFadeProps) {
+// Horizontal menus clip cleanly without a blur layer over their end buttons.
+export function HorizontalEdgeFade({ children, style, tint }: HorizontalEdgeFadeProps) {
   const { themeMode } = useLiquidGlass();
   const surface = useContext(BackdropSurfaceContext);
   const background = captureBackground(tint, surface ?? (themeMode === 'dark' ? '#17171C' : '#F4F5F8'));
   return (
     <View collapsable={false} style={[styles.horizontal, { backgroundColor: Platform.OS === 'ios' ? 'transparent' : background }, style]}>
       {children}
-      {width > 0 ? <>
-        <GradualBlur position="left" active={left} width={width} strength={0.5} curve="bezier" />
-        <GradualBlur position="right" active={right} width={width} strength={0.5} curve="bezier" />
-      </> : null}
     </View>
   );
 }

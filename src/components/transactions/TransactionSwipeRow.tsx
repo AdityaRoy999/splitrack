@@ -11,7 +11,7 @@ import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP } from '../../constants/
 import { useTransactionActions } from './TransactionActions';
 
 let openRow: SwipeableMethods | null = null;
-const ACTION_WIDTH = 164;
+const ACTION_WIDTH = 180;
 const ROW_SPRING = { mass: 0.7, damping: 32, stiffness: 420, overshootClamping: true, reduceMotion: ReduceMotion.System };
 
 function SwipeActions({ progress, translation, rowProgress, side, dark, transaction, requestAction }: {
@@ -20,7 +20,7 @@ function SwipeActions({ progress, translation, rowProgress, side, dark, transact
 }) {
   // Both panels receive the same row translation. Use one writer for the card,
   // and each panel's own progress so the hidden panel stays still.
-  useAnimatedReaction(() => Math.min(1, Math.abs(translation.get()) / ACTION_WIDTH), value => { if (side === 'left') rowProgress.set(value); });
+  useAnimatedReaction(() => Math.max(-1, Math.min(1, translation.get() / ACTION_WIDTH)), value => { if (side === 'left') rowProgress.set(value); });
   const editMotion = useAnimatedStyle(() => {
     const reveal = Math.max(0, Math.min(1, (progress.get() - 0.08) / 0.82));
     return { opacity: reveal, transform: [{ scale: 0.78 + 0.22 * reveal }, { translateX: (side === 'right' ? 8 : -8) * (1 - reveal) }] };
@@ -44,7 +44,7 @@ function SwipeActions({ progress, translation, rowProgress, side, dark, transact
 // The installed gesture library animates and tracks the row on the UI thread.
 export function TransactionSwipeRow({ transaction, children }: { transaction: Transaction; children: React.ReactNode }) {
   const actions = useTransactionActions();
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, transactionActionStyle } = useLiquidGlass();
   const surface = useContext(BackdropSurfaceContext);
   const swipeable = useRef<SwipeableMethods>(null);
   const pendingAction = useRef<(() => void) | null>(null);
@@ -52,11 +52,14 @@ export function TransactionSwipeRow({ transaction, children }: { transaction: Tr
   const dark = themeMode === 'dark';
   const baseSurface = surface ?? (dark ? '#17171C' : '#FFFFFF');
   const cardMotion = useAnimatedStyle(() => {
-    const reveal = interpolate(rowProgress.get(), [0, 0.35], [0, 1], Extrapolation.CLAMP);
+    const reveal = interpolate(Math.abs(rowProgress.get()), [0, 0.35], [0, 1], Extrapolation.CLAMP);
     // Padding changes re-layout every text and icon on Android during a drag.
     // Keep the row geometry fixed; its translation, corner and color reveal stay.
     return { borderRadius: 16 * reveal, backgroundColor: interpolateColor(reveal, [0, 1], [baseSurface, dark ? '#29292E' : '#E5E5EA']) };
   });
+  // Add breathing room at the revealed end without re-laying out text during
+  // the gesture. Normal list alignment returns when the row closes.
+  const contentMotion = useAnimatedStyle(() => ({ transform: [{ translateX: rowProgress.get() * 8 }] }));
   useEffect(() => {
     const row = swipeable.current;
     return () => { if (openRow === row) openRow = null; };
@@ -84,6 +87,17 @@ export function TransactionSwipeRow({ transaction, children }: { transaction: Tr
   };
 
   if (!actions.canManage(transaction)) return <>{children}</>;
+  if (transactionActionStyle === 'buttons') return <View>
+    {children}
+    <View style={styles.inlineActions}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Edit ${transaction.title}`} disabled={actions.busy} onPress={() => actions.edit(transaction)} style={[styles.action, { backgroundColor: dark ? '#1C1C22' : '#E5E5EA' }]}>
+        <Pen2Icon size={16} color={dark ? '#FFFFFF' : '#18181B'} /><Text style={[styles.label, { color: dark ? '#FFFFFF' : '#18181B' }]}>Edit</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${transaction.title}`} disabled={actions.busy} onPress={() => actions.remove(transaction)} style={[styles.action, styles.delete]}>
+        <TrashBinTrashIcon size={16} color="#FFFFFF" /><Text style={styles.label}>Delete</Text>
+      </Pressable>
+    </View>
+  </View>;
   return <ReanimatedSwipeable ref={swipeable} enabled={!actions.busy} friction={1}
     leftThreshold={48} rightThreshold={48} overshootLeft={false} overshootRight={false}
     dragOffsetFromLeft={10} dragOffsetFromRight={-10}
@@ -92,14 +106,15 @@ export function TransactionSwipeRow({ transaction, children }: { transaction: Tr
     onSwipeableOpenStartDrag={closeOtherRow} onSwipeableWillOpen={closeOtherRow}
     onSwipeableClose={finishClose}
     containerStyle={styles.row}>
-    <Animated.View style={[styles.card, cardMotion]}>{children}</Animated.View>
+    <Animated.View style={[styles.card, cardMotion]}><Animated.View style={contentMotion}>{children}</Animated.View></Animated.View>
   </ReanimatedSwipeable>;
 }
 
 const styles = StyleSheet.create({
   row: { borderWidth: 0 },
   card: { overflow: 'hidden', borderWidth: 0 },
-  actions: { width: ACTION_WIDTH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 4 },
+  actions: { width: ACTION_WIDTH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 4 },
+  inlineActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, paddingHorizontal: 12, paddingBottom: 10 },
   action: { width: 66, height: COMPACT_BUTTON_HEIGHT, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 12, borderWidth: 0 },
   delete: { backgroundColor: '#E5484D' },
   label: { fontSize: 11, fontWeight: '600', color: '#FFFFFF' },

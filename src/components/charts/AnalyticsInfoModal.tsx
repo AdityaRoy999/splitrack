@@ -81,13 +81,7 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
-  const cardBg = isLiquidGlassEnabled
-    ? isDark
-      ? 'rgba(255,255,255,0.06)'
-      : 'rgba(255,255,255,0.72)'
-    : isDark
-      ? '#16161C'
-      : '#F4F5F8';
+  const cardBg = isDark ? '#111114' : isLiquidGlassEnabled ? 'rgba(255,255,255,0.72)' : '#F4F5F8';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
   return (

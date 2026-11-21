@@ -44,13 +44,15 @@ export function useChartTransition(ready = true) {
     const next = pending.current;
     if (!next || next.sequence !== sequence.current) return;
     if (!ready) return;
-    pending.current = null;
     translateX.setValue(next.direction * 12);
     opacity.setValue(0);
 
     frame.current = requestAnimationFrame(() => {
       frame.current = null;
       if (!mounted.current || next.sequence !== sequence.current) return;
+      // A cache refresh can change readiness between this commit and the next
+      // frame. Keep the pending reveal until a ready frame actually runs.
+      pending.current = null;
       const enter = Animated.parallel([
         Animated.timing(opacity, {
           toValue: 1, duration: 210, easing: Easing.out(Easing.cubic),

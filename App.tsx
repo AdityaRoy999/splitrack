@@ -1,5 +1,7 @@
 import { BackdropBlurTargetProvider } from './src/components/common/BackdropBlurTarget';
 import { TransactionSwipeRow } from './src/components/transactions/TransactionSwipeRow';
+import { ItemActionReveal } from './src/components/common/ItemActionReveal';
+import { SettingsAvatarTransitionProvider } from './src/components/common/SettingsAvatarTransition';
 import React, { startTransition, useCallback, useMemo, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { errorMessage } from './src/services/api';
@@ -13,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import type { ViewRefNode } from './src/utils/measureWindow';
 import { CardReceiveIcon } from '@solar-icons/react-native/bold/card-receive';
 import { CardSendIcon } from '@solar-icons/react-native/bold/card-send';
@@ -22,7 +25,7 @@ import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { BillListIcon } from '@solar-icons/react-native/bold/bill-list';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
-import { MinusCircleIcon } from '@solar-icons/react-native/bold/minus-circle';
+import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { UsersGroupTwoRoundedIcon } from '@solar-icons/react-native/bold/users-group-two-rounded';
 import { Pen2Icon } from '@solar-icons/react-native/bold/pen-2';
 import { InfoCircleIcon } from '@solar-icons/react-native/linear/info-circle';
@@ -62,7 +65,6 @@ import { AddCategoryModal } from './src/components/categories/AddCategoryModal';
 import { SettleModal } from './src/components/trips/SettleModal';
 import { SettingsPage } from './src/components/settings/SettingsPage';
 import { CalendarDatePickerModal, formatDisplayDate } from './src/components/common/CalendarDatePickerModal';
-import { BottomBubble, type BubbleNotice } from './src/components/common/BottomBubble';
 import { FormError } from './src/hooks/useAsyncAction';
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 import { PreloaderSplash, hasCompletedStartupPreloader } from './src/components/common/PreloaderSplash';
@@ -111,7 +113,7 @@ function MainAppContent({
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const transactionActions = useTransactionActions();
-  const { palette, themeMode, formatAmount } = useLiquidGlass();
+  const { palette, themeMode, formatAmount, transactionActionStyle } = useLiquidGlass();
   const {
     totalIncome,
     totalExpenses,
@@ -147,15 +149,12 @@ function MainAppContent({
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [removingTrips, setRemovingTrips] = useState(false);
   const [tripRemovalError, setTripRemovalError] = useState('');
-  const [tripNotice, setTripNotice] = useState<BubbleNotice | null>(null);
-  const dismissTripNotice = useCallback(() => setTripNotice(null), []);
   const removableTrips = trips.filter(trip => trip.ownerId === user?.uid);
-  const removalMode = removingTrips && removableTrips.length > 0;
+  const removalMode = transactionActionStyle === 'buttons' && removingTrips && removableTrips.length > 0;
   const removeTrip = useCallback(async (id: string, name: string) => {
     try {
       await deleteTrip(id);
       setTripRemovalError('');
-      setTripNotice({ id: Date.now(), message: `${name} removed` });
     } catch (failure) {
       setTripRemovalError(errorMessage(failure));
       throw failure;
@@ -787,14 +786,14 @@ function MainAppContent({
                 </Text>
               </View>
               <View style={styles.tripActions}>
-                {removableTrips.length > 0 ? <AnimatedPressable
+                {transactionActionStyle === 'buttons' && removableTrips.length > 0 ? <AnimatedPressable
                   onPress={() => { setRemovingTrips(!removalMode); setTripRemovalError(''); }}
                   accessibilityLabel={removalMode ? 'Finish removing trips' : 'Remove trips'}
                   accessibilityState={{ selected: removalMode }}
                   contentStyle={[styles.tripRemoveToggle, { backgroundColor: removalMode ? (isDark ? '#18181D' : '#EFEFF4') : '#E5484D' }]}
                   hitSlop={COMPACT_BUTTON_HIT_SLOP}
                 >
-                  {removalMode ? <CheckCircleIcon size={20} color="#10B981" /> : <MinusCircleIcon size={20} color="#FFFFFF" />}
+                  {removalMode ? <CheckCircleIcon size={20} color="#10B981" /> : <TrashBinTrashIcon size={20} color="#FFFFFF" />}
                 </AnimatedPressable> : null}
                 <AnimatedPressable
                   accessibilityLabel="Add a trip or group"
@@ -805,17 +804,18 @@ function MainAppContent({
               </View>
             </View>
 
-            {removalMode ? <Text style={[styles.tripRemovalHint, { color: mutedText }]}>Tap a minus to remove a trip. Its expenses and balances stay in your ledger.</Text> : null}
+            {removalMode ? <Text style={[styles.tripRemovalHint, { color: mutedText }]}>Tap a delete button to remove a trip. Its expenses and balances stay in your ledger.</Text> : null}
             <FormError message={tripRemovalError} />
 
             {/* Clean Double-Surface Album Cover Trip Cards (tap to open dedicated Trip Page) */}
             {trips.map((trip) => (
+              <ItemActionReveal key={trip.id} name={trip.name} buttons={false} onDelete={trip.ownerId === user?.uid ? () => { void removeTrip(trip.id, trip.name).catch(() => {}); } : undefined}>
               <TripCard
                 key={trip.id}
                 trip={trip}
                 onPress={() => setSelectedTripId(trip.id)}
                 onRemove={removalMode && trip.ownerId === user?.uid ? () => removeTrip(trip.id, trip.name) : undefined}
-              />
+              /></ItemActionReveal>
             ))}
 
             {/* Pending Debt Simplification Stream — grouped inside one card */}
@@ -992,7 +992,7 @@ function MainAppContent({
   }, [categories, dividerColor, dynamicScrollContent, formatAmount, friends,
     getSimplifiedDebts, isDark, mutedText, selectedTripId, textColor,
     totalOwedToYou, totalYouOwe, transactions, trips, removalMode, removableTrips.length,
-    removeTrip, tripRemovalError, user?.uid, transactionActions, openExpenseEditor]);
+    removeTrip, tripRemovalError, user?.uid, transactionActions, transactionActionStyle, openExpenseEditor]);
 
   const renderAnalyticsTab = useCallback(() => (
     <ScrollView
@@ -1040,14 +1040,14 @@ function MainAppContent({
   ), [chipBg, dynamicScrollContent, textColor]);
 
   return (
-    <View style={[styles.container, { backgroundColor: rootBg, paddingTop: 0 }]}>
+    <SettingsAvatarTransitionProvider onOpen={() => setShowSettings(true)}><View style={[styles.container, { backgroundColor: rootBg, paddingTop: 0 }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <CloudStatus />
 
       <View collapsable={false} style={[styles.mainViewport, { backgroundColor: rootBg }]}>
         <View style={[styles.tabPagesContainer, { backgroundColor: rootBg }]}>
           {showSettings ? (
-            <TabScene active><View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
+            <TabScene active duration={340} offsetY={0}><View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
               <SettingsPage
                 onBack={() => setShowSettings(false)}
                 onSignOut={onSignOut}
@@ -1090,25 +1090,26 @@ function MainAppContent({
             </View>
 
         </View>
-        <GradualBlur
+        {!showSettings ? <GradualBlur
+          active={effectsActive}
           position="top"
           height={Math.max(32, insets.top + 12)}
           strength={0.6}
           layers={6}
           curve="bezier"
           zIndex={45}
-        />
-        <GradualBlur
+        /> : null}
+        {!showSettings ? <GradualBlur
+          active={effectsActive}
           position="bottom"
           height={Math.max(48, insets.bottom + 32)}
           strength={0.6}
           layers={6}
           curve="bezier"
           zIndex={45}
-        />
+        /> : null}
       </View>
 
-      <BottomBubble notice={tripNotice} onDismiss={dismissTripNotice} />
 
       <View
         pointerEvents={expenseEditorMounted || showAddTrip || showAddMember ? 'none' : 'box-none'}
@@ -1179,19 +1180,19 @@ function MainAppContent({
         allowClear={true}
         title="Filter Ledger by Date"
       />
-    </View>
+    </View></SettingsAvatarTransitionProvider>
   );
 }
 
 export default function App() {
   return (
-    <SafeAreaProvider>
+    <GestureHandlerRootView style={styles.appRoot}><SafeAreaProvider>
       <ErrorBoundary>
         <AuthProvider>
           <AppContent />
         </AuthProvider>
       </ErrorBoundary>
-    </SafeAreaProvider>
+    </SafeAreaProvider></GestureHandlerRootView>
   );
 }
 
@@ -1287,8 +1288,8 @@ function AppContent() {
 }
 
 const styles = StyleSheet.create({
-  tripActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tripRemoveToggle: { ...COMPACT_ICON_BUTTON_STYLE, borderRadius: 12, borderWidth: 0 },
+  tripActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tripRemoveToggle: { ...COMPACT_ICON_BUTTON_STYLE, borderRadius: 18, borderWidth: 0 },
   tripRemovalHint: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
   appRoot: {
     flex: 1,

@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,10 +17,16 @@ import { pickedImageUri } from '../../utils/pickedImage';
 import { File as ExpoFile } from 'expo-file-system';
 import { useAuth } from '../../auth/AuthContext';
 import { authenticationError } from '../../auth/authErrors';
+import { api } from '../../services/api';
 import { FormError, useAsyncAction } from '../../hooks/useAsyncAction';
 import { SheetModal } from '../common/SheetModal';
 import { ModalBackdrop } from '../common/ModalBackdrop';
 import { GlassModalSheet } from '../common/GlassModalSheet';
+import { SheetHeader } from '../common/SheetHeader';
+import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
+import { BottomBubble, type BubbleNotice } from '../common/BottomBubble';
+import { useSettingsAvatarTransition } from '../common/SettingsAvatarTransition';
+import type { ViewRefNode } from '../../utils/measureWindow';
 import { GlassPill } from '../glass/GlassPill';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
@@ -55,6 +59,7 @@ import {
   parseAnyTextTransactions,
   parseJsonTransactions,
   parseSpreadsheetTransactions,
+  parseGooglePayPdfTransactions,
 } from '../../utils/importTransactions';
 import { ImpactStyle, NotificationType, triggerImpact, triggerNotification } from '../../utils/haptics';
 
@@ -82,6 +87,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onManageCards,
 }) => {
   const insets = useSafeAreaInsets();
+  const avatarTarget = useRef<ViewRefNode>(null);
+  const avatarTransition = useSettingsAvatarTransition();
+  const reportAvatar = avatarTransition?.destination;
+  const measureAvatar = useCallback(() => reportAvatar?.(avatarTarget.current), [reportAvatar]);
+  useLayoutEffect(() => {
+    const frame = requestAnimationFrame(measureAvatar);
+    return () => cancelAnimationFrame(frame);
+  }, [measureAvatar]);
   const {
     isLiquidGlassEnabled,
     setIsLiquidGlassEnabled,
@@ -90,11 +103,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     themeMode,
     setThemeMode,
     currency,
+    formatAmount,
     setCurrency,
     selectionStyle,
     setSelectionStyle,
     notificationDirection,
     setNotificationDirection,
+    transactionActionStyle,
+    setTransactionActionStyle,
   } = useLiquidGlass();
   const transactionActions = useTransactionActions();
 
@@ -105,6 +121,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     importTransactions,
     trips,
     friends,
+    syncing, syncError, isOffline, queuedTransactionCount, pendingFailure, refresh, reviewQueuedTransactions,
   } = useSplitTrack();
   const { user, profile, completeProfile, googleLinked, linkGoogle, cancelGoogleLink } = useAuth();
   const { run: runGoogle, pending: googlePending, error: googleError, setError: setGoogleError } = useAsyncAction();
@@ -112,6 +129,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [googlePassword, setGooglePassword] = useState('');
   const [googleNeedsPassword, setGoogleNeedsPassword] = useState(false);
   const [googleNotice, setGoogleNotice] = useState('');
+  const [profileNotice, setProfileNotice] = useState<BubbleNotice | null>(null);
   const { run, pending, error } = useAsyncAction();
 
   const [chosenAccountId, setTargetAccountId] = useState<string>(
@@ -133,7 +151,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const currSym = currencies[currency]?.symbol || '₹';
 
   const rootBg = isDark ? '#09090B' : '#F4F4F6';
-  const cardBg = isDark ? '#141418' : '#FFFFFF';
+  const cardBg = isDark ? '#111114' : '#FFFFFF';
   const chipBg = isDark ? '#1C1C22' : '#F4F4F6';
   const textColor = isDark ? '#FFFFFF' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
@@ -156,6 +174,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         if (await linkGoogle(googleNeedsPassword ? googlePassword : undefined)) {
           setShowGoogleLink(false); setGooglePassword('');
           setGoogleNotice('Google is synced. Continue with Google now opens this account and its saved records.');
+          setProfileNotice({ id: Date.now(), message: 'Google sign-in connected' });
           triggerNotification(NotificationType.Success);
         }
       } catch (failure) {
@@ -181,6 +200,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         const pickedUri = await pickedImageUri(asset);
         if (profile) await completeProfile({ displayName: profile.displayName, username: profile.username, avatar: pickedUri });
         triggerNotification(NotificationType.Success);
+        setProfileNotice({ id: Date.now(), message: 'Profile photo updated' });
       }
     });
   };
@@ -203,91 +223,79 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setShowEraseConfirm(true);
   };
 
+  const applyImportResult = (result: ImportParseResult) => {
+    setImportResult(result);
+    if (!result.success) {
+      const problems = result.report?.issues.slice(0, 3).map(problem => `${problem.location}: ${problem.reason}`).join(' ') ?? '';
+      const skipped = result.report?.skipped ? `${result.report.skipped} entries skipped. ` : '';
+      setImportStatusMsg({ type: 'error', text: `${result.error || 'No valid transaction entries found.'} ${skipped}${problems}`.trim() });
+    }
+  };
+
   const handlePickFile = async () => {
+    if (isParsing || pending) return;
     try {
       setIsParsing(true);
+      setImportResult(null);
       setImportStatusMsg(null);
       const res = await DocumentPicker.getDocumentAsync({
-        type: [
-          'application/json',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'application/vnd.ms-excel',
-          'text/csv',
-          'text/plain',
-          '*/*',
-        ],
+        type: ['application/pdf', 'application/json', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'text/csv', 'text/plain'],
         copyToCacheDirectory: true,
+        multiple: false,
       });
-
-      if (res.canceled || !res.assets || res.assets.length === 0) {
-        setIsParsing(false);
-        return;
-      }
-
+      if (res.canceled || !res.assets?.length) return;
       const asset = res.assets[0];
-      const fileName = asset.name || 'imported_data';
-      const isJson =
-        fileName.toLowerCase().endsWith('.json') ||
-        (asset.mimeType && asset.mimeType.includes('json'));
-
-      triggerSmoothLayout(280);
-
-      if (Platform.OS === 'web' && (asset as any).file) {
-        const fileObj = (asset as any).file as File;
-        if (isJson) {
-          const text = await fileObj.text();
-          const result = parseJsonTransactions(text, fileName, targetAccountId);
-          setImportResult(result);
-        } else {
-          const buffer = await fileObj.arrayBuffer();
-          const result = parseSpreadsheetTransactions(buffer, fileName, targetAccountId);
-          setImportResult(result);
-        }
+      const fileName = asset.name || 'statement';
+      const isPdf = /\.pdf$/i.test(fileName) || asset.mimeType === 'application/pdf';
+      const isJson = /\.json$/i.test(fileName) || Boolean(asset.mimeType?.includes('json'));
+      const webFile = Platform.OS === 'web' ? asset.file : undefined;
+      const nativeFile = webFile ? null : new ExpoFile(asset.uri);
+      const size = asset.size ?? webFile?.size ?? nativeFile?.size ?? 0;
+      if (size > (isPdf ? 3 : 10) * 1024 * 1024) throw new Error(isPdf ? 'PDF imports must be 3 MB or smaller. Export a shorter date range.' : 'Statement imports must be 10 MB or smaller. Export a shorter date range.');
+      // Yield once so the parsing indicator paints before XLSX decoding begins.
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      let result: ImportParseResult;
+      if (isPdf) {
+        const base64 = webFile ? await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+          reader.onerror = () => reject(new Error('Could not read this PDF. Choose the original statement again.'));
+          reader.readAsDataURL(webFile);
+        }) : await nativeFile!.base64();
+        const extracted = await api<{ pages: string[] }>('/api/import/statement/pdf', { method: 'POST', body: { base64 }, attempts: 1, timeoutMs: 30000 });
+        result = parseGooglePayPdfTransactions(extracted.pages, fileName, targetAccountId);
+      } else if (isJson) {
+        result = parseJsonTransactions(await (webFile ? webFile.text() : nativeFile!.text()), fileName, targetAccountId);
       } else {
-        const file = new ExpoFile(asset.uri);
-        if (isJson) {
-          const text = await file.text();
-          const result = parseJsonTransactions(text, fileName, targetAccountId);
-          setImportResult(result);
-        } else {
-          const result = parseSpreadsheetTransactions(await file.arrayBuffer(), fileName, targetAccountId);
-          setImportResult(result);
-        }
+        result = parseSpreadsheetTransactions(await (webFile ? webFile.arrayBuffer() : nativeFile!.arrayBuffer()), fileName, targetAccountId);
       }
-      setIsParsing(false);
-    } catch (err: any) {
-      setIsParsing(false);
-      setImportStatusMsg({
-        type: 'error',
-        text: err.message || 'Error selecting or parsing document.',
-      });
-    }
+      triggerSmoothLayout(280);
+      applyImportResult(result);
+    } catch (err) {
+      setImportStatusMsg({ type: 'error', text: err instanceof Error ? err.message : 'Error selecting or parsing document.' });
+    } finally { setIsParsing(false); }
   };
 
   const handleParsePastedJson = () => {
     if (!jsonInputText.trim()) return;
     triggerSmoothLayout(260);
     const result = parseAnyTextTransactions(jsonInputText, 'pasted_statement.csv', targetAccountId);
-    setImportResult(result);
-    if (!result.success) {
-      setImportStatusMsg({
-        type: 'error',
-        text: result.error || 'Failed to parse statement data.',
-      });
-    }
+    setImportStatusMsg(null);
+    applyImportResult(result);
   };
 
   const handleConfirmImport = () => {
-    if (!importResult || !importResult.success || importResult.transactions.length === 0) {
+    if (pending || !importResult || !importResult.success || importResult.transactions.length === 0) {
       return;
     }
+    if (!targetAccountId) { setImportStatusMsg({ type: 'error', text: 'Add and choose a UPI/card profile before importing.' }); return; }
     void run(async () => {
     const count = await importTransactions(importResult.transactions.map(tx => ({ ...tx, upiAccountId: targetAccountId })));
     triggerNotification(NotificationType.Success);
     triggerSmoothLayout(260);
     setImportStatusMsg({
       type: 'success',
-      text: `Successfully imported ${count} transactions from ${importResult.sourceApp}!`,
+      text: `${count} transactions saved on this device. They will sync automatically.`,
     });
     setImportResult(null);
     setJsonInputText('');
@@ -314,7 +322,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             scaleTo={0.92}
             onPress={() => {
               triggerImpact(ImpactStyle.Light);
-              onBack();
+              if (avatarTransition) avatarTransition.close(avatarTarget.current, onBack);
+              else onBack();
             }}
             accessibilityLabel="Back to previous screen"
             contentStyle={[styles.backBtn, { backgroundColor: cardBg }]}
@@ -323,9 +332,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <Text style={[styles.backBtnText, { color: textColor }]}>Back</Text>
           </AnimatedPressable>
 
-          <Text style={[styles.headerTitle, { color: textColor }]}>Settings</Text>
-
-          <View style={styles.headerRightPlaceholder} />
+          <View pointerEvents="none" style={styles.headerTitlePosition}><Text style={[styles.headerTitle, { color: textColor }]}>Settings</Text></View>
         </View>
 
         {/* User Profile Card Header */}
@@ -336,17 +343,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             style={styles.profileAvatarWrap}
             accessibilityLabel="Change profile photo"
           >
-            <UserAvatar
+            <View ref={avatarTarget} collapsable={false} onLayout={measureAvatar} style={{ width: 92, height: 92, opacity: avatarTransition?.moving ? 0 : 1 }}><UserAvatar
               avatarUri={avatarUri}
+              name={userName}
               size={92}
               borderRadius={28}
               isDark={isDark}
-            />
-            {/* Cutout Verified Badge */}
-            <View style={styles.verifiedBadgeWrap}>
-              <View style={[styles.verifiedCutoutDisk, { backgroundColor: cardBg }]} />
-              <CheckCircleIcon size={22} color="#10B981" />
-            </View>
+            /></View>
           </TouchableOpacity>
 
           <Text style={[styles.profileName, { color: textColor }]}>{userName}</Text>
@@ -370,6 +373,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </View>
 
         {/* Quick Management & Navigation Stack Card */}
+        <View style={[styles.joinedCard, { backgroundColor: cardBg }]}>
+          <View style={styles.joinedSection}>
+            <Text style={[styles.sectionHeader, { color: mutedText }]}>SYNC STATUS</Text>
+            <Text style={[styles.surfaceCaption, { color: mutedText }]}>{pendingFailure ? 'A saved entry needs review. Your other entries can still sync.' : isOffline ? 'Offline. Saved entries will sync when you reconnect.' : syncing ? 'Syncing saved entries…' : queuedTransactionCount ? `${queuedTransactionCount} entries waiting to sync` : syncError ? 'Sync paused. Your saved entries are retained.' : 'Your ledger is up to date'}</Text>
+            {syncError ? <Text style={[styles.surfaceCaption, { color: mutedText }]}>{syncError}</Text> : null}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+              {pendingFailure ? <GlassPill label="Review saved entry" variant="dark" disabled={pending} onPress={reviewQueuedTransactions} /> : null}
+              <GlassPill label={syncing ? 'Syncing…' : 'Sync now'} variant="dark" disabled={syncing || pending} onPress={() => { void run(refresh); }} />
+            </View>
+          </View>
+        </View>
         <View style={[styles.joinedCard, { backgroundColor: cardBg }]}>
           <View style={styles.joinedSection}>
             <Text style={[styles.sectionHeader, { color: mutedText }]}>QUICK NAVIGATION</Text>
@@ -597,6 +611,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {/* Currency Settings */}
           <View style={styles.joinedSection}>
+            <Text style={[styles.sectionHeader, { color: mutedText }]}>EDIT & DELETE ACTIONS</Text>
+            <JellyRadio presentation="chips" items={[{ value: 'swipe', label: 'Swipe & Select' }, { value: 'buttons', label: 'Show Buttons' }]}
+              value={transactionActionStyle} onChange={value => setTransactionActionStyle(value as 'swipe' | 'buttons')}
+              chipColor={chipBg} activeColor={activeBg} textColor={textColor} activeTextColor={activeText} size="sm" gap={10} />
+            <Text style={[styles.surfaceCaption, { color: mutedText }]}>Use swipes or buttons for editable and removable items throughout the app.</Text>
+          </View>
+          <View style={[styles.sectionDivider, { backgroundColor: dividerColor }]} />
+          <View style={styles.joinedSection}>
             <Text style={[styles.sectionHeader, { color: mutedText }]}>CURRENCY</Text>
             <JellyRadio
               items={[
@@ -645,8 +667,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             IMPORT FROM OTHER APPS
           </Text>
           <Text style={[styles.importDesc, { color: mutedText }]}>
-            Import expenses from Splitwise, Tricount, Walnut, Fold, or any Excel (.xlsx/.xls), CSV, or JSON file.
+            Import Paytm or Slice XLSX, CSV/JSON transaction exports, or an original Google Pay text PDF. Review the totals before saving.
           </Text>
+
+          <Text style={[styles.importDesc, { color: mutedText, marginTop: 6 }]}>PDFs are sent securely to your existing SplitTrack backend only for text extraction. Scanned/encrypted PDFs and other PDF layouts are not supported. Spreadsheet parsing stays on this device.</Text>
 
           {/* Status Banner */}
           {importStatusMsg && (
@@ -682,16 +706,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <AnimatedPressable
               scaleTo={0.96}
               onPress={handlePickFile}
-              disabled={isParsing}
-              contentStyle={[styles.importActionBtn, { backgroundColor: activeBg }]}
+              disabled={isParsing || pending}
+              contentStyle={[styles.importActionBtn, { backgroundColor: cardBg }]}
             >
               {isParsing ? (
-                <ActivityIndicator size="small" color={activeText} />
+                <ActivityIndicator size="small" color={textColor} />
               ) : (
                 <>
-                  <DocumentAddIcon size={16} color={activeText} />
-                  <Text style={[styles.importActionBtnText, { color: activeText }]}>
-                    Import File (.json / .xlsx)
+                  <DocumentAddIcon size={16} color={textColor} />
+                  <Text style={[styles.importActionBtnText, { color: textColor }]}>
+                    Import Statement
                   </Text>
                 </>
               )}
@@ -703,7 +727,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 triggerSmoothLayout(240);
                 setShowJsonPaste((prev) => !prev);
               }}
-              contentStyle={[styles.importSecondaryBtn, { backgroundColor: chipBg }]}
+              contentStyle={[styles.importSecondaryBtn, { backgroundColor: cardBg }]}
             >
               <FileTextIcon size={15} color={textColor} />
               <Text style={[styles.importSecondaryBtnText, { color: textColor }]}>
@@ -723,7 +747,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 ]}
                 multiline
                 numberOfLines={5}
-                placeholder="Paste statement CSV or JSON here (e.g. Slice, Splitwise, or bank export)"
+                placeholder="Paste CSV with Date, Description and Amount/Type columns, or JSON transactions with date, title, amount and type."
                 placeholderTextColor={mutedText}
                 value={jsonInputText}
                 onChangeText={setJsonInputText}
@@ -762,6 +786,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   </View>
                 </View>
 
+                {importResult.report ? <View style={{ gap: 6, marginBottom: 10 }}>
+                  <Text style={{ color: textColor, fontSize: 12 }}>Paid: {formatAmount(importResult.report.expenseTotal)} · Received: {formatAmount(importResult.report.incomeTotal)}</Text>
+                  <Text style={{ color: mutedText, fontSize: 12 }}>{importResult.report.imported} valid · {importResult.report.skipped} skipped · {importResult.report.ignored} header/summary rows ignored</Text>
+                  {importResult.report.warnings.map((warning, index) => <Text key={`warning-${index}`} style={{ color: mutedText, fontSize: 12 }}>{warning}</Text>)}
+                  {importResult.report.issues.map((problem, index) => <Text key={`issue-${index}`} style={{ color: '#E5898F', fontSize: 12 }}>{problem.location}: {problem.reason}</Text>)}
+                </View> : null}
+
                 {/* Target Profile Selector */}
                 <Text style={[styles.accountPickLabel, { color: mutedText }]}>
                   LINK TO UPI / CARD PROFILE:
@@ -781,7 +812,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                         </Text>
                       </View>
                       <Text style={[styles.previewEntryAmount, { color: textColor }]}>
-                        {currSym}{Math.abs(item.amount).toFixed(2)}
+                        {item.type === 'income' ? '+' : '−'}{currSym}{Math.abs(item.amount).toFixed(2)}
                       </Text>
                     </View>
                   ))}
@@ -797,11 +828,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <AnimatedPressable
                     scaleTo={0.96}
                     onPress={handleConfirmImport}
+                    disabled={pending || !targetAccountId}
                     contentStyle={[styles.confirmImportBtn, { backgroundColor: '#10B981' }]}
                   >
                     <CheckCircleIcon size={16} color="#FFFFFF" />
                     <Text style={styles.confirmImportBtnText}>
-                      Confirm & Import ({importResult.transactions.length})
+                      {pending ? 'Saving on this device…' : `Confirm & Import (${importResult.transactions.length})`}
                     </Text>
                   </AnimatedPressable>
 
@@ -826,7 +858,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         <View style={styles.dataActionsSection}>
           <TouchableOpacity
             onPress={transactionActions.openDeleted}
-            style={[styles.resetBtn, { backgroundColor: chipBg }]}
+            style={[styles.resetBtn, { backgroundColor: cardBg }]}
             activeOpacity={0.7} accessibilityRole="button"
           >
             <TrashBinTrashIcon size={16} color={textColor} />
@@ -839,22 +871,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             style={[
               styles.eraseBtn,
               {
-                backgroundColor: '#E5484D',
+                backgroundColor: '#E77878',
               },
             ]}
             activeOpacity={0.7}
             accessibilityLabel="Start a fresh ledger"
             disabled={pending}
           >
-            <TrashBinTrashIcon size={16} color="#FFFFFF" />
-            <Text style={styles.eraseBtnTitle}>Start a Fresh Ledger</Text>
+            <TrashBinTrashIcon size={16} color="#47191D" />
+            <Text style={[styles.eraseBtnTitle, { color: '#47191D' }]}>Start a Fresh Ledger</Text>
           </TouchableOpacity>
 
           {onSignOut && (
             <TouchableOpacity
               onPress={onSignOut}
               disabled={googlePending}
-              style={[styles.resetBtn, { backgroundColor: chipBg }]}
+              style={[styles.resetBtn, { backgroundColor: cardBg }]}
               activeOpacity={0.7}
             >
               <Logout2Icon size={16} color={textColor} />
@@ -868,86 +900,42 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
 
 
-      {/* Erase All Data Confirmation Dialog */}
-      <Modal
-        visible={showEraseConfirm}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowEraseConfirm(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => setShowEraseConfirm(false)}
-          />
-          <View
-            style={[
-              styles.confirmDialogCard,
-              {
-                backgroundColor: isDark ? '#0C0C0F' : '#FFFFFF',
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.confirmIconWrap,
-                { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2' },
-              ]}
-            >
-              <TrashBinTrashIcon size={24} color="#EF4444" />
-            </View>
-            <Text style={[styles.confirmDialogTitle, { color: textColor }]}>
-              Start a Fresh Ledger?
-            </Text>
-            <Text style={[styles.confirmDialogMessage, { color: mutedText }]}>
-              Delete your earlier ledger entries, payment profiles and saved rules, clear shared balances, and remove your trips. Your sign-in, profile and app preferences stay. This cannot be undone.
-            </Text>
-            <FormError message={error} />
-
-            <View style={styles.confirmDialogButtons}>
-              <TouchableOpacity
-                onPress={() => setShowEraseConfirm(false)}
-                style={[styles.confirmCancelBtn, { backgroundColor: chipBg }]}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.confirmCancelText, { color: textColor }]}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  performErase();
-                }}
-                style={[styles.confirmEraseBtn, { backgroundColor: '#EF4444' }]}
-                activeOpacity={0.8}
-                disabled={pending}
-              >
-                <Text style={styles.confirmEraseText}>
-                  {pending ? 'Saving…' : 'Start Fresh'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+      <SheetModal visible={showEraseConfirm} onRequestClose={() => !pending && setShowEraseConfirm(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <ModalBackdrop onClose={() => !pending && setShowEraseConfirm(false)} />
+          <GlassModalSheet>
+            <SheetHeader title="Start a fresh ledger?" subtitle="Clear your current ledger and begin again" onClose={() => !pending && setShowEraseConfirm(false)} disabled={pending} />
+            <ScrollEdgeFade><ScrollView contentContainerStyle={{ gap: 14, paddingBottom: 4 }}>
+              <View style={{ padding: 18, borderRadius: 22, gap: 12, backgroundColor: isDark ? '#111114' : '#EDEDF1' }}>
+                <TrashBinTrashIcon size={28} color="#E5484D" />
+                <Text style={{ color: textColor, fontSize: 15, fontWeight: '600' }}>Your earlier ledger will be cleared</Text>
+                <Text style={{ color: mutedText, fontSize: 13, lineHeight: 20 }}>Delete earlier entries, payment profiles and saved rules, clear shared balances, and remove your trips. Your sign-in, profile and app preferences stay. This cannot be undone.</Text>
+              </View>
+              <FormError message={error} />
+              <GlassPill label={pending ? 'Clearing…' : 'Start fresh'} size="lg" variant="danger" disabled={pending} onPress={performErase} />
+              <GlassPill label="Cancel" size="lg" variant="dark" disabled={pending} onPress={() => setShowEraseConfirm(false)} />
+            </ScrollView></ScrollEdgeFade>
+          </GlassModalSheet>
         </View>
-      </Modal>
+      </SheetModal>
+      <BottomBubble notice={profileNotice} onDismiss={() => setProfileNotice(null)} />
       <SheetModal visible={showGoogleLink} onRequestClose={closeGoogleLink}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <ModalBackdrop onClose={closeGoogleLink} />
           <GlassModalSheet>
-            <View style={{ alignItems: 'center', paddingVertical: 6, marginBottom: 12 }}><View style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: isDark ? '#52525B' : '#A1A1AA' }} /></View>
-            <Text style={{ color: textColor, fontSize: 22, fontWeight: '600', marginBottom: 14 }}>Sync with Google</Text>
-            <Text style={{ color: mutedText, fontSize: 14, lineHeight: 20, marginBottom: 18 }}>
-              Choose the Google account for {user?.email || profile?.email || 'your email'}. Your transactions, groups and password sign-in stay with this account.
-            </Text>
-            {googleNeedsPassword ? <TextInput accessibilityLabel="Current account password" value={googlePassword} onChangeText={setGooglePassword}
-              placeholder="Current password" placeholderTextColor={mutedText} secureTextEntry autoCapitalize="none" autoCorrect={false}
-              editable={!googlePending} style={{ width: '100%', backgroundColor: chipBg, color: textColor, fontSize: 14, borderRadius: 14, paddingHorizontal: 14, minHeight: 48, marginBottom: 12 }} /> : null}
-            <FormError message={googleError} />
-            <View style={{ gap: 12 }}>
-              <GlassPill label={googlePending ? 'Syncing…' : googleNeedsPassword ? 'Confirm password and sync' : 'Continue with Google'} size="lg" shape="rounded" variant="accent" disabled={googlePending} onPress={performGoogleLink} />
-              <GlassPill label="Cancel" size="lg" disabled={googlePending} onPress={closeGoogleLink} />
-            </View>
+            <SheetHeader title="Sync with Google" subtitle="Connect Google to your existing account" onClose={closeGoogleLink} disabled={googlePending} />
+            <ScrollEdgeFade><ScrollView contentContainerStyle={{ gap: 14, paddingBottom: 4 }}>
+              <View style={{ padding: 18, borderRadius: 22, gap: 12, backgroundColor: isDark ? '#111114' : '#EDEDF1' }}>
+                <Text style={{ color: textColor, fontSize: 15, fontWeight: '600' }}>{user?.email || profile?.email || 'Your account'}</Text>
+                <Text style={{ color: mutedText, fontSize: 13, lineHeight: 20 }}>Your transactions, groups and password sign-in stay with this account.</Text>
+                {googleNeedsPassword ? <TextInput accessibilityLabel="Current account password" value={googlePassword} onChangeText={setGooglePassword}
+                  placeholder="Current password" placeholderTextColor={mutedText} secureTextEntry autoCapitalize="none" autoCorrect={false}
+                  editable={!googlePending} style={{ backgroundColor: chipBg, color: textColor, fontSize: 14, borderRadius: 14, paddingHorizontal: 14, height: 48 }} /> : null}
+              </View>
+              <FormError message={googleError} />
+              <GlassPill label={googlePending ? 'Syncing…' : googleNeedsPassword ? 'Confirm password and sync' : 'Continue with Google'} size="lg" variant="dark" disabled={googlePending} onPress={performGoogleLink} />
+              <GlassPill label="Cancel" size="lg" variant="dark" disabled={googlePending} onPress={closeGoogleLink} />
+            </ScrollView></ScrollEdgeFade>
           </GlassModalSheet>
         </View>
       </SheetModal>
@@ -980,7 +968,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     paddingVertical: 12,
   },
   backBtn: {
@@ -1000,8 +988,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.2,
   },
-  headerRightPlaceholder: {
-    width: 60,
+  headerTitlePosition: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -1022,26 +1012,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  profileAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-  },
-  verifiedBadgeWrap: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  verifiedCutoutDisk: {
-    position: 'absolute',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
   },
   profileName: {
     fontSize: 20,

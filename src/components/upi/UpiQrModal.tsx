@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     top: 16,
     right: 16,
     zIndex: 20,
-    borderRadius: 14,
+    borderRadius: COMPACT_BUTTON_HEIGHT / 2,
     backgroundColor: '#F3F4F6',
     borderWidth: 0,
   },

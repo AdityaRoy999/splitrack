@@ -1,10 +1,9 @@
 import React, { useLayoutEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { Easing, ReduceMotion, useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { isPhotoUri, UserAvatar } from '../common/UserAvatar';
 
-// Only the small profile image is blurred during the handoff; there is no
-// backdrop capture or per-frame React rendering.
+// Crossfade decoded photos without a persistent image blur on web or native.
 export function HeaderAvatar({ uri, hidden, dark, name }: { uri: string | null; hidden: boolean; dark: boolean; name: string }) {
   const photo = isPhotoUri(uri);
   const [readyUri, setReadyUri] = useState<string | null>(null);
@@ -20,13 +19,12 @@ export function HeaderAvatar({ uri, hidden, dark, name }: { uri: string | null; 
   const motion = useAnimatedStyle(() => ({ opacity: progress.get() }));
   const photoMotion = useAnimatedStyle(() => ({ opacity: photoProgress.get() }));
   const fallbackMotion = useAnimatedStyle(() => ({ opacity: 1 - photoProgress.get() }));
-  const imageProps = useAnimatedProps(() => ({ blurRadius: (1 - photoProgress.get()) * 5 }));
   return <View style={styles.slot}>
     <Animated.View style={[StyleSheet.absoluteFill, motion]}>
       <Animated.View style={[StyleSheet.absoluteFill, fallbackMotion]}><UserAvatar avatarUri={photo ? null : uri} name={name} size={42} borderRadius={14} isDark={dark} /></Animated.View>
       {photo && failedUri !== uri ? <Animated.Image source={{ uri: uri! }} resizeMode="cover"
         onLoadEnd={() => setReadyUri(uri)} onError={() => setFailedUri(uri)}
-        animatedProps={imageProps} style={[StyleSheet.absoluteFill, photoMotion]} /> : null}
+        style={[StyleSheet.absoluteFill, photoMotion]} /> : null}
     </Animated.View>
   </View>;
 }

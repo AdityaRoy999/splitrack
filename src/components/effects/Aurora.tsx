@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   PixelRatio,
+  Platform,
   processColor,
   StyleSheet,
   View,
@@ -15,6 +16,7 @@ import { subscribeAuroraFrame } from './auroraFrameLoop';
 import { createNativeAuroraRenderer, type AuroraRenderer } from './auroraRenderer';
 import { normalizeAuroraSettings, type AuroraOptions } from './auroraSettings';
 import { clamp, INTRO_SECONDS } from './auroraShader';
+import { useAndroidEffectVisibility } from './useAndroidEffectVisibility';
 
 export interface AuroraProps extends AuroraOptions {
   style?: StyleProp<ViewStyle>;
@@ -29,7 +31,11 @@ function parseColor(color: string): number[] {
 export const Aurora = memo(function Aurora({ style, ...options }: AuroraProps) {
   const sceneActive = useSceneActive();
   const { foreground, reducedMotion } = useVisualActivity();
-  const settings = normalizeAuroraSettings(options);
+  const { ref: visibilityRef, visible } = useAndroidEffectVisibility(foreground && sceneActive);
+  // Android's backdrop capture and the card shader share the same frame budget.
+  // A one-pixel-per-point noise target keeps the soft aurora shape/colors while
+  // shading 56% fewer pixels than the old default DPR 1.5 on high-density phones.
+  const settings = normalizeAuroraSettings({ ...options, dpr: options.dpr ?? (Platform.OS === 'android' ? 1 : undefined) });
   const settingsRef = useRef(settings);
   const aliveRef = useRef(true);
   const rendererRef = useRef<AuroraRenderer | null>(null);
@@ -66,7 +72,7 @@ export const Aurora = memo(function Aurora({ style, ...options }: AuroraProps) {
     if (!renderer) return;
     try {
       renderer.update(settings);
-      if (foreground && sceneActive) {
+      if (foreground && sceneActive && visible) {
         if (!settings.intro || reducedMotion || settings.paused) stateRef.current.reveal = 1;
         renderer.draw(stateRef.current.clock, stateRef.current.reveal);
       }
@@ -78,7 +84,7 @@ export const Aurora = memo(function Aurora({ style, ...options }: AuroraProps) {
   useEffect(() => {
     const state = stateRef.current;
     state.last = 0;
-    if (!ready || failed || !foreground || !sceneActive || reducedMotion || settings.paused || settings.speed === 0) return;
+    if (!ready || failed || !foreground || !sceneActive || !visible || reducedMotion || settings.paused || settings.speed === 0) return;
     const stop = subscribeAuroraFrame((now) => {
       const current = settingsRef.current;
       const dt = state.last ? clamp((now - state.last) / 1000, 0, 0.05) : 1 / 30;
@@ -97,7 +103,7 @@ export const Aurora = memo(function Aurora({ style, ...options }: AuroraProps) {
       stopFrameRef.current = null;
       state.last = 0;
     };
-  }, [fail, failed, foreground, ready, reducedMotion, sceneActive, settings.paused, settings.speed]);
+  }, [fail, failed, foreground, ready, reducedMotion, sceneActive, settings.paused, settings.speed, visible]);
 
   useLayoutEffect(() => {
     aliveRef.current = true;
@@ -110,8 +116,10 @@ export const Aurora = memo(function Aurora({ style, ...options }: AuroraProps) {
     };
   }, []);
 
+  const mountContext = Platform.OS !== 'android' || ready || (sceneActive && foreground && visible);
+
   return (
-    <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.container, style]}>
+    <View ref={visibilityRef} collapsable={false} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.container, style]}>
       {failed ? (
         <LinearGradient
           colors={['transparent', settings.stops[0]]}
@@ -119,9 +127,9 @@ export const Aurora = memo(function Aurora({ style, ...options }: AuroraProps) {
           end={{ x: 0.5, y: settings.flip ? 1 : 0 }}
           style={[StyleSheet.absoluteFill, { opacity: settings.opacity }]}
         />
-      ) : (
+      ) : mountContext ? (
         <GLView pointerEvents="none" msaaSamples={0} onContextCreate={onContextCreate} style={StyleSheet.absoluteFill} />
-      )}
+      ) : null}
     </View>
   );
 });

@@ -1,6 +1,6 @@
 # Android and iOS builds
 
-Build from the separate **frontend** repository (`AdityaRoy999/splitrack`), checked out here at `C:\projects\AWS-SplitTrack\frontend`. The AWS backend remains in `C:\projects\AWS-SplitTrack\backend` and is deployed separately using the backend repository's README. Deploy the matching backend changes before testing offline replay and duplicate confirmation against the production API.
+Build from the separate **frontend** repository (`AdityaRoy999/splitrack`). The AWS backend is maintained in the separate `AWS-SplitTrack` checkout and deployed using that repository's README. The matching backend for updated offline replay, independent equal-amount transactions and PDF statement extraction was deployed on **21 November 2026**; see [backend integration](backend-integration.md) for verification and remaining device checks.
 
 The existing GitHub workflows build native Android APKs and unsigned iOS IPAs. They do not require an Expo Build/EAS account. Both workflows also publish a GitHub release after a successful build; the iOS workflow updates `apps.json` for the existing SideStore feed. Run them when those outputs are intended. They also run automatically after pushing to `main`.
 
