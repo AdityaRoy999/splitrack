@@ -179,12 +179,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.44",
-      "versionDate": "2026-11-20T21:47:25Z",
-      "versionDescription": "Fix: UI consistency and transaction animations",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-44/Splittrack-unsigned.ipa",
-      "size": 27214051,
+      "version": "1.0.45",
+      "versionDate": "2026-11-21T21:13:03Z",
+      "versionDescription": "Improve Android rendering, sheet gestures and statement imports",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-45/Splittrack-unsigned.ipa",
+      "size": 27244107,
       "versions": [
+        {
+          "version": "1.0.45",
+          "buildVersion": "45",
+          "date": "2026-11-21T21:13:03Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-45/Splittrack-unsigned.ipa",
+          "size": 27244107,
+          "localizedDescription": "Improve Android rendering, sheet gestures and statement imports"
+        },
         {
           "version": "1.0.44",
           "buildVersion": "44",
