@@ -2,7 +2,7 @@
 
 Build from the separate **frontend** repository (`AdityaRoy999/splitrack`). The AWS backend is maintained in the separate `AWS-SplitTrack` checkout and deployed using that repository's README. The matching backend for updated offline replay, independent equal-amount transactions and PDF statement extraction was deployed on **21 November 2026**; see [backend integration](backend-integration.md) for verification and remaining device checks.
 
-The existing GitHub workflows build native Android APKs and unsigned iOS IPAs. They do not require an Expo Build/EAS account. Both workflows also publish a GitHub release after a successful build; the iOS workflow updates `apps.json` on `ios` for the SideStore feed.
+The existing GitHub workflows build native Android APKs and unsigned iOS IPAs. They do not require an Expo Build/EAS account. Both workflows also publish a GitHub release after a successful build; the iOS workflow updates `apps.json` on both `main` and `ios` for the SideStore feeds.
 
 ## Platform branches
 
@@ -12,11 +12,12 @@ The existing GitHub workflows build native Android APKs and unsigned iOS IPAs. T
 | --- | --- | --- |
 | `android` | **Build Android APK** | `Splittrack-release.apk` |
 | `ios` | **Build Unsigned iOS IPA** | `Splittrack-unsigned.ipa` |
-| `main` or any other branch | Neither mobile build | No automatic mobile artifact |
+| `main` | Both workflows | APK and unsigned IPA |
+| Any other branch | Neither mobile build | No automatic mobile artifact |
 
-Manual workflow runs must also select the matching branch. The build job skips a manual run selected on any other branch. Both workflow files remain in all three branches so future shared changes can be merged without restoring cross-platform build triggers.
+Manual workflow runs can select `main` for either platform, or the matching platform branch. The build job skips a manual run selected on any other branch. Both workflow files remain in all three branches with the same routing rules.
 
-Keep common changes on `main`, then merge them into each platform branch when that platform is ready to build:
+Push common changes to `main` to build both platforms. The platform branches remain independent; merge shared changes into a platform branch when it should also receive that source:
 
 ```powershell
 git switch android
@@ -28,9 +29,9 @@ git merge main
 git push origin ios
 ```
 
-For a platform-specific change, commit and push directly on its branch. The iOS workflow publishes the SideStore feed only to `ios`; it does not write to `main` or `android`. Feed commits use the GitHub Actions token, and bot commits are guarded, so publishing a feed does not cause a rebuild loop. Repository secrets, native signing, artifact names, release tags and each platform's existing build steps stay the same.
+For a platform-specific change, commit and push directly on its branch. Each successful iOS build publishes the release to both `main/apps.json` and `ios/apps.json`, updating only the feed file on each branch and preserving its existing history. It does not update the Android branch. Feed commits use the GitHub Actions token and `[skip ci]`, and bot commits are guarded, so publishing feeds does not cause a rebuild loop. Repository secrets, native signing, artifact names, release tags and each platform's existing build steps stay the same.
 
-Use this source in SideStore: [iOS apps.json](https://raw.githubusercontent.com/AdityaRoy999/splitrack/ios/apps.json). Replace an existing source using the old `main/apps.json` URL with this iOS branch URL to receive future updates. The feed preserves existing releases and adds each successful iOS build.
+Either SideStore source receives every successful iOS release: [main apps.json](https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/apps.json) or [iOS apps.json](https://raw.githubusercontent.com/AdityaRoy999/splitrack/ios/apps.json). Existing subscribers can keep either URL. Each feed points to its own branch's source URL and assets.
 
 ## Configure the frontend repository
 
@@ -74,7 +75,7 @@ npm run lint
 ## Build Android
 
 1. Commit the updated frontend code on `android`, or merge the desired shared changes from `main` into `android`.
-2. Push `android` to trigger only the APK build. For a manual build, open GitHub **Actions → Build Android APK → Run workflow** and select `android`.
+2. Push `android` to trigger only the APK build, or push `main` to build both platforms. For a manual APK build, open GitHub **Actions → Build Android APK → Run workflow** and select `android` or `main`.
 3. After success, download artifact **Splittrack-android-apk**. It contains `Splittrack-release.apk` and `android-signing-certificate.txt`. The release asset is also named `Splittrack-release.apk`.
 4. Compare the signer in the artifact/build summary with the registered SHA-1 above. The configured `GOOGLE_ANDROID_CERTIFICATE_SHA1` makes a signer mismatch fail the workflow. Register another signer if intentionally changing it.
 5. Install the APK on a physical Android device or Google Play-enabled emulator. Test new and returning Google accounts, then save an offline expense/payment receipt, reopen the app offline, reconnect, and verify one backend record. Check duplicate Continue/Cancel as well.
@@ -83,7 +84,7 @@ The workflow generates Android with Expo Prebuild, builds `assembleRelease`, ver
 
 ## Build iOS
 
-1. Commit the updated frontend code on `ios`, or merge the desired shared changes from `main` into `ios`. Push `ios` to trigger only the IPA build. For a manual build, open GitHub **Actions → Build Unsigned iOS IPA → Run workflow** and select `ios`.
+1. Commit the updated frontend code on `ios`, or merge the desired shared changes from `main` into `ios`. Push `ios` to trigger only the IPA build, or push `main` to build both platforms. For a manual IPA build, open GitHub **Actions → Build Unsigned iOS IPA → Run workflow** and select `ios` or `main`.
 2. Wait for Expo Prebuild, CocoaPods, and the Xcode Release build on GitHub's macOS runner. After success, download artifact **Splittrack-unsigned-ipa** or `Splittrack-unsigned.ipa` from the generated release.
 3. Sign the unsigned IPA using the existing SideStore/AltStore installation process or another appropriate signing method before installing it. An unsigned IPA cannot be installed directly or submitted to the App Store.
 4. Confirm the installed app's actual bundle ID remains `com.AdiSai.fintrack`, matching the supplied iOS OAuth registration. If the signing/installation tool changes it, that resulting bundle ID needs a matching iOS Google client and native callback configuration.

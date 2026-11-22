@@ -1,7 +1,7 @@
 {
   "name": "Aditya's Apps",
   "identifier": "com.adityaroy999.splittrack.source",
-  "sourceURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/ios/apps.json",
+  "sourceURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/apps.json",
   "apps": [
     {
       "name": "Splittrack",
@@ -9,7 +9,7 @@
       "developerName": "Aditya Roy",
       "subtitle": "Split bills, trips & instant UPI payouts.",
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
-      "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/ios/assets/icon-light.png",
+      "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
       "version": "1.0.28",
       "versionDate": "2026-11-18T10:26:41Z",
@@ -177,7 +177,7 @@
       "developerName": "Aditya Roy",
       "subtitle": "Split bills, trips & instant UPI payouts.",
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
-      "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/ios/assets/icon-light.png",
+      "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
       "version": "1.0.47",
       "versionDate": "2026-11-22T13:31:57Z",
