@@ -220,13 +220,13 @@ jobs:
             export COMMIT_MESSAGE="$(git log -1 --pretty=%s)"
           fi
 
-          # Keep the existing subscribers' feed on main. Main has no mobile push
-          # builds, so this feed update cannot start either platform's workflow.
-          # Fetch the latest main before editing to preserve concurrent changes.
+          # Publish the feed on the iOS build branch. Fetch its latest version
+          # before editing to preserve concurrent source and feed changes.
+          # GITHUB_TOKEN pushes and the bot job guard prevent a rebuild loop.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          git switch -C main origin/main
+          git fetch origin ios
+          git switch -C ios origin/ios
 
           node <<'NODE'
           const fs = require('fs');
@@ -281,13 +281,13 @@ jobs:
               : {
                   name: "Aditya's Apps",
                   identifier: 'com.adityaroy999.splittrack.source',
-                  sourceURL: `https://raw.githubusercontent.com/${repo}/main/apps.json`,
+                  sourceURL: `https://raw.githubusercontent.com/${repo}/ios/apps.json`,
                   apps: [],
                 };
 
             source.name = "Aditya's Apps";
             source.identifier = 'com.adityaroy999.splittrack.source';
-            source.sourceURL = `https://raw.githubusercontent.com/${repo}/main/apps.json`;
+            source.sourceURL = `https://raw.githubusercontent.com/${repo}/ios/apps.json`;
             if (!Array.isArray(source.apps)) {
               source.apps = [];
             }
@@ -329,7 +329,7 @@ jobs:
               subtitle: 'Split bills, trips & instant UPI payouts.',
               localizedDescription:
                 'Split expenses, track shared balances, and manage group spending with Splittrack.',
-              iconURL: `https://raw.githubusercontent.com/${repo}/main/assets/icon-light.png`,
+              iconURL: `https://raw.githubusercontent.com/${repo}/ios/assets/icon-light.png`,
               tintColor: '#6366F1',
               version: newVersion.version,
               versionDate: newVersion.date,
@@ -357,7 +357,7 @@ jobs:
           git add apps.json
           if ! git diff --cached --quiet; then
             git commit -m "chore: update SideStore source for iOS build $BUILD_NUMBER"
-            git push origin HEAD:main
+            git push origin HEAD:ios
           else
             echo "AltSource feed is already up to date."
           fi

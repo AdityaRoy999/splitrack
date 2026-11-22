@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
 const { load } = require('js-yaml');
@@ -41,11 +42,44 @@ test('isolated workflows retain their native platforms, artifacts and separate q
   assert.ok(ipa.steps.some(step => step.uses === 'actions/upload-artifact@v4' && step.with.path === 'Splittrack-unsigned.ipa'));
 });
 
-test('iOS preserves the existing main SideStore feed without updating Android', () => {
+test('iOS publishes its SideStore feed only to the iOS branch', () => {
   const feed = ios.jobs['build-unsigned-ios'].steps.find(step => step.name === 'Update SideStore AltSource feed');
   assert.ok(feed);
-  assert.match(feed.run, /git fetch origin main/);
-  assert.match(feed.run, /git push origin HEAD:main/);
-  assert.doesNotMatch(feed.run, /git push[^\n]*\bandroid\b/);
+  assert.match(feed.run, /git fetch origin ios/);
+  assert.match(feed.run, /git switch -C ios origin\/ios/);
+  assert.match(feed.run, /git push origin HEAD:ios/);
+  assert.doesNotMatch(feed.run, /git (?:fetch|switch|push)[^\n]*\b(?:main|android)\b/);
+  assert.doesNotMatch(feed.run, /raw\.githubusercontent\.com\/[^\n]*\/main\//);
   assert.deepEqual(pushTargets('main'), [false, false]);
+});
+
+test('SideStore generation migrates the feed URL to iOS and preserves release history', async () => {
+  const feed = ios.jobs['build-unsigned-ios'].steps.find(step => step.name === 'Update SideStore AltSource feed');
+  const script = feed.run.match(/node <<'NODE'\n([\s\S]*?)\nNODE/)[1];
+  const previous = { version: '1.0.47', buildVersion: '47', downloadURL: 'https://example.invalid/previous.ipa', size: 100 };
+  const bundle = 'com.AdiSai.fintrack';
+  const seed = { sourceURL: 'https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/apps.json', apps: [{ name: 'Splittrack', bundleIdentifier: bundle, versions: [previous] }] };
+  const result = await new Promise((resolve, reject) => {
+    vm.runInNewContext(script, {
+      require(name) {
+        assert.equal(name, 'fs');
+        return {
+          existsSync: () => true,
+          readFileSync: () => JSON.stringify(seed),
+          writeFileSync(file, content) { assert.equal(file, 'apps.json'); resolve(JSON.parse(content)); },
+        };
+      },
+      process: {
+        env: { REPOSITORY: 'AdityaRoy999/splitrack', RELEASE_TAG: 'splittrack-ios-50', BUNDLE_ID: bundle, APP_VERSION: '1.0.50', BUILD_NUMBER: '50', COMMIT_MESSAGE: 'iOS update', FALLBACK_URL: 'https://example.invalid/fresh.ipa', FALLBACK_SIZE: '200', RELEASE_DATE: '2026-11-22T12:00:00Z' },
+        exit: code => reject(new Error(`Feed script exited with ${code}`)),
+      },
+      fetch: async () => ({ ok: false }),
+      console: { log() {}, warn() {}, error: reject },
+    });
+  });
+  assert.equal(result.sourceURL, 'https://raw.githubusercontent.com/AdityaRoy999/splitrack/ios/apps.json');
+  assert.equal(result.apps[0].iconURL, 'https://raw.githubusercontent.com/AdityaRoy999/splitrack/ios/assets/icon-light.png');
+  assert.equal(result.apps[0].versions[0].buildVersion, '50');
+  assert.deepEqual(result.apps[0].versions[1], previous);
+  assert.equal(result.apps[0].downloadURL, 'https://example.invalid/fresh.ipa');
 });

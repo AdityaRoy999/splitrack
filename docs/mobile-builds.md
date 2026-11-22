@@ -2,7 +2,7 @@
 
 Build from the separate **frontend** repository (`AdityaRoy999/splitrack`). The AWS backend is maintained in the separate `AWS-SplitTrack` checkout and deployed using that repository's README. The matching backend for updated offline replay, independent equal-amount transactions and PDF statement extraction was deployed on **21 November 2026**; see [backend integration](backend-integration.md) for verification and remaining device checks.
 
-The existing GitHub workflows build native Android APKs and unsigned iOS IPAs. They do not require an Expo Build/EAS account. Both workflows also publish a GitHub release after a successful build; the iOS workflow updates `apps.json` on `main` for the existing SideStore feed.
+The existing GitHub workflows build native Android APKs and unsigned iOS IPAs. They do not require an Expo Build/EAS account. Both workflows also publish a GitHub release after a successful build; the iOS workflow updates `apps.json` on `ios` for the SideStore feed.
 
 ## Platform branches
 
@@ -28,7 +28,9 @@ git merge main
 git push origin ios
 ```
 
-For a platform-specific change, commit and push directly on its branch. The iOS workflow continues publishing the SideStore feed to `main` so existing feed URLs keep working; that feed commit starts neither mobile build. Repository secrets, native signing, artifact names, release tags and each platform's existing build steps stay the same.
+For a platform-specific change, commit and push directly on its branch. The iOS workflow publishes the SideStore feed only to `ios`; it does not write to `main` or `android`. Feed commits use the GitHub Actions token, and bot commits are guarded, so publishing a feed does not cause a rebuild loop. Repository secrets, native signing, artifact names, release tags and each platform's existing build steps stay the same.
+
+Use this source in SideStore: [iOS apps.json](https://raw.githubusercontent.com/AdityaRoy999/splitrack/ios/apps.json). Replace an existing source using the old `main/apps.json` URL with this iOS branch URL to receive future updates. The feed preserves existing releases and adds each successful iOS build.
 
 ## Configure the frontend repository
 
