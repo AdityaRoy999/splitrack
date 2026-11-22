@@ -1,3 +1,5 @@
+import { SheetFooter } from '../common/SheetFooter';
+import { GlassSurface } from '../glass/GlassSurface';
 import { SheetCloseButton } from '../common/SheetCloseButton';
 import { SheetHandle } from '../common/SheetHandle';
 import { SheetModal } from '../common/SheetModal';
@@ -872,7 +874,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
           <ScrollEdgeFade style={styles.scrollAreaWrap}>
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {/* Amount, Description & Category */}
-            <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
+            <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>
               <View style={[styles.amountInputBox, { backgroundColor: inputBg }]}>
                 <Text style={[styles.currencySymbol, { color: textColor }]}>{currSym}</Text>
                 <TextInput
@@ -1068,11 +1070,12 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   style={styles.locationChipsScroll}
                 />
               )}
-            </View>
+            </GlassSurface>
 
             {/* Paid By, UPI Profile & Trip Group */}
-            <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
+            <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>
               <Text style={[styles.fieldLabel, { color: mutedText }]}>UPI OR CARD PROFILE</Text>
+              {accounts.length === 0 ? <Text style={[styles.noPayerText, { color: mutedText, marginBottom: 12 }]}>Add a UPI or card profile in Settings to choose it here.</Text> : null}
               <JellyRadio
                 scrollable
                 fadeColor={cardBg}
@@ -1252,10 +1255,10 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                 gap={8}
                 radius={999}
               />
-            </View>
+            </GlassSurface>
 
             {/* Split Among Whom using React Bits SpringCheck */}
-            <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
+            <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>
               <View style={styles.splitHeaderRow}>
                 <Text style={[styles.fieldLabel, { color: mutedText, marginBottom: 0 }]}>
                   SPLIT AMONG ({splitWithMembers.length})
@@ -1453,10 +1456,11 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   </View>
                 )}
               </View>
-            </View>
+            </GlassSurface>
             </ScrollView>
           </ScrollEdgeFade>
 
+          <SheetFooter>
           <FormError message={error} />
           <GlassPill
             label={pending ? 'Saving…' : transactionToEdit ? 'Save changes' : 'Save & Split Expense'}
@@ -1466,6 +1470,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
             onPress={handleSave}
             style={styles.saveBtn}
           />
+          </SheetFooter>
         </GlassModalSheet>
       </View>
 

@@ -19,6 +19,7 @@ import { ImpactStyle, NotificationType, triggerImpact, triggerNotification } fro
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassPill } from '../glass/GlassPill';
+import { GlassSurface } from '../glass/GlassSurface';
 import { AnimatedPressable } from '../common/MotionPrimitives';
 import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { GlassModalSheet } from '../common/GlassModalSheet';
@@ -102,7 +103,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
     highlighted: boolean,
     keyPrefix: string
   ) => (
-    <View
+    <GlassSurface borderRadius={22} matteColor={isDark ? '#111114' : '#EDEDF1'}
       style={[
         styles.debtsGroupCard,
         {
@@ -207,7 +208,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
           </React.Fragment>
         );
       })}
-    </View>
+    </GlassSurface>
   );
 
   return (

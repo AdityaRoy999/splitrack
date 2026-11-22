@@ -1,3 +1,5 @@
+import { SheetFooter } from '../common/SheetFooter';
+import { GlassSurface } from '../glass/GlassSurface';
 import { SheetCloseButton } from '../common/SheetCloseButton';
 import { SheetHandle } from '../common/SheetHandle';
 import { ModalBackdrop } from '../common/ModalBackdrop';
@@ -188,7 +190,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {/* Category Preview + Name Input */}
             <ItemActionReveal name={categoryToEdit?.name || 'category'} disabled={pending} onDelete={categoryToEdit ? handleDelete : undefined} buttons={false}>
-            <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
+            <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>
               <View style={styles.previewRow}>
                 <View style={[styles.previewIconBox, { backgroundColor: `${selectedColor}24` }]}>
                   {renderSolarIcon(selectedIconKey, 22, selectedColor)}
@@ -226,11 +228,11 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                 size="sm"
                 gap={10}
               />
-            </View>
+            </GlassSurface>
             </ItemActionReveal>
 
             {/* Solar Bold Icon Menu */}
-            <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
+            <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>
               <View style={styles.menuHeaderRow}>
                 <Text style={[styles.fieldLabel, { color: mutedText, marginBottom: 0 }]}>
                   SOLAR SYMBOL MENU
@@ -298,10 +300,11 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                 radius={14}
                 gap={8}
               />
-            </View>
+            </GlassSurface>
             </ScrollView>
           </ScrollEdgeFade>
 
+          <SheetFooter>
           <FormError message={error} />
           <GlassPill
             label={pending ? 'Saving…' : categoryToEdit ? 'Save Changes' : 'Create Category'}
@@ -311,6 +314,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
             size="lg"
             style={styles.saveBtn}
           />
+          </SheetFooter>
         </GlassModalSheet>
       </View>
     </SheetModal>

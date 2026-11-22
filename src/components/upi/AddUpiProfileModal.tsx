@@ -1,3 +1,5 @@
+import { SheetFooter } from '../common/SheetFooter';
+import { GlassSurface } from '../glass/GlassSurface';
 import { SheetCloseButton } from '../common/SheetCloseButton';
 import { SheetHandle } from '../common/SheetHandle';
 import { ModalBackdrop } from '../common/ModalBackdrop';
@@ -253,7 +255,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
+            <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>
               <Text style={[styles.fieldLabel, { color: mutedText }]}>PROFILE TYPE</Text>
               <JellyRadio
                 scrollable
@@ -459,10 +461,10 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
                   />
                 </>
               )}
-            </View>
+            </GlassSurface>
 
             {/* Make Active Toggle */}
-            <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
+            <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>
               <SpringCheck
                 label="Make this the default profile"
                 checked={makeActive}
@@ -476,8 +478,11 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
                 strike="none"
                 doneOpacity={1}
               />
-            </View>
+            </GlassSurface>
 
+          </ScrollView>
+        </ScrollEdgeFade>
+        <SheetFooter>
             {formError ? <Text accessibilityRole="alert" style={styles.formError}>{formError}</Text> : null}
             <FormError message={error} />
             <GlassPill
@@ -494,8 +499,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
               onPress={handleSave}
               style={styles.saveBtn}
             />
-          </ScrollView>
-        </ScrollEdgeFade>
+        </SheetFooter>
       </GlassModalSheet>
 
       {/* Dedicated Bank Issuer Picker (Full Page with Authentic Logos) */}

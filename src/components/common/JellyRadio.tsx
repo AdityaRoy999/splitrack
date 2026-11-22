@@ -14,7 +14,6 @@ import { triggerSelection } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { HorizontalEdgeFade, useHorizontalScrollEdges } from './ScrollEdgeFade';
 import { DropdownSelect } from './DropdownSelect';
-import { AppleRadioControl } from './AppleNativeControls';
 import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -367,7 +366,7 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   dropdownHeight,
 }) => {
   const scrollEdges = useHorizontalScrollEdges();
-  const { themeMode, selectionStyle, isLiquidGlassEnabled } = useLiquidGlass();
+  const { themeMode, selectionStyle } = useLiquidGlass();
   const isDark = themeMode === 'dark';
   const normalizedItems: JellyRadioItem[] =
     items === 'levels'
@@ -446,13 +445,6 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
       )) : normalizedItems.map(renderChip)}
     </View>
   );
-
-  if (Platform.OS === 'ios' && isLiquidGlassEnabled && variant === 'chip' && normalizedItems.every(item => item.label)) {
-    return <AppleRadioControl items={normalizedItems.map(item => ({ value: item.value, label: item.label, disabled: item.disabled }))}
-      value={currentValue} onChange={(_, index) => handleSelect(index)} size={size} gap={gap} columns={columns}
-      scrollable={scrollable} disabled={disabled} isDark={isDark} style={style}
-      menu={presentation === 'auto' && selectionStyle === 'dropdown' && normalizedItems.length > 1} />;
-  }
 
   if (presentation === 'auto' && selectionStyle === 'dropdown' && normalizedItems.length > 1) {
     return <DropdownSelect

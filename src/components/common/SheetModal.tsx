@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, Modal, Platform, useWindowDimensions, View, type ModalProps } from 'react-native';
+import { Keyboard, Modal, Platform, useWindowDimensions, type ModalProps } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SceneActivityContext } from './SceneActivityContext';
@@ -7,7 +7,8 @@ import { ModalVisualContext } from './ModalVisualContext';
 import { BubbleNoticeHost } from './BottomBubble';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AppleSheet } from './AppleSheet';
-import { NativeSheetPresentationContext } from './NativeSheetPresentation';
+import { NativeSheetPresentationContext, NativeSheetSizingContext } from './NativeSheetPresentation';
+import { SheetKeyboardViewport } from './SheetKeyboardViewport';
 
 const SheetModalContext = createContext({ open: true, ready: true, close: () => {}, finishExit: () => {} });
 export const useSheetModal = () => useContext(SheetModalContext);
@@ -31,6 +32,7 @@ export function SheetModal({ visible = false, children, onRequestClose, onShow, 
 function NativeSheetModal({ visible, children, onRequestClose, onDismiss, onExitComplete }: SheetModalProps) {
   const parentInsets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const [contentHeight, setContentHeight] = useState<number>();
   const visibleRef = useRef(visible);
   const dismissalPending = useRef(Boolean(visible));
   useLayoutEffect(() => {
@@ -43,7 +45,7 @@ function NativeSheetModal({ visible, children, onRequestClose, onDismiss, onExit
   }, [onRequestClose]);
   const value = useMemo(() => ({ open: Boolean(visible), ready: true, close, finishExit: () => {} }), [close, visible]);
   const metrics = { frame: { x: 0, y: 0, width, height }, insets: { ...parentInsets, top: 0, bottom: 0 } };
-  return <AppleSheet visible={Boolean(visible)} onRequestClose={close} onDismiss={() => {
+  return <AppleSheet visible={Boolean(visible)} height={contentHeight} onRequestClose={close} onDismiss={() => {
     if (visibleRef.current || !dismissalPending.current) return;
     dismissalPending.current = false;
     onDismiss?.();
@@ -51,10 +53,14 @@ function NativeSheetModal({ visible, children, onRequestClose, onDismiss, onExit
   }}>
     <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider initialMetrics={metrics}>
       <NativeSheetPresentationContext.Provider value>
+        <NativeSheetSizingContext.Provider value={setContentHeight}>
         <SheetModalContext.Provider value={value}><ModalVisualContext.Provider value><SceneActivityContext.Provider value>
-          <RetainedSheetContent visible={Boolean(visible)}>{children}</RetainedSheetContent>
+          <SheetKeyboardViewport pointerEvents={visible ? 'auto' : 'none'}>
+            <RetainedSheetContent visible={Boolean(visible)}>{children}</RetainedSheetContent>
+          </SheetKeyboardViewport>
         </SceneActivityContext.Provider></ModalVisualContext.Provider></SheetModalContext.Provider>
         <BubbleNoticeHost />
+        </NativeSheetSizingContext.Provider>
       </NativeSheetPresentationContext.Provider>
     </SafeAreaProvider></GestureHandlerRootView>
   </AppleSheet>;
@@ -126,9 +132,9 @@ function CustomSheetModal({ visible = false, children, onRequestClose, onShow, o
             <ModalVisualContext.Provider value>
             {/* A sheet keeps its live backdrop until its exit finishes. */}
             <SceneActivityContext.Provider value>
-              <View pointerEvents={visible ? 'auto' : 'none'} style={{ flex: 1 }}>
+              <SheetKeyboardViewport pointerEvents={visible ? 'auto' : 'none'}>
                 <RetainedSheetContent visible={visible}>{children}</RetainedSheetContent>
-              </View>
+              </SheetKeyboardViewport>
             </SceneActivityContext.Provider>
             </ModalVisualContext.Provider>
           </SheetModalContext.Provider>

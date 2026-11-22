@@ -100,7 +100,7 @@ export const GlassDock = memo(function GlassDock({
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
-  const useSplitLiquidDock = Platform.OS === 'ios' && isLiquidGlassEnabled;
+  const useSplitLiquidDock = Platform.OS === 'ios';
   const maxTotalWidth = Math.min(windowWidth - 28, 396);
   const capsuleWidth = useSplitLiquidDock ? maxTotalWidth - 74 : maxTotalWidth;
   const [rowWidth, setRowWidth] = useState(capsuleWidth - 12);

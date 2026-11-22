@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
+  FlatList, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View, type ViewStyle,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -156,7 +156,7 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.page, { backgroundColor: bg }]}>
+    <View style={[styles.page, { backgroundColor: bg }]}>
       <View style={[styles.header, { paddingTop: insets.top + 28 }]}>
         {!native ? <View pointerEvents="none" style={[styles.handle, { top: insets.top + 8, backgroundColor: mutedText }]} /> : null}
         <View style={styles.headerRow}>
@@ -235,7 +235,7 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
           {isEditing ? <GlassPill label={pendingMember ? 'Saving…' : 'Save Changes'} disabled={Boolean(pendingMember)} variant="accent" size="lg" onPress={() => { void saveDetails(); }} /> : null}
         </View>
       ) : null}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

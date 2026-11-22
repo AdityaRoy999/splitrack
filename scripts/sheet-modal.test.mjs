@@ -28,6 +28,7 @@ function sheetHarness(platform, code = compiled, componentName = 'CustomSheetMod
   const changed = (before, after) => !before || !after || before.length !== after.length || before.some((value, index) => !Object.is(value, after[index]));
   const hooks = {
     ...React,
+    useContext: context => context?._currentValue,
     useState(initial) {
       const index = cursor++;
       if (!slots[index]) slots[index] = { value: typeof initial === 'function' ? initial() : initial };
@@ -73,7 +74,8 @@ function sheetHarness(platform, code = compiled, componentName = 'CustomSheetMod
     if (name === './BottomBubble') return { BubbleNoticeHost: 'BubbleNoticeHost' };
     if (name === '../../theme/LiquidGlassContext') return { useLiquidGlass: () => ({ isLiquidGlassEnabled: false }) };
     if (name === './AppleSheet') return { AppleSheet: 'AppleSheet' };
-    if (name === './NativeSheetPresentation') return { NativeSheetPresentationContext: React.createContext(false), useNativeSheetPresentation: () => false };
+    if (name === './NativeSheetPresentation') return { NativeSheetPresentationContext: React.createContext(false), NativeSheetSizingContext: React.createContext(null), useNativeSheetPresentation: () => false };
+    if (name === './SheetKeyboardViewport') return { SheetKeyboardViewport: 'KeyboardViewport' };
     throw new Error(`Unexpected import ${name}`);
   };
   const module = { exports: {} };
@@ -133,6 +135,7 @@ function transactionHarness() {
     '@solar-icons/react-native/bold/trash-bin-trash': { TrashBinTrashIcon: 'TrashBinTrashIcon' },
     '@solar-icons/react-native/bold/bill-list': { BillListIcon: 'BillListIcon' },
     '../common/SheetModal': { SheetModal: 'SheetModal' },
+    '../common/SheetFooter': { SheetFooter: 'SheetFooter' },
     '../common/ModalBackdrop': { ModalBackdrop: 'ModalBackdrop' },
     '../common/GlassModalSheet': { GlassModalSheet: 'GlassModalSheet' },
     '../glass/GlassPill': { GlassPill: 'GlassPill' },
@@ -386,4 +389,26 @@ test('full-page member menu has a usable handle/title drag target without coveri
   const { left, right, height } = target.props.style[0];
   assert.ok(height >= 64, 'drags can start on the page title, not only the tiny handle');
   assert.ok(left >= 64 && right >= 64, 'header edge buttons keep their own touch regions');
+});
+
+test('native short sheets report content height and retain a separate footer', () => {
+  let height;
+  const sheet = sheetHarness('ios', compiledSheet, 'GlassModalSheet', {
+    'react-native-reanimated': { default: { View: 'AnimatedView' } },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark' }) },
+    '../glass/GlassSurface': { GlassSurface: 'GlassSurface' },
+    './useSheetMotion': { useSheetMotion: () => ({ animatedStyle: {}, gesture: {} }) },
+    './NativeSheetPresentation': { useNativeSheetPresentation: () => true, NativeSheetSizingContext: React.createContext(value => { height = value; }) },
+    './SheetSizingContext': { SheetSizingContext: React.createContext(null) },
+    './ScrollEdgeFade': { ScrollEdgeFade: 'ScrollEdgeFade' },
+  });
+  sheet.update({ children: [React.createElement('View', { key: 'header' }), React.createElement('ScrollEdgeFade', { key: 'scroll' }), React.createElement('SheetFooter', { key: 'footer' })] });
+  const [header, scroll, footer] = sheet.output.props.children;
+  assert.equal(height, undefined, 'do not collapse to zero before native layout reports');
+  header.props.report(header.props.id, 68);
+  scroll.props.report(scroll.props.id, 180);
+  footer.props.report(footer.props.id, 58);
+  sheet.flush();
+  assert.equal(height, 356, 'short details use content height, rather than a full-screen empty sheet');
+  assert.equal(footer.props.scrollable, false, 'bottom actions stay outside the content scroller');
 });

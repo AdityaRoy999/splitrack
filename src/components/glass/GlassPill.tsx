@@ -7,7 +7,6 @@ import { GlassSurface } from './GlassSurface';
 import { useModalVisual } from '../common/ModalVisualContext';
 import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
 import { ACTION_COLORS } from '../../theme/actionColors';
-import { AppleGlassButton } from '../common/AppleGlassButton';
 
 interface GlassPillProps {
   label?: string;
@@ -21,6 +20,7 @@ interface GlassPillProps {
   disabled?: boolean;
   shape?: 'pill' | 'rounded';
   backgroundColor?: string;
+  accessibilityLabel?: string;
 }
 
 export const GlassPill: React.FC<GlassPillProps> = ({
@@ -35,6 +35,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
   disabled = false,
   shape,
   backgroundColor,
+  accessibilityLabel,
 }) => {
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
@@ -45,9 +46,6 @@ export const GlassPill: React.FC<GlassPillProps> = ({
     triggerImpact(ImpactStyle.Light);
     onPress();
   };
-
-  if (Platform.OS === 'ios' && isLiquidGlassEnabled) return <AppleGlassButton label={label} icon={icon}
-    onPress={handlePress} disabled={disabled} active={active} variant={variant} size={size} shape={shape ?? (modal ? 'rounded' : 'pill')} style={style} />;
 
   const getContainerStyle = () => {
     if (backgroundColor) return { backgroundColor };
@@ -91,7 +89,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
     lg: { paddingHorizontal: 22, height: modal ? 48 : COMPACT_BUTTON_HEIGHT },
   }[size];
 
-  const useTranslucentGlass = isLiquidGlassEnabled && !modal && !backgroundColor && (variant === 'glass' || variant === 'dark') && !active;
+  const useTranslucentGlass = isLiquidGlassEnabled && (Platform.OS === 'ios' || !modal) && !backgroundColor && (variant === 'glass' || variant === 'dark') && !active;
 
   const innerContent = (
     <>
@@ -117,8 +115,8 @@ export const GlassPill: React.FC<GlassPillProps> = ({
       scaleTo={0.95}
       onPress={handlePress}
       hitSlop={COMPACT_BUTTON_HIT_SLOP}
-      accessibilityLabel={label}
-      style={style}
+      accessibilityLabel={accessibilityLabel ?? label}
+      style={[size === 'lg' ? styles.fullWidth : undefined, style]}
       contentStyle={
         useTranslucentGlass
           ? [styles.glassPressReset, { borderRadius: radius }]
@@ -158,6 +156,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
 };
 
 const styles = StyleSheet.create({
+  fullWidth: { width: '100%', alignSelf: 'stretch' },
   glassPressReset: {
     borderRadius: 999,
     overflow: 'hidden',
@@ -170,10 +169,13 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   iconContainer: {
+    flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
   text: {
+    flexShrink: 1,
+    minWidth: 0,
     fontSize: 13,
     fontWeight: '500',
     letterSpacing: -0.2,

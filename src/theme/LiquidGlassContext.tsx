@@ -24,6 +24,15 @@ const actionStyles = new Map<string, TransactionActionStyle>();
 export function LiquidGlassProvider({ children, onPreferencesReady }: { children: React.ReactNode; onPreferencesReady?: (ready: boolean) => void }) {
   const { user, profile } = useAuth(), { settings, saveSettings, preferencesReady, syncError, refresh, actionNotice, dismissActionNotice } = useSplitTrack();
   const [overrides, setOverrides] = useState<Partial<CloudSettings>>({});
+  const preferenceWrites = useRef(0);
+  const [pendingPreferences, setPendingPreferences] = useState<Record<string, number>>({});
+  const [observedSettings, setObservedSettings] = useState(settings);
+  if (observedSettings !== settings) {
+    setObservedSettings(settings);
+    // A completed older write cannot undo a newer local selection.
+    const remaining = Object.entries(overrides).filter(([key, value]) => key in pendingPreferences || settings[key as keyof CloudSettings] !== value);
+    if (remaining.length !== Object.keys(overrides).length) setOverrides(Object.fromEntries(remaining));
+  }
   const themeMode = overrides.themeMode ?? settings.themeMode;
   const hideAmounts = overrides.hideAmounts ?? settings.hideAmounts;
   const isLiquidGlassEnabled = overrides.isLiquidGlassEnabled ?? settings.isLiquidGlassEnabled;
@@ -55,10 +64,16 @@ export function LiquidGlassProvider({ children, onPreferencesReady }: { children
   const [notice, setNotice] = useState<BubbleNotice | null>(null);
   const dismiss = useCallback(() => setNotice(null), []);
   const persist = useCallback((next: Partial<CloudSettings>) => {
+    const write = ++preferenceWrites.current;
+    const keys = Object.keys(next);
+    setPendingPreferences(current => ({ ...current, ...Object.fromEntries(keys.map(key => [key, write])) }));
     setOverrides(current => ({ ...current, ...next }));
     if (!profile?.username) return;
-    const clearSaved = () => setOverrides(current => Object.fromEntries(Object.entries(current).filter(([key, value]) => !(key in next) || next[key as keyof CloudSettings] !== value)));
-    void saveSettings(next).then(clearSaved).catch(error => { clearSaved(); setNotice(previous => ({ id: (previous?.id ?? 0) + 1, message: errorMessage(error) })); });
+    void saveSettings(next).then(() => {
+      setPendingPreferences(current => Object.fromEntries(Object.entries(current).filter(([key, value]) => !keys.includes(key) || value !== write)));
+      // Re-check against the next committed settings, even if publishing was coalesced.
+      setObservedSettings(previous => ({ ...previous }));
+    }).catch(error => { setNotice(previous => ({ id: (previous?.id ?? 0) + 1, message: errorMessage(error) })); });
   }, [profile?.username, saveSettings]);
   const setThemeMode = useCallback((mode: ThemeMode) => persist({ themeMode: mode }), [persist]);
   const setHideAmounts = useCallback((hide: boolean) => persist({ hideAmounts: hide }), [persist]);

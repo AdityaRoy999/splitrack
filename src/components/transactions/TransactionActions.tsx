@@ -7,6 +7,7 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { api, errorMessage } from '../../services/api';
 import type { Transaction } from '../../types';
 import { SheetModal } from '../common/SheetModal';
+import { SheetFooter } from '../common/SheetFooter';
 import { ModalBackdrop } from '../common/ModalBackdrop';
 import { GlassModalSheet } from '../common/GlassModalSheet';
 import { GlassPill } from '../glass/GlassPill';
@@ -178,9 +179,9 @@ export function TransactionActionsProvider({ children }: { children: React.React
               </> : <Text style={[styles.body, { color }]}>{current.id.startsWith('offline-') ? 'Reconnect before editing, deleting or settling this transaction.' : 'Only the transaction owner can edit, delete or mark its members settled.'}</Text>}
             </> : null}
             <FormError message={error} />
-            <GlassPill label={confirmDelete ? 'Cancel' : 'Close'} size="lg" variant="dark" backgroundColor={dark ? '#111114' : undefined} disabled={pending} onPress={closeDetail} />
           </ScrollView>
         </ScrollEdgeFade>
+        <SheetFooter><GlassPill label={confirmDelete ? 'Cancel' : 'Close'} size="lg" variant="dark" disabled={pending} onPress={closeDetail} /></SheetFooter>
       </GlassModalSheet></View>
     </SheetModal>
     <SheetModal visible={binOpen} onRequestClose={() => !pending && setBinOpen(false)} onExitComplete={finishBinExit}>

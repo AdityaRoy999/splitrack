@@ -79,7 +79,7 @@ test('native sheets preserve the system background and use the saved appearance'
   const Sheet = await component('src/components/common/AppleSheet.ios.tsx', {
     'react-native': { ...nativeViews, useWindowDimensions: () => ({ width: 390 }) },
     '@expo/ui/swift-ui': { BottomSheet: 'BottomSheet', Group: 'Group', Host: 'Host', RNHostView: 'RNHostView' },
-    '@expo/ui/swift-ui/modifiers': Object.fromEntries(['preferredColorScheme', 'presentationDetents', 'presentationDragIndicator'].map(name => [name, value => { calls.push([name, value]); return { name, value }; }])),
+    '@expo/ui/swift-ui/modifiers': Object.fromEntries(['preferredColorScheme', 'presentationDetents', 'presentationDragIndicator', 'ignoreSafeArea'].map(name => [name, value => { calls.push([name, value]); return { name, value }; }])),
     '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark' }) },
   }, 'AppleSheet');
   let closed = 0, dismissed = 0;
@@ -92,30 +92,123 @@ test('native sheets preserve the system background and use the saved appearance'
   assert.equal(closed, 1); assert.equal(dismissed, 1);
 });
 
-test('native tabs use system styling and Split opens the editor without selecting an empty screen', async () => {
-  function Trigger() {}
-  Trigger.Icon = 'NativeIcon'; Trigger.Label = 'NativeLabel';
-  function NativeTabs() {}
-  NativeTabs.Trigger = Trigger;
-  let splitOpens = 0;
+test('surface changes keep the same navigator and dock action handlers', async () => {
+  const mode = { isLiquidGlassEnabled: true };
+  let opened = 0, navigated;
+  const Tabs = Object.assign(function Tabs() {}, { Screen: 'Screen' });
   const AppTabs = await component('src/app/(tabs)/_layout.tsx', {
-    'react-native': { ...nativeViews, Platform: { OS: 'ios' } },
-    'expo-router': { useSegments: () => ['(tabs)', 'index'], Tabs: 'JSTabs' },
-    'expo-router/native-tabs': { NativeTabs },
-    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ isLiquidGlassEnabled: true }) },
-    '../../navigation/MainTabsContext': { useMainTabs: () => ({ settingsVisible: false, openSplit: () => splitOpens++ }) },
-    '../../components/glass/GlassDock': { GlassDock: 'CustomDock' },
+    'expo-router': { useSegments: () => ['(tabs)', 'expenses'], Tabs },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => mode },
+    '../../navigation/MainTabsContext': { useMainTabs: () => ({ hidden: false, openSplit: () => opened++, navigate: value => { navigated = value; } }) },
+    '../../components/glass/GlassDock': { GlassDock: 'GlassDock' },
   }, 'AppTabs', '\nmodule.exports.AppTabs = AppTabs;');
-  const tree = AppTabs();
-  assert.equal(tree.type, NativeTabs);
-  assert.equal(tree.props.tintColor, undefined);
-  assert.equal(tree.props.backgroundColor, undefined);
-  assert.equal(tree.props.blurEffect, undefined);
-  const tabs = all(tree, node => node.type === Trigger);
-  assert.deepEqual(tabs.map(tab => tab.props.name), ['index', 'expenses', 'split', 'trips', 'analytics']);
-  const split = tabs.find(tab => tab.props.name === 'split');
-  assert.equal(split.props.disabled, true);
-  split.props.listeners.tabPress();
-  assert.equal(splitOpens, 1);
-  assert.equal(all(tree, node => node.type === 'CustomDock').length, 0);
+  const glass = AppTabs();
+  mode.isLiquidGlassEnabled = false;
+  const matte = AppTabs();
+  assert.equal(glass.type, matte.type, 'Glass/Matte does not replace the navigator or discard scroll positions');
+  const dock = glass.props.tabBar();
+  assert.equal(dock.type, 'GlassDock');
+  assert.equal(dock.props.currentTab, 'expenses');
+  dock.props.onQuickAdd(); dock.props.onTabChange('trips');
+  assert.equal(opened, 1); assert.equal(navigated, 'trips');
+  assert.equal(all(glass, node => node.type === 'Screen' && node.props.name === 'split')[0].props.options.href, null);
+});
+
+test('glass buttons retain the supplied icon, one-line label and full-width footer geometry', async () => {
+  const Pill = await component('src/components/glass/GlassPill.tsx', {
+    'react-native': { ...nativeViews, Platform: { OS: 'ios' } },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark', isLiquidGlassEnabled: true }) },
+    '../../utils/haptics': { triggerImpact() {}, ImpactStyle: {} },
+    '../common/MotionPrimitives': { AnimatedPressable: 'AnimatedPressable' },
+    './GlassSurface': { GlassSurface: 'GlassSurface' },
+    '../common/ModalVisualContext': { useModalVisual: () => true },
+    '../../constants/buttonSizes': { COMPACT_BUTTON_HEIGHT: 36, COMPACT_BUTTON_HIT_SLOP: {} },
+    '../../theme/actionColors': { ACTION_COLORS: { danger: '#A92F3A', success: '#16734B', onAction: '#FFFFFF' } },
+  }, 'GlassPill');
+  const icon = React.createElement('OriginalSolarIcon');
+  const footer = Pill({ label: 'Save & Split Expense', icon, size: 'lg', variant: 'accent', onPress() {} });
+  const outer = nativeViews.StyleSheet.flatten(footer.props.style);
+  assert.equal(outer.width, '100%');
+  const label = all(footer, node => node.type === 'Text')[0];
+  assert.equal(label.props.numberOfLines, 1);
+  assert.equal(all(footer, node => node.type === 'OriginalSolarIcon')[0].type, icon.type);
+  assert.equal(all(footer, node => node.type === 'Host').length, 0, 'button width no longer depends on SwiftUI intrinsic measurement');
+  const close = Pill({ label: 'Close', size: 'lg', variant: 'dark', onPress() {} });
+  assert.equal(all(close, node => node.type === 'GlassSurface').length, 1);
+});
+
+test('sheet viewport uses native keyboard progress and a single avoidance owner', async () => {
+  const Viewport = await component('src/components/common/SheetKeyboardViewport.tsx', {
+    'react-native': { ...nativeViews, Platform: { OS: 'ios' } },
+    'react-native-keyboard-controller': { KeyboardProvider: 'KeyboardProvider', KeyboardAvoidingView: 'KeyboardAvoidingView' },
+  }, 'SheetKeyboardViewport');
+  const tree = Viewport({ children: React.createElement('PinnedSaveButton') });
+  assert.equal(tree.type, 'KeyboardProvider');
+  const viewport = all(tree, node => node.type === 'KeyboardAvoidingView');
+  assert.equal(viewport.length, 1);
+  assert.equal(viewport[0].props.behavior, 'padding');
+  assert.equal(viewport[0].props.automaticOffset, true, 'sheet position is measured in screen coordinates');
+  assert.equal(all(viewport[0], node => node.type === 'PinnedSaveButton').length, 1);
+});
+
+test('expense form keeps its three cards, payment profiles and pinned save action in glass mode', async () => {
+  const Animated = { View: 'AnimatedView', Value: class { constructor(value) { this.value = value; } interpolate() { return 0; } } };
+  const hooks = { ...React, memo: value => value, useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}], useMemo: callback => callback() };
+  const Form = await component('src/components/split/AddExpenseModal.tsx', {
+    react: hooks,
+    'react-native': { ...nativeViews, Animated, Platform: { OS: 'ios' } },
+    '../../store/SplitTrackStore': { useSplitTrack: () => ({ accounts: [{ id: 'bank', title: 'Bank UPI', upiId: 'synthetic@bank', kind: 'upi' }], selectedAccountId: 'bank', friends: [{ id: 'sai', name: 'Sai Ardhendu', handle: '@sai', avatar: '' }], trips: [], transactions: [], categories: [{ name: 'Food', iconKey: 'cup-hot' }] }) },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ currency: 'INR', themeMode: 'dark', isLiquidGlassEnabled: true }) },
+    '../../auth/AuthContext': { useAuth: () => ({ profile: { handle: '@you', avatar: '' } }) },
+    '../../hooks/useAsyncAction': { useAsyncAction: () => ({}), FormError: 'FormError' },
+    '../../theme/colors': { currencies: { INR: { symbol: '₹' } } },
+    '../../utils/splitAmounts': { allocateSplitAmounts: () => [0] },
+    '../../constants/solarIconsCatalog': { renderSolarIcon: () => React.createElement('CategoryIcon') },
+    '../../utils/haptics': {}, 'expo-location': {},
+    'lucide-react-native': { LocateFixed: 'LocateFixed' },
+    '../../constants/buttonSizes': {},
+    '../common/CalendarDatePickerModal': { getTodayLocalISO: () => '2026-11-23', formatDisplayDate: value => value, CalendarDatePickerModal: 'CalendarDatePickerModal' },
+    ...Object.fromEntries(['close-circle', 'check-circle', 'add-circle', 'calendar-date', 'alt-arrow-right', 'map-point', 'magnifier', 'pen-2'].map(name => [`@solar-icons/react-native/bold/${name}`, new Proxy({}, { get: (_, key) => String(key) })])),
+    ...Object.fromEntries(['SheetFooter', 'SheetCloseButton', 'SheetHandle', 'SheetModal', 'ScrollEdgeFade', 'GlassModalSheet', 'ModalBackdrop', 'JellyRadio', 'SpringCheck', 'UserAvatar'].map(name => [`../common/${name}`, { [name]: name }])),
+    '../common/MotionPrimitives': { AnimatedPressable: 'AnimatedPressable' },
+    '../common/SmoothCollapsible': { SmoothCollapsible: 'SmoothCollapsible' },
+    '../glass/GlassSurface': { GlassSurface: 'GlassSurface' }, '../glass/GlassPill': { GlassPill: 'GlassPill' },
+    '../categories/AddCategoryModal': { AddCategoryModal: 'AddCategoryModal' },
+  }, 'AddExpenseModal');
+  const tree = Form({ visible: true, onClose() {} });
+  assert.equal(all(tree, node => node.type === 'GlassSurface').length, 3);
+  const profiles = all(tree, node => node.type === 'JellyRadio' && node.props.items?.some(item => item.value === 'bank'))[0];
+  assert.equal(profiles.props.items[0].label, 'synthetic@bank');
+  const footer = all(tree, node => node.type === 'SheetFooter')[0];
+  assert.equal(all(footer, node => node.type === 'GlassPill' && node.props.label === 'Save & Split Expense').length, 1);
+  const scroller = all(tree, node => node.type === 'ScrollEdgeFade')[0];
+  assert.equal(all(scroller, node => node.type === 'GlassPill' && node.props.label === 'Save & Split Expense').length, 0);
+});
+
+test('iOS dock keeps four original tabs and a separate plus in both surface modes', async () => {
+  const mode = { themeMode: 'dark', isLiquidGlassEnabled: true };
+  const hooks = { ...React, memo: value => value, useEffect() {}, useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}], useRef: value => ({ current: value }) };
+  const Dock = await component('src/components/glass/GlassDock.tsx', {
+    react: hooks,
+    'react-native': { ...nativeViews, Platform: { OS: 'ios' }, useWindowDimensions: () => ({ width: 390 }), Animated: { View: 'AnimatedView', Value: class { constructor(value) { this.value = value; } } } },
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: 34 }) },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => mode },
+    '../../utils/haptics': { triggerImpact() {}, ImpactStyle: {} },
+    './GlassSurface': { GlassSurface: 'GlassSurface' },
+    '../common/AppleNativeControls': { NativeGlassContainer: 'NativeGlassContainer' },
+    '../../utils/measureWindow': {},
+    ...Object.fromEntries(['home-2', 'bill-list', 'add-circle', 'users-group-two-rounded', 'pie-chart-2'].map(name => [`@solar-icons/react-native/bold/${name}`, new Proxy({}, { get: (_, key) => String(key) })])),
+  }, 'GlassDock');
+  for (const glass of [true, false]) {
+    mode.isLiquidGlassEnabled = glass;
+    let opened = 0, selected;
+    const tree = Dock({ currentTab: 'home', onQuickAdd: () => opened++, onTabChange: tab => { selected = tab; } });
+    const tabs = all(tree, node => node.props.item);
+    assert.deepEqual(tabs.map(node => node.props.item.key), ['home', 'expenses', 'trips', 'analytics']);
+    assert.deepEqual(tabs.map(node => node.props.item.icon('#fff').type), ['Home2Icon', 'BillListIcon', 'UsersGroupTwoRoundedIcon', 'PieChart2Icon']);
+    tabs[1].props.onPress(); assert.equal(selected, 'expenses');
+    const plus = all(tree, node => node.props.accessibilityLabel === 'Add split expense')[0];
+    assert.equal(all(plus, node => node.type === 'AddCircleIcon').length, 1);
+    plus.props.onPress(); assert.equal(opened, 1);
+  }
 });

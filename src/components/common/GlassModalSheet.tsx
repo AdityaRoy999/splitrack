@@ -1,7 +1,5 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useContext, useLayoutEffect, useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
   StyleProp,
   StyleSheet,
   useWindowDimensions,
@@ -17,7 +15,7 @@ import { GlassSurface } from '../glass/GlassSurface';
 import { useSheetMotion } from './useSheetMotion';
 import { SheetSizingContext } from './SheetSizingContext';
 import { ScrollEdgeFade } from './ScrollEdgeFade';
-import { useNativeSheetPresentation } from './NativeSheetPresentation';
+import { NativeSheetSizingContext, useNativeSheetPresentation } from './NativeSheetPresentation';
 
 // Measure fixed sections directly, including their margins. Scroll sections
 // report their intrinsic content, so sheet height never depends on its viewport.
@@ -47,6 +45,7 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
   const { height: windowHeight } = useWindowDimensions();
   const { themeMode } = useLiquidGlass();
   const native = useNativeSheetPresentation();
+  const reportNativeHeight = useContext(NativeSheetSizingContext);
   const isDark = themeMode === 'dark';
 
   const bgMatte = isDark ? '#09090B' : '#F4F4F8';
@@ -81,9 +80,13 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
   // Empty sections (for example a hidden FormError) may never dispatch a native
   // layout event. They must not leave an otherwise laid-out sheet offscreen.
   const { animatedStyle, gesture } = useSheetMotion(windowHeight, laidOut);
+  useLayoutEffect(() => {
+    const headerReady = sections.slice(0, headerCount).some(section => (measurements[section.id] ?? 0) > 0);
+    if (native && measured && headerReady) reportNativeHeight?.(Math.min(maxSheetHeight, sheetHeight + 16));
+  }, [headerCount, maxSheetHeight, measured, measurements, native, reportNativeHeight, sections, sheetHeight]);
 
   if (native) return <View style={[styles.sheetBase, style, { flex: 1, maxWidth: undefined, paddingBottom: bottomPadding, backgroundColor: 'transparent' }]}>
-    <SheetSizingContext.Provider value={null}>{children}</SheetSizingContext.Provider>
+    {sections.map(section => <MeasuredSheetSection key={section.id} id={section.id} scrollable={section.scrollable} report={report}>{section.child}</MeasuredSheetSection>)}
   </View>;
 
   return (
@@ -94,11 +97,12 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
         {
           height: sheetHeight,
           maxHeight: maxSheetHeight,
+          minHeight: 0,
         },
         animatedStyle,
       ]}
     >
-      <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={windowHeight - sheetHeight}>
+      <View style={styles.keyboardArea}>
         <GlassSurface
           borderTopLeftRadius={32}
           borderTopRightRadius={32}
@@ -128,7 +132,7 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
           </GestureDetector> : null}
           {sections.slice(headerCount).map(section => <MeasuredSheetSection key={section.id} id={section.id} scrollable={section.scrollable} report={report}>{section.child}</MeasuredSheetSection>)}
         </GlassSurface>
-      </KeyboardAvoidingView>
+      </View>
     </Animated.View>
   );
 };

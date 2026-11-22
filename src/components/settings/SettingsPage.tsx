@@ -1,3 +1,4 @@
+import { SheetFooter } from '../common/SheetFooter';
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -938,10 +939,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <Text style={{ color: mutedText, fontSize: 13, lineHeight: 20 }}>Entries tied to money you owe or are owed will stay, including payment history needed for those balances. Your members, groups and payment profiles stay too. Saved rules and templates will be cleared. Removing settled history cannot be undone.</Text>
                 <Text style={{ color: textColor, fontSize: 13, lineHeight: 20 }}>{friends.filter(friend => friend.netBalance !== 0).length} {friends.filter(friend => friend.netBalance !== 0).length === 1 ? 'member has' : 'members have'} an unpaid balance with you. Those balances will not change.</Text>
               </GlassSurface>
+            </ScrollView></ScrollEdgeFade>
+            <SheetFooter>
               <FormError message={error} />
               <GlassPill label={pending ? 'Clearing settled history…' : 'Clear settled history'} size="lg" variant="danger" disabled={pending || isOffline} onPress={performErase} />
               <GlassPill label="Cancel" size="lg" variant="dark" disabled={pending} onPress={() => setShowEraseConfirm(false)} />
-            </ScrollView></ScrollEdgeFade>
+            </SheetFooter>
           </GlassModalSheet>
         </View>
       </SheetModal>
@@ -960,10 +963,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   placeholder="Current password" placeholderTextColor={mutedText} secureTextEntry autoCapitalize="none" autoCorrect={false}
                   editable={!googlePending} style={{ backgroundColor: chipBg, color: textColor, fontSize: 14, borderRadius: 14, paddingHorizontal: 14, height: 48 }} /> : null}
               </View>
+            </ScrollView></ScrollEdgeFade>
+            <SheetFooter>
               <FormError message={googleError} />
               <GlassPill label={googlePending ? 'Syncing…' : googleNeedsPassword ? 'Confirm password and sync' : 'Continue with Google'} size="lg" variant="dark" disabled={googlePending} onPress={performGoogleLink} />
               <GlassPill label="Cancel" size="lg" variant="dark" disabled={googlePending} onPress={closeGoogleLink} />
-            </ScrollView></ScrollEdgeFade>
+            </SheetFooter>
           </GlassModalSheet>
         </View>
       </SheetModal>

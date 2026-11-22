@@ -1,3 +1,4 @@
+import { SheetFooter } from '../common/SheetFooter';
 import { SheetCloseButton } from '../common/SheetCloseButton';
 import { SheetHandle } from '../common/SheetHandle';
 import { ModalBackdrop } from '../common/ModalBackdrop';
@@ -407,6 +408,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
             </ScrollView>
           </ScrollEdgeFade>
 
+          <SheetFooter>
           <FormError message={error} />
           <GlassPill
             label={pending ? 'Creating…' : 'Create Trip'}
@@ -416,6 +418,7 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
             onPress={handleCreate}
             style={styles.createBtn}
           />
+          </SheetFooter>
         </GlassModalSheet>
       </View>
 
