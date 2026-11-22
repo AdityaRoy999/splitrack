@@ -72,8 +72,8 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Validate Google auth, Firebase configuration and platform build routing
-        run: node --test scripts/android-google-auth.test.mjs scripts/mobile-workflows.test.mjs
+      - name: Validate mobile auth, build routing and settled-only ledger reset
+        run: node --test scripts/android-google-auth.test.mjs scripts/mobile-workflows.test.mjs scripts/ledger-reset.test.mjs scripts/settings-import-action.test.mjs
 
       - name: Generate native iOS project (Expo Prebuild)
         env:
