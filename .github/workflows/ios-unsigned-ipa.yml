@@ -3,6 +3,7 @@ name: Build Unsigned iOS IPA
 on:
   push:
     branches:
+      - main
       - ios
   workflow_dispatch:
 
@@ -27,7 +28,7 @@ concurrency:
 
 jobs:
   build-unsigned-ios:
-    if: github.ref == 'refs/heads/ios' && github.actor != 'github-actions[bot]'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ios') && github.actor != 'github-actions[bot]'
     name: Build and publish unsigned iOS IPA
     runs-on: macos-latest
     timeout-minutes: 60
@@ -220,19 +221,23 @@ jobs:
             export COMMIT_MESSAGE="$(git log -1 --pretty=%s)"
           fi
 
-          # Keep the existing subscribers' feed on main. Main has no mobile push
-          # builds, so this feed update cannot start either platform's workflow.
-          # Fetch the latest main before editing to preserve concurrent changes.
+          # Publish this successful IPA to both feeds, updating only apps.json
+          # on each branch. Fetch each branch before editing to preserve source
+          # changes. Token pushes, the bot guard and [skip ci] prevent rebuilds.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          git switch -C main origin/main
+          for FEED_BRANCH in main ios; do
+          export FEED_BRANCH
+          git fetch origin "$FEED_BRANCH"
+          git switch -C "$FEED_BRANCH" "origin/$FEED_BRANCH"
 
           node <<'NODE'
           const fs = require('fs');
 
           (async () => {
             const repo = process.env.REPOSITORY;
+            const branch = process.env.FEED_BRANCH;
+            if (!['main', 'ios'].includes(branch)) throw new Error('Invalid SideStore feed branch');
             const tag = process.env.RELEASE_TAG;
             const token = process.env.GH_TOKEN;
 
@@ -281,13 +286,13 @@ jobs:
               : {
                   name: "Aditya's Apps",
                   identifier: 'com.adityaroy999.splittrack.source',
-                  sourceURL: `https://raw.githubusercontent.com/${repo}/main/apps.json`,
+                  sourceURL: `https://raw.githubusercontent.com/${repo}/${branch}/apps.json`,
                   apps: [],
                 };
 
             source.name = "Aditya's Apps";
             source.identifier = 'com.adityaroy999.splittrack.source';
-            source.sourceURL = `https://raw.githubusercontent.com/${repo}/main/apps.json`;
+            source.sourceURL = `https://raw.githubusercontent.com/${repo}/${branch}/apps.json`;
             if (!Array.isArray(source.apps)) {
               source.apps = [];
             }
@@ -329,7 +334,7 @@ jobs:
               subtitle: 'Split bills, trips & instant UPI payouts.',
               localizedDescription:
                 'Split expenses, track shared balances, and manage group spending with Splittrack.',
-              iconURL: `https://raw.githubusercontent.com/${repo}/main/assets/icon-light.png`,
+              iconURL: `https://raw.githubusercontent.com/${repo}/${branch}/assets/icon-light.png`,
               tintColor: '#6366F1',
               version: newVersion.version,
               versionDate: newVersion.date,
@@ -356,8 +361,9 @@ jobs:
 
           git add apps.json
           if ! git diff --cached --quiet; then
-            git commit -m "chore: update SideStore source for iOS build $BUILD_NUMBER"
-            git push origin HEAD:main
+            git commit -m "chore: update SideStore source for iOS build $BUILD_NUMBER [skip ci]"
+            git push origin "HEAD:$FEED_BRANCH"
           else
             echo "AltSource feed is already up to date."
           fi
+          done
