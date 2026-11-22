@@ -84,7 +84,7 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
         matteColor={isDark ? '#111114' : '#FFFFFF'}
         style={styles.heroCard}
       >
-        <Aurora
+        {Platform.OS === 'ios' && isLiquidGlassEnabled ? null : <Aurora
           colorStops={
             isDark
               ? ['#5227FF', '#00E5FF', '#10B981', '#5227FF']
@@ -100,7 +100,7 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
           opacity={isDark ? 0.9 : 0.75}
           lightMode={!isDark}
           style={{ borderRadius: 24 }}
-        />
+        />}
         {/* Foreground Card Content */}
         <View style={styles.cardContent}>
           {/* Top Header: Net Balance + Eye Toggle */}

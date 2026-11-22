@@ -23,7 +23,6 @@ import {
   pickerStyle,
   scrollIndicators,
   tag,
-  tint,
   toggleStyle,
 } from '@expo/ui/swift-ui/modifiers';
 import { GlassContainer, isLiquidGlassAvailable } from 'expo-glass-effect';
@@ -130,7 +129,7 @@ export const AppleGraphicalCalendar: React.FC<AppleGraphicalCalendarProps> = ({
           selection={selectionDate}
           displayedComponents={['date']}
           onDateChange={(date) => onSelectDate(dateToISOSafe(date))}
-          modifiers={[datePickerStyle('graphical'), tint('#10B981')]}
+          modifiers={[datePickerStyle('graphical')]}
         />
         {hasGlass ? (
           <GlassEffectContainer spacing={10}>{actionButtons}</GlassEffectContainer>
@@ -291,7 +290,6 @@ export const AppleToggleSwitch: React.FC<AppleToggleSwitchProps> = ({
   onChange,
   disabled = false,
   isDark,
-  tintColor = '#10B981',
 }) => (
   <Host
     matchContents
@@ -307,7 +305,6 @@ export const AppleToggleSwitch: React.FC<AppleToggleSwitchProps> = ({
       modifiers={[
         labelsHidden(),
         toggleStyle('switch'),
-        tint(tintColor),
         ...(disabled ? [disabledModifier(true)] : []),
       ]}
     />

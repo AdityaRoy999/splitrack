@@ -226,6 +226,9 @@ jobs:
           # changes. Token pushes, the bot guard and [skip ci] prevent rebuilds.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Prebuild updates these files in the disposable runner checkout.
+          # Restore them after publishing so switching feed branches succeeds.
+          git restore -- package.json package-lock.json
           for FEED_BRANCH in main ios; do
           export FEED_BRANCH
           git fetch origin "$FEED_BRANCH"

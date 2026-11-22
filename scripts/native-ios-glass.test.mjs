@@ -74,6 +74,24 @@ test('settled iOS Quick Send photos render outside SVG ForeignObject and still o
   assert.equal(selected, friend);
 });
 
+test('native sheets preserve the system background and use the saved appearance', async () => {
+  const calls = [];
+  const Sheet = await component('src/components/common/AppleSheet.ios.tsx', {
+    'react-native': { ...nativeViews, useWindowDimensions: () => ({ width: 390 }) },
+    '@expo/ui/swift-ui': { BottomSheet: 'BottomSheet', Group: 'Group', Host: 'Host', RNHostView: 'RNHostView' },
+    '@expo/ui/swift-ui/modifiers': Object.fromEntries(['preferredColorScheme', 'presentationDetents', 'presentationDragIndicator'].map(name => [name, value => { calls.push([name, value]); return { name, value }; }])),
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark' }) },
+  }, 'AppleSheet');
+  let closed = 0, dismissed = 0;
+  const tree = Sheet({ visible: true, children: 'draft', onRequestClose: () => closed++, onDismiss: () => dismissed++ });
+  const sheet = all(tree, node => node.type === 'BottomSheet')[0];
+  assert.equal(sheet.props.presentationBackground, undefined, 'system owns the sheet material');
+  assert.ok(calls.some(([name, value]) => name === 'preferredColorScheme' && value === 'dark'));
+  sheet.props.onIsPresentedChange(false);
+  sheet.props.onDismiss();
+  assert.equal(closed, 1); assert.equal(dismissed, 1);
+});
+
 test('native tabs use system styling and Split opens the editor without selecting an empty screen', async () => {
   function Trigger() {}
   Trigger.Icon = 'NativeIcon'; Trigger.Label = 'NativeLabel';

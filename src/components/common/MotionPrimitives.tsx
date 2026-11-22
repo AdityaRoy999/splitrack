@@ -36,6 +36,7 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   accessibilityLabel,
   accessibilityState,
 }) => {
+  const { isLiquidGlassEnabled } = useLiquidGlass();
   const [scaleAnim] = useState(() => new Animated.Value(1));
 
   const animateTo = (toValue: number) => {
@@ -55,7 +56,7 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
         : {})}
     >
       <TouchableOpacity
-        activeOpacity={0.9}
+        activeOpacity={Platform.OS === 'ios' && isLiquidGlassEnabled ? 1 : 0.9}
         disabled={disabled || !onPress}
         onPress={onPress}
         onLongPress={onLongPress}

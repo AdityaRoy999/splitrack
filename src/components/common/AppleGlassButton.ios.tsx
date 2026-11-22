@@ -8,9 +8,10 @@ import type { AppleGlassButtonProps } from './AppleGlassButton';
 export function AppleGlassButton({ label, icon, onPress, disabled, active, role, variant, size, shape, style }: AppleGlassButtonProps) {
   const { themeMode } = useLiquidGlass();
   const semantic = variant === 'danger' || variant === 'success';
-  const fillsWidth = style?.flex === 1 || style?.width === '100%';
-  const nativeStyle = semantic || active ? 'glassProminent' : 'glass';
-  return <Host matchContents={fillsWidth ? { vertical: true } : true} colorScheme={themeMode} style={[style, { backgroundColor: 'transparent' }]}>
+  const fillsWidth = style?.flex === 1 || style?.width === '100%' || (size === 'lg' && !style?.width && !style?.flex);
+  const nativeStyle = semantic || active || variant === 'accent' ? 'glassProminent' : 'glass';
+  return <Host matchContents={fillsWidth ? { vertical: true } : true} colorScheme={themeMode}
+    style={[fillsWidth && !style?.flex ? { width: '100%' } : undefined, style, { backgroundColor: 'transparent' }]}>
     <Button label={icon ? undefined : label} onPress={onPress} role={role ?? (variant === 'danger' ? 'destructive' : 'default')}
       modifiers={[buttonStyle(nativeStyle), buttonBorderShape(shape === 'pill' ? 'capsule' : 'roundedRectangle'),
         ...(fillsWidth ? [frame({ maxWidth: Infinity })] : []),

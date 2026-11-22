@@ -50,6 +50,8 @@ test('each iOS release publishes both feeds without starting a build loop or pus
   assert.match(feed.run, /export FEED_BRANCH/);
   assert.match(feed.run, /git fetch origin "\$FEED_BRANCH"/);
   assert.match(feed.run, /git switch -C "\$FEED_BRANCH" "origin\/\$FEED_BRANCH"/);
+  assert.match(feed.run, /git restore -- package\.json package-lock\.json/);
+  assert.ok(feed.run.indexOf('git restore -- package.json package-lock.json') < feed.run.indexOf('git switch -C'), 'prebuild package edits are restored before feed checkout');
   assert.match(feed.run, /git add apps\.json/);
   assert.match(feed.run, /git commit[^\n]*\[skip ci\]/);
   assert.match(feed.run, /git push origin "HEAD:\$FEED_BRANCH"/);

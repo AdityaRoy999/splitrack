@@ -932,12 +932,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           <GlassModalSheet>
             <SheetHeader title="Start a fresh ledger?" subtitle="Clear settled history and keep unpaid balances" onClose={() => !pending && setShowEraseConfirm(false)} disabled={pending} />
             <ScrollEdgeFade><ScrollView contentContainerStyle={{ gap: 14, paddingBottom: 4 }}>
-              <View style={{ padding: 18, borderRadius: 22, gap: 12, backgroundColor: isDark ? '#111114' : '#EDEDF1' }}>
+              <GlassSurface borderRadius={22} style={{ padding: 18, gap: 12 }} matteColor={isDark ? '#111114' : '#EDEDF1'}>
                 <TrashBinTrashIcon size={28} color="#E5484D" />
                 <Text style={{ color: textColor, fontSize: 15, fontWeight: '600' }}>Only settled history will be cleared</Text>
                 <Text style={{ color: mutedText, fontSize: 13, lineHeight: 20 }}>Entries tied to money you owe or are owed will stay, including payment history needed for those balances. Your members, groups and payment profiles stay too. Saved rules and templates will be cleared. Removing settled history cannot be undone.</Text>
                 <Text style={{ color: textColor, fontSize: 13, lineHeight: 20 }}>{friends.filter(friend => friend.netBalance !== 0).length} {friends.filter(friend => friend.netBalance !== 0).length === 1 ? 'member has' : 'members have'} an unpaid balance with you. Those balances will not change.</Text>
-              </View>
+              </GlassSurface>
               <FormError message={error} />
               <GlassPill label={pending ? 'Clearing settled history…' : 'Clear settled history'} size="lg" variant="danger" disabled={pending || isOffline} onPress={performErase} />
               <GlassPill label="Cancel" size="lg" variant="dark" disabled={pending} onPress={() => setShowEraseConfirm(false)} />
