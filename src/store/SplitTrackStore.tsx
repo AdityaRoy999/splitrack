@@ -10,16 +10,17 @@ import { getReceivingUpiAccount } from '../utils/upi';
 import { preserveOpenedHistory, retainUnchanged } from './cloudSnapshot';
 import { TransactionOutbox, encodeOfflineCheckpoint, optimisticSnapshot, validateOfflineTransaction } from './transactionOutbox';
 import { mutationFeedback } from './actionFeedback';
+import { clearSettledLedger } from './ledgerReset';
 
 export interface CloudSettings { selectedAccountId: string; receivingAccountId?: string; themeMode: ThemeMode; currency: 'INR'; hideAmounts: boolean; isLiquidGlassEnabled: boolean; selectionStyle?: SelectionStyle; notificationDirection?: 'top' | 'bottom' }
 interface Snapshot {
-  schemaVersion: 2; userId: string; revision: number; generation?: number; ledgerResetId?: string | null;
+  schemaVersion: 2; userId: string; revision: number; generation?: number; ledgerResetId?: string | null; resetPolicy?: 'settled-only';
   accounts: UpiAccount[]; friends: Friend[]; trips: Trip[]; transactions: Transaction[]; categories: ExpenseCategory[];
   transactionCursor: string | null; settings: CloudSettings;
   profile: { id: string; name: string; handle: string; avatar: string; avatarRef: string } | null;
   summary: { totalIncome: number; totalExpenses: number; categories: Record<string, number>; months: Record<string, { income: number; expense: number }> };
 }
-type MutationResult = { result: { id?: string; importedCount?: number; needsContinue?: boolean }; state: Snapshot };
+type MutationResult = { result: { id?: string; importedCount?: number; needsContinue?: boolean; removedTransactions?: number; retainedTransactions?: number }; state: Snapshot };
 const categories: ExpenseCategory[] = [
   { id: 'cat-food', name: 'Food & Drinks', iconKey: 'cup-hot', color: '#F97316' },
   { id: 'cat-groceries', name: 'Groceries', iconKey: 'cart-large-minimalistic', color: '#10B981' },
@@ -84,7 +85,7 @@ interface SplitTrackContextType {
   updateCategory(id: string, name: string, iconKey: string, color?: string): Promise<ExpenseCategory | null>;
   deleteCategory(id: string): Promise<boolean>;
   settleWithFriend(friendId: string, amount?: number, accountId?: string, intentId?: string): Promise<void>;
-  getSimplifiedDebts(): DebtSimplification[]; eraseAllData(): Promise<void>;
+  getSimplifiedDebts(): DebtSimplification[]; eraseAllData(): Promise<{ removedTransactions: number; retainedTransactions: number }>;
 }
 const Context = createContext<SplitTrackContextType | undefined>(undefined);
 
@@ -491,10 +492,16 @@ function CloudStore({ children, uid, ready }: { children: React.ReactNode; uid: 
     await queueReceipt(friendId, amount, accountId, intentId);
   }, [queueReceipt]);
   const eraseAllData = useCallback(async () => {
+    await hydration.current;
     await outbox.ready;
     if (outbox.entries.length) throw new Error('Sync your saved transactions and resolve pending warnings before resetting the ledger.');
-    await mutate('/state/erase', 'POST');
-  }, [outbox, mutate]);
+    // Verify the server's policy rather than trusting a cached capability. Older
+    // deployments ignored reset bodies and would also delete outstanding debts.
+    return clearSettledLedger(async () => {
+      const latest = await api<Snapshot>('/state', { expectedUid: uid, attempts: 1, timeoutMs: 8000 });
+      accept(latest, uid); return latest;
+    }, body => mutate('/state/erase', 'POST', body));
+  }, [uid, outbox, mutate, accept]);
   const loadMoreTransactions = useCallback(async () => {
     if (pending.current || loadingHistory.current) return;
     loadingHistory.current = true;

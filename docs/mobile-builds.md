@@ -60,7 +60,7 @@ In Firebase Authentication settings, keep **One account per email address** enab
 
 ## Validate source before building
 
-From `C:\projects\AWS-SplitTrack\frontend` with Node 22 or newer:
+From `C:\projects\AWS-SplitTrack\frontend-android` or `C:\projects\AWS-SplitTrack\frontend-ios` with Node 22 or newer:
 
 ```powershell
 npm ci
