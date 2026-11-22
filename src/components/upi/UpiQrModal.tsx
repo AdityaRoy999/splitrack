@@ -98,8 +98,9 @@ function QrModalContent({ account, amount, note }: { account: UpiAccount } & Upi
 
   return (
       <View style={[styles.modalOverlay, { paddingTop: Math.max(20, insets.top), paddingBottom: Math.max(20, insets.bottom) }]}>
-        <BlurView pointerEvents="none" style={StyleSheet.absoluteFill} intensity={55}
-          tint={isDark ? 'dark' : 'light'} blurTarget={blurTarget} blurMethod="dimezisBlurView" />
+        {Platform.OS === 'android' ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(9,9,11,0.68)' : 'rgba(244,244,248,0.68)' }]} /> :
+          <BlurView pointerEvents="none" style={StyleSheet.absoluteFill} intensity={55}
+            tint={isDark ? 'dark' : 'light'} blurTarget={blurTarget} blurMethod="dimezisBlurView" />}
         <ModalBackdrop label="Close QR modal backdrop" onClose={handleSmoothClose} shadeColor={isDark ? 'rgba(6, 7, 11, 0.44)' : 'rgba(15, 23, 42, 0.24)'} />
 
         <Animated.View

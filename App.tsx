@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { errorMessage } from './src/services/api';
 import * as SplashScreen from 'expo-splash-screen';
 import {
+  Platform,
   ScrollView,
   ActivityIndicator,
   StatusBar,
@@ -1091,24 +1092,26 @@ function MainAppContent({
             </View>
 
         </View>
-        {!showSettings ? <GradualBlur
+        <GradualBlur
           active={effectsActive}
+          tint={Platform.OS === 'android' ? rootBg : 'transparent'}
           position="top"
           height={Math.max(32, insets.top + 12)}
           strength={0.6}
           layers={6}
           curve="bezier"
           zIndex={45}
-        /> : null}
-        {!showSettings ? <GradualBlur
+        />
+        <GradualBlur
           active={effectsActive}
+          tint={Platform.OS === 'android' ? rootBg : 'transparent'}
           position="bottom"
           height={Math.max(48, insets.bottom + 32)}
           strength={0.6}
           layers={6}
           curve="bezier"
           zIndex={45}
-        /> : null}
+        />
       </View>
 
 

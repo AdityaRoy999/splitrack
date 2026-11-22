@@ -642,7 +642,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   upiCardGradient: {
-    flex: 1,
+    // The swipe wrapper measures intrinsic content. A flex-only card inside it
+    // has no height, hiding both restored and newly created payment profiles.
+    height: CARD_HEIGHT,
     borderRadius: 24,
     padding: 0,
     overflow: 'hidden',

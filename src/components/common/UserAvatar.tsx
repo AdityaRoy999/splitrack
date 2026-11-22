@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Image, ImageStyle, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { CARTOON_AVATARS } from '../auth/CartoonAvatars';
+import { useAvatarPhoto } from '../../hooks/useAvatarPhoto';
 
 interface UserAvatarProps {
   avatarUri?: string | null;
@@ -14,7 +15,7 @@ interface UserAvatarProps {
 
 // Only resolved photos can be used as image sources. Canonical media references
 // and cartoon selections are rendered separately from the Image component.
-export const isPhotoUri = (uri?: string | null) => Boolean(uri && /^(https?:\/\/|file:\/\/|content:\/\/|blob:|data:image\/)/i.test(uri));
+export { isPhotoUri } from '../../hooks/useAvatarPhoto';
 
 export const UserAvatar = React.memo(function UserAvatar({
   avatarUri,
@@ -25,7 +26,7 @@ export const UserAvatar = React.memo(function UserAvatar({
   imageStyle,
   name,
 }: UserAvatarProps) {
-  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const photo = useAvatarPhoto(avatarUri);
   if (avatarUri && avatarUri.startsWith('cartoon:')) {
     const cartoonId = avatarUri.replace('cartoon:', '');
     const found = CARTOON_AVATARS.find((a) => a.id === cartoonId) || CARTOON_AVATARS[0];
@@ -42,7 +43,6 @@ export const UserAvatar = React.memo(function UserAvatar({
     );
   }
 
-  const hasPhoto = isPhotoUri(avatarUri) && failedUri !== avatarUri;
   const initials = name?.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
   return (
     <View
@@ -58,21 +58,16 @@ export const UserAvatar = React.memo(function UserAvatar({
         style,
       ]}
     >
-      {!hasPhoto && initials ? (
+      {!photo.loaded ? initials ? (
         <Text style={{ color: isDark ? '#F4F4F5' : '#18181B', fontSize: size * 0.36, fontWeight: '600' }}>{initials}</Text>
-      ) : <Image
-        source={
-          hasPhoto
-            ? { uri: avatarUri! }
-            : isDark
-            ? require('../../../assets/icon-dark.png')
-            : require('../../../assets/icon-light.png')
-        }
-        style={[styles.img, imageStyle]}
-        resizeMode="cover"
-        fadeDuration={0}
-        onError={hasPhoto ? () => setFailedUri(avatarUri!) : undefined}
-      />}
+      ) : <Image source={isDark ? require('../../../assets/icon-dark.png') : require('../../../assets/icon-light.png')}
+        style={[styles.img, imageStyle]} resizeMode="cover" fadeDuration={0} /> : null}
+      {photo.shouldLoad ? <Image
+        key={`${avatarUri}:${photo.attempt}`}
+        source={{ uri: avatarUri!, cache: photo.attempt > 0 ? 'reload' : 'default' }}
+        style={[styles.img, StyleSheet.absoluteFill, imageStyle, { opacity: photo.loaded ? 1 : 0 }]}
+        resizeMode="cover" fadeDuration={0} onError={photo.onError} onLoad={photo.onLoad}
+      /> : null}
     </View>
   );
 });
