@@ -1,3 +1,5 @@
+import { SheetCloseButton } from '../common/SheetCloseButton';
+import { SheetHandle } from '../common/SheetHandle';
 import { ModalBackdrop } from '../common/ModalBackdrop';
 import { SheetModal } from '../common/SheetModal';
 import React from 'react';
@@ -6,8 +8,8 @@ import {
   StyleSheet,
   Text,
   View,
+  Platform,
 } from 'react-native';
-import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { CalendarDateIcon } from '@solar-icons/react-native/bold/calendar-date';
 import { GraphUpIcon } from '@solar-icons/react-native/bold/graph-up';
 import { PieChart2Icon } from '@solar-icons/react-native/bold/pie-chart-2';
@@ -81,7 +83,7 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
 
-  const cardBg = isDark ? '#111114' : isLiquidGlassEnabled ? 'rgba(255,255,255,0.72)' : '#F4F5F8';
+  const cardBg = Platform.OS === 'ios' && isLiquidGlassEnabled ? 'transparent' : isDark ? '#111114' : isLiquidGlassEnabled ? 'rgba(255,255,255,0.72)' : '#F4F5F8';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
   return (
@@ -94,14 +96,10 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
       <View style={styles.backdrop}>
         <ModalBackdrop onClose={onClose} shadeColor={isDark ? 'rgba(0,0,0,0.72)' : 'rgba(15,23,42,0.35)'} />
         <GlassModalSheet style={styles.sheet}>
-          <View style={styles.dragHandleWrap}>
-            <View
-              style={[
+          <SheetHandle style={styles.dragHandleWrap} handleStyle={[
                 styles.dragHandle,
                 { backgroundColor: isDark ? 'rgba(255,255,255,0.22)' : 'rgba(15,23,42,0.18)' },
-              ]}
-            />
-          </View>
+              ]} />
 
           <View style={styles.header}>
             <View>
@@ -110,17 +108,7 @@ export const AnalyticsInfoModal: React.FC<AnalyticsInfoModalProps> = ({
                 Gestures, chart gliding & date controls
               </Text>
             </View>
-            <AnimatedPressable
-              scaleTo={0.9}
-              onPress={onClose}
-              accessibilityLabel="Close analytics guide"
-              contentStyle={[
-                styles.closeBtn,
-                { backgroundColor: isDark ? '#1B1B22' : '#E5E7EB' },
-              ]}
-            >
-              <CloseCircleIcon size={20} color={textColor} />
-            </AnimatedPressable>
+          <SheetCloseButton onClose={onClose} />
           </View>
 
           <ScrollEdgeFade style={styles.scrollWrap}>

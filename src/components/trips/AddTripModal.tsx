@@ -1,3 +1,5 @@
+import { SheetCloseButton } from '../common/SheetCloseButton';
+import { SheetHandle } from '../common/SheetHandle';
 import { ModalBackdrop } from '../common/ModalBackdrop';
 import { SheetModal } from '../common/SheetModal';
 import React, { useMemo, useState } from 'react';
@@ -9,12 +11,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { pickedImageUri } from '../../utils/pickedImage';
-import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { CameraIcon } from '@solar-icons/react-native/bold/camera';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { NotificationType, triggerNotification } from '../../utils/haptics';
@@ -194,17 +194,10 @@ export const AddTripModal: React.FC<AddTripModalProps> = ({ visible, onClose }) 
       <View style={styles.modalOverlay}>
         <ModalBackdrop onClose={onClose} />
         <GlassModalSheet style={styles.sheetContainer}>
-          <View style={styles.dragHandleWrap}>
-            <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
-          </View>
+          <SheetHandle style={styles.dragHandleWrap} handleStyle={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: textColor }]}>Create New Trip or Group</Text>
-            <TouchableOpacity
-              onPress={onClose}
-              style={[styles.closeBtn, { backgroundColor: isDark ? '#1C1C20' : '#F3F4F6' }]}
-            >
-              <CloseCircleIcon size={20} color={textColor} />
-            </TouchableOpacity>
+          <SheetCloseButton onClose={onClose} />
           </View>
 
           <ScrollEdgeFade style={styles.scrollAreaWrap}>

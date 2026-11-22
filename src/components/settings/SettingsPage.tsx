@@ -28,6 +28,7 @@ import { BottomBubble, type BubbleNotice } from '../common/BottomBubble';
 import { useSettingsAvatarTransition } from '../common/SettingsAvatarTransition';
 import type { ViewRefNode } from '../../utils/measureWindow';
 import { GlassPill } from '../glass/GlassPill';
+import { GlassSurface } from '../glass/GlassSurface';
 import { AddUpiProfileModal } from '../upi/AddUpiProfileModal';
 import { ACTION_COLORS } from '../../theme/actionColors';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
@@ -350,7 +351,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </View>
 
         {/* User Profile Card Header */}
-        <View style={[styles.profileCard, { backgroundColor: cardBg }]}>
+        <GlassSurface style={[styles.profileCard, { backgroundColor: cardBg }]}>
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handlePickAvatar}
@@ -368,9 +369,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           <Text style={[styles.profileName, { color: textColor }]}>{userName}</Text>
           <Text style={[styles.profileHandle, { color: mutedText }]}>{userHandle}</Text>
-        </View>
+        </GlassSurface>
 
-        <View style={[styles.joinedCard, { backgroundColor: cardBg }]}>
+        <GlassSurface style={[styles.joinedCard, { backgroundColor: cardBg }]}>
           <View style={styles.joinedSection}><Text style={[styles.sectionHeader, { color: mutedText }]}>ACCOUNT SIGN-IN</Text></View>
           <TouchableOpacity activeOpacity={0.7} style={styles.navRowItem} onPress={openGoogleLink}
             disabled={googleLinked || googlePending || pending} accessibilityRole="button" accessibilityLabel={googleLinked ? 'Google account synced' : 'Sync with Google'}>
@@ -384,10 +385,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             {googleLinked ? <CheckCircleIcon size={18} color="#10B981" /> : <AltArrowRightIcon size={14} color={mutedText} />}
           </TouchableOpacity>
           {googleNotice ? <Text accessibilityLiveRegion="polite" style={[styles.surfaceCaption, { color: '#10B981', paddingHorizontal: 20, paddingBottom: 16 }]}>{googleNotice}</Text> : null}
-        </View>
+        </GlassSurface>
 
         {/* Quick Management & Navigation Stack Card */}
-        <View style={[styles.joinedCard, { backgroundColor: cardBg }]}>
+        <GlassSurface style={[styles.joinedCard, { backgroundColor: cardBg }]}>
           <View style={styles.joinedSection}>
             <Text style={[styles.sectionHeader, { color: mutedText }]}>SYNC STATUS</Text>
             <Text style={[styles.surfaceCaption, { color: mutedText }]}>{pendingFailure ? 'A saved entry needs review. Your other entries can still sync.' : isOffline ? 'Offline. Saved entries will sync when you reconnect.' : syncing ? 'Syncing saved entries…' : queuedTransactionCount ? `${queuedTransactionCount} entries waiting to sync` : syncError ? 'Sync paused. Your saved entries are retained.' : 'Your ledger is up to date'}</Text>
@@ -397,8 +398,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               <GlassPill label={syncing ? 'Syncing…' : 'Sync now'} variant="dark" disabled={syncing || pending} onPress={() => { void run(refresh); }} />
             </View>
           </View>
-        </View>
-        <View style={[styles.joinedCard, { backgroundColor: cardBg }]}>
+        </GlassSurface>
+        <GlassSurface style={[styles.joinedCard, { backgroundColor: cardBg }]}>
           <View style={styles.joinedSection}>
             <Text style={[styles.sectionHeader, { color: mutedText }]}>QUICK NAVIGATION</Text>
           </View>
@@ -518,10 +519,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </View>
             <AltArrowRightIcon size={14} color={mutedText} />
           </TouchableOpacity>
-        </View>
+        </GlassSurface>
 
         {/* Joined Settings Card (Theme, Surface Style, Currency, Preferences) */}
-        <View style={[styles.joinedCard, { backgroundColor: cardBg }]}>
+        <GlassSurface style={[styles.joinedCard, { backgroundColor: cardBg }]}>
           {/* Theme Settings */}
           <View style={styles.joinedSection}>
             <Text style={[styles.sectionHeader, { color: mutedText }]}>THEME</Text>
@@ -673,10 +674,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </View>
             </View>
           </View>
-        </View>
+        </GlassSurface>
 
         {/* Import Transactions from Other Apps */}
-        <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
+        <GlassSurface style={[styles.sectionCard, { backgroundColor: cardBg }]}>
           <Text style={[styles.sectionHeader, { color: mutedText }]}>
             IMPORT FROM OTHER APPS
           </Text>
@@ -782,7 +783,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           {/* Import Preview Smooth Collapsible */}
           <SmoothCollapsible expanded={Boolean(importResult && importResult.success)}>
             {importResult && importResult.success && (
-              <View style={[styles.previewCard, { backgroundColor: chipBg }]}>
+              <GlassSurface style={[styles.previewCard, { backgroundColor: chipBg }]}>
                 <View style={styles.previewHeaderRow}>
                   <View style={{ flex: 1 }}>
                     <View style={styles.sourceTagRow}>
@@ -873,10 +874,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     <Text style={[styles.cancelImportBtnText, { color: mutedText }]}>Cancel</Text>
                   </AnimatedPressable>
                 </View>
-              </View>
+              </GlassSurface>
             )}
           </SmoothCollapsible>
-        </View>
+        </GlassSurface>
 
         <FormError message={error} />
         {/* Data Management Section */}

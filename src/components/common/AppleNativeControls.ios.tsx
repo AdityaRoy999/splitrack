@@ -52,6 +52,7 @@ export interface AppleRadioControlProps {
   gap?: number;
   columns?: number;
   scrollable?: boolean;
+  menu?: boolean;
   disabled?: boolean;
   isDark: boolean;
   style?: StyleProp<ViewStyle>;
@@ -149,6 +150,7 @@ export const AppleRadioControl: React.FC<AppleRadioControlProps> = ({
   gap = 8,
   columns,
   scrollable = false,
+  menu = false,
   disabled = false,
   isDark,
   style,
@@ -156,6 +158,16 @@ export const AppleRadioControl: React.FC<AppleRadioControlProps> = ({
   const hasGlass = isLiquidGlassAvailable();
   const colorScheme = isDark ? 'dark' : 'light';
   const ctrlSize = size === 'xs' || size === 'sm' ? 'small' : size === 'lg' ? 'large' : 'regular';
+
+  if (menu) return <Host matchContents colorScheme={colorScheme} style={style}>
+    <Picker label="Selection" selection={value} onSelectionChange={selected => {
+      const index = items.findIndex(item => item.value === String(selected));
+      if (!disabled && index >= 0 && !items[index].disabled) onChange(items[index].value, index);
+    }} modifiers={[pickerStyle('menu'), labelsHidden(), buttonStyle(hasGlass ? 'glass' : 'bordered'), buttonBorderShape('capsule'),
+      ...(disabled ? [disabledModifier(true)] : [])]}>
+      {items.map(item => <SwiftUIText key={item.value} modifiers={[tag(item.value), ...(item.disabled ? [disabledModifier(true)] : [])]}>{item.label}</SwiftUIText>)}
+    </Picker>
+  </Host>;
 
   // Use Apple's native segmented control for compact non-grid radio groups (up to 4 items)
   if (!scrollable && !columns && items.length >= 2 && items.length <= 4) {

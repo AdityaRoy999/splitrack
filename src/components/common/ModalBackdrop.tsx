@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet } from 'react-native';
 import { useSheetModal } from './SheetModal';
+import { useNativeSheetPresentation } from './NativeSheetPresentation';
 
 export function ModalBackdrop({ onClose, label = 'Dismiss modal backdrop', shadeColor = 'rgba(0, 0, 0, 0.72)' }: { onClose: () => void; label?: string; shadeColor?: string }) {
   const { open, ready } = useSheetModal();
+  const native = useNativeSheetPresentation();
   const pressStartedHere = useRef(false);
   const [opacity] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || native) return;
     const animation = Animated.timing(opacity, {
       toValue: open ? 1 : 0,
       duration: 180,
@@ -17,7 +19,9 @@ export function ModalBackdrop({ onClose, label = 'Dismiss modal backdrop', shade
     });
     animation.start();
     return () => animation.stop();
-  }, [opacity, open, ready]);
+  }, [native, opacity, open, ready]);
+
+  if (native) return null;
 
   return (
     <Pressable

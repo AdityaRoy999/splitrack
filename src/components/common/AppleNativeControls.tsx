@@ -25,6 +25,7 @@ export interface AppleRadioControlProps {
   gap?: number;
   columns?: number;
   scrollable?: boolean;
+  menu?: boolean;
   disabled?: boolean;
   isDark: boolean;
   style?: StyleProp<ViewStyle>;

@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const React = require('react');
 const ts = require('typescript');
 const source = await readFile(new URL('../src/components/common/SheetModal.tsx', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React } }).outputText;
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React } }).outputText + '\nmodule.exports.CustomSheetModal = CustomSheetModal; module.exports.NativeSheetModal = NativeSheetModal;';
 const sheetSource = await readFile(new URL('../src/components/common/GlassModalSheet.tsx', import.meta.url), 'utf8');
 const compiledSheet = ts.transpileModule(sheetSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React } }).outputText;
 const pageSource = await readFile(new URL('../src/components/common/ModalPage.tsx', import.meta.url), 'utf8');
@@ -20,7 +20,7 @@ const compiledStatus = ts.transpileModule(statusSource, { compilerOptions: { mod
 
 // Exercise the real component's commits and native callbacks without loading
 // React Native in Node. Descendant views do not need to render for these tests.
-function sheetHarness(platform, code = compiled, componentName = 'SheetModal', extraModules = {}) {
+function sheetHarness(platform, code = compiled, componentName = 'CustomSheetModal', extraModules = {}) {
   const slots = [];
   const memoBoundaries = new Map();
   let cursor = 0, dirty = false, rendering = false, renderStateUpdates = 0;
@@ -71,6 +71,9 @@ function sheetHarness(platform, code = compiled, componentName = 'SheetModal', e
     if (name === './SceneActivityContext') return { SceneActivityContext: React.createContext(true) };
     if (name === './ModalVisualContext') return { ModalVisualContext: React.createContext(false) };
     if (name === './BottomBubble') return { BubbleNoticeHost: 'BubbleNoticeHost' };
+    if (name === '../../theme/LiquidGlassContext') return { useLiquidGlass: () => ({ isLiquidGlassEnabled: false }) };
+    if (name === './AppleSheet') return { AppleSheet: 'AppleSheet' };
+    if (name === './NativeSheetPresentation') return { NativeSheetPresentationContext: React.createContext(false), useNativeSheetPresentation: () => false };
     throw new Error(`Unexpected import ${name}`);
   };
   const module = { exports: {} };
@@ -146,6 +149,46 @@ function transactionHarness() {
     get editor() { return React.Children.toArray(actions.output.props.children).find(child => child.type === 'AddExpenseModal'); },
   };
 }
+
+test('Liquid Glass selects native presentation only for enabled iOS', () => {
+  for (const platform of ['ios', 'android', 'web']) for (const enabled of [true, false]) {
+    const sheet = sheetHarness(platform, compiled, 'SheetModal', {
+      '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ isLiquidGlassEnabled: enabled }) },
+    });
+    sheet.update({ visible: true });
+    assert.equal(sheet.output.type.name, platform === 'ios' && enabled ? 'NativeSheetModal' : 'CustomSheetModal');
+  }
+});
+
+test('native sheet retains edits through dismissal and completes a handoff once', () => {
+  const sheet = sheetHarness('ios', compiled, 'NativeSheetModal');
+  let closed = 0, completed = 0;
+  sheet.update({ visible: true, children: 'draft', onRequestClose: () => closed++, onExitComplete: () => completed++ });
+  sheet.update({ children: 'edited draft' });
+  sheet.modal.props.onRequestClose();
+  assert.equal(closed, 1);
+  sheet.update({ visible: false, children: 'cleared draft' });
+  assert.equal(sheet.retainedContent, 'edited draft');
+  assert.equal(completed, 0, 'wait for the SwiftUI transition before opening another sheet');
+  sheet.modal.props.onDismiss();
+  sheet.modal.props.onDismiss();
+  assert.equal(completed, 1);
+});
+
+test('a delayed native dismissal cannot complete a reopened editor', () => {
+  const sheet = sheetHarness('ios', compiled, 'NativeSheetModal');
+  let completed = 0;
+  sheet.update({ visible: true, children: 'draft', onExitComplete: () => completed++ });
+  sheet.update({ visible: false });
+  const dismissed = sheet.modal.props.onDismiss;
+  sheet.update({ visible: true, children: 'new draft' });
+  dismissed();
+  assert.equal(completed, 0);
+  assert.equal(sheet.retainedContent, 'new draft');
+  sheet.update({ visible: false });
+  sheet.modal.props.onDismiss();
+  assert.equal(completed, 1);
+});
 
 test('sync failures never open an overhead banner or review sheet until Settings requests it', () => {
   const state = { pendingFailure: { requestId: 'failed-request', title: 'A saved entry', error: 'Review needed' }, queueReviewRequest: 0 };

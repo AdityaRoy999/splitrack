@@ -86,7 +86,8 @@ export function HorizontalEdgeFade({ children, style, tint }: HorizontalEdgeFade
 // A single scrollable child fills the bounded viewport. Preserve its handlers,
 // and only enable a fade where content is actually being clipped.
 export function ScrollEdgeFade({ children, style, tint, top = 24, bottom = 28 }: ScrollEdgeFadeProps) {
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
   const surface = useContext(BackdropSurfaceContext);
   const background = captureBackground(tint, surface ?? (themeMode === 'dark' ? '#09090B' : '#F4F4F8'));
   const edges = useScrollEdges(false);
@@ -117,8 +118,8 @@ export function ScrollEdgeFade({ children, style, tint, top = 24, bottom = 28 }:
   return (
     <View collapsable={false} style={[styles.viewport, { backgroundColor: Platform.OS === 'ios' ? 'transparent' : background }, style]}>
       {scroller}
-      {!modal && top > 0 ? <GradualBlur position="top" active={edges.left} height={top} strength={0.5} curve="bezier" /> : null}
-      {!modal && bottom > 0 ? <GradualBlur position="bottom" active={edges.right} height={bottom} strength={0.5} curve="bezier" /> : null}
+      {!modal && !nativeGlass && top > 0 ? <GradualBlur position="top" active={edges.left} height={top} strength={0.5} curve="bezier" /> : null}
+      {!modal && !nativeGlass && bottom > 0 ? <GradualBlur position="bottom" active={edges.right} height={bottom} strength={0.5} curve="bezier" /> : null}
     </View>
   );
 }

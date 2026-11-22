@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Platform,
 } from 'react-native';
 import { ArrowRightIcon } from '@solar-icons/react-native/bold/arrow-right';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
@@ -40,7 +41,8 @@ export const SettleModal: React.FC<SettleModalProps> = ({
 }) => {
   const { accounts, friends, selectedAccountId, getSimplifiedDebts, settleWithFriend } = useSplitTrack();
   const { runWithIntent, pending, error } = useAsyncAction();
-  const { formatAmount, themeMode } = useLiquidGlass();
+  const { formatAmount, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
   const [paymentAmounts, setPaymentAmounts] = useState<Record<string, string>>({});
   const [qrRequest, setQrRequest] = useState<({ account: UpiAccount } & UpiPaymentDetails) | null>(null);
   const closeQr = useCallback(() => setQrRequest(null), []);
@@ -89,7 +91,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
     } catch {}
   };
 
-  const cardSurface = isDark ? '#111114' : '#EDEDF1';
+  const cardSurface = nativeGlass ? 'transparent' : isDark ? '#111114' : '#EDEDF1';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
   const pillSurface = isDark ? '#1C1C22' : '#E5E5EA';
@@ -120,7 +122,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
             <View
               style={[
                 styles.debtCardInner,
-                highlighted && {
+                highlighted && !nativeGlass && {
                   backgroundColor: isDark
                     ? 'rgba(16, 185, 129, 0.08)'
                     : 'rgba(16, 185, 129, 0.06)',

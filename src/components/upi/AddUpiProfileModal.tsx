@@ -1,3 +1,5 @@
+import { SheetCloseButton } from '../common/SheetCloseButton';
+import { SheetHandle } from '../common/SheetHandle';
 import { ModalBackdrop } from '../common/ModalBackdrop';
 import { SheetModal } from '../common/SheetModal';
 import React, { useState } from 'react';
@@ -10,13 +12,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { MagnifierIcon } from '@solar-icons/react-native/bold/magnifier';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { BankBrand, PaymentProfileKind, UpiAccount, UpiProvider } from '../../types';
 import { NotificationType, triggerNotification } from '../../utils/haptics';
-import { AnimatedPressable } from '../common/MotionPrimitives';
 import { JellyRadio } from '../common/JellyRadio';
 import { SpringCheck } from '../common/SpringCheck';
 import { GlassPill } from '../glass/GlassPill';
@@ -113,7 +113,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
   const isEditing = Boolean(editingAccount);
 
   const cardBg = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
+    ? (Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
     : (isDark ? '#121216' : '#FFFFFF');
   const inputBg = isLiquidGlassEnabled
     ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
@@ -232,9 +232,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
   return (
     <>
       <GlassModalSheet style={styles.sheetContainer}>
-        <View style={styles.dragHandleWrap}>
-          <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
-        </View>
+        <SheetHandle style={styles.dragHandleWrap} handleStyle={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
 
         <View style={styles.headerRow}>
           <View>
@@ -247,15 +245,7 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
                 : 'Add a UPI handle, card, wallet, or netbanking profile'}
             </Text>
           </View>
-          <AnimatedPressable
-            onPress={onClose}
-            scaleTo={0.9}
-            accessibilityLabel="Close profile modal"
-            hitSlop={COMPACT_BUTTON_HIT_SLOP}
-            contentStyle={[styles.closeBtn, { backgroundColor: cardBg }]}
-          >
-            <CloseCircleIcon size={20} color={textColor} />
-          </AnimatedPressable>
+          <SheetCloseButton onClose={onClose} />
         </View>
 
         <ScrollEdgeFade style={styles.scrollAreaWrap}>

@@ -51,7 +51,7 @@ export function AddMemberModal({ visible, onClose, tripId, editingFriend }: AddM
 
 function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberModalProps, 'visible'>) {
   const { friends, trips, addFriend, updateFriend, addMemberToTrip } = useSplitTrack();
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const insets = useSafeAreaInsets();
   const isDark = themeMode === 'dark';
   const isEditing = Boolean(editingFriend);
@@ -80,7 +80,7 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
     return () => { active = false; clearTimeout(timer); controller.abort(); };
   }, [query, isEditing]);
 
-  const bg = isDark ? '#09090B' : '#F4F4F8';
+  const bg = Platform.OS === 'ios' && isLiquidGlassEnabled ? 'transparent' : isDark ? '#09090B' : '#F4F4F8';
   const surface = isDark ? '#1C1C22' : '#EFEFF4';
   const textColor = isDark ? '#F4F4F5' : '#18181B';
   const mutedText = isDark ? '#A1A1AA' : '#71717A';

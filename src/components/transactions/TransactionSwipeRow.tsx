@@ -1,6 +1,6 @@
 import { ACTION_COLORS } from '../../theme/actionColors';
 import React, { useCallback, useContext, useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Animated, { Extrapolation, interpolate, interpolateColor, ReduceMotion, useAnimatedReaction, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { Pen2Icon } from '@solar-icons/react-native/bold/pen-2';
@@ -45,13 +45,13 @@ function SwipeActions({ progress, translation, rowProgress, side, dark, transact
 // The installed gesture library animates and tracks the row on the UI thread.
 export function TransactionSwipeRow({ transaction, children }: { transaction: Transaction; children: React.ReactNode }) {
   const actions = useTransactionActions();
-  const { themeMode, transactionActionStyle } = useLiquidGlass();
+  const { themeMode, transactionActionStyle, isLiquidGlassEnabled } = useLiquidGlass();
   const surface = useContext(BackdropSurfaceContext);
   const swipeable = useRef<SwipeableMethods>(null);
   const pendingAction = useRef<(() => void) | null>(null);
   const rowProgress = useSharedValue(0);
   const dark = themeMode === 'dark';
-  const baseSurface = surface ?? (dark ? '#17171C' : '#FFFFFF');
+  const baseSurface = Platform.OS === 'ios' && isLiquidGlassEnabled ? 'transparent' : surface ?? (dark ? '#17171C' : '#FFFFFF');
   const cardMotion = useAnimatedStyle(() => {
     const reveal = interpolate(Math.abs(rowProgress.get()), [0, 0.35], [0, 1], Extrapolation.CLAMP);
     // Padding changes re-layout every text and icon on Android during a drag.

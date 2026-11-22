@@ -5,6 +5,9 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { SceneActivityContext } from './SceneActivityContext';
 import { ModalVisualContext } from './ModalVisualContext';
 import { BubbleNoticeHost } from './BottomBubble';
+import { useLiquidGlass } from '../../theme/LiquidGlassContext';
+import { AppleSheet } from './AppleSheet';
+import { NativeSheetPresentationContext } from './NativeSheetPresentation';
 
 const SheetModalContext = createContext({ open: true, ready: true, close: () => {}, finishExit: () => {} });
 export const useSheetModal = () => useContext(SheetModalContext);
@@ -20,6 +23,44 @@ const RetainedSheetContent = React.memo(function RetainedSheetContent({ children
 }, (_previous, next) => !next.visible);
 
 export function SheetModal({ visible = false, children, onRequestClose, onShow, onDismiss, onExitComplete, ...props }: SheetModalProps) {
+  const { isLiquidGlassEnabled } = useLiquidGlass();
+  if (Platform.OS === 'ios' && isLiquidGlassEnabled) return <NativeSheetModal visible={visible} onRequestClose={onRequestClose} onDismiss={onDismiss} onExitComplete={onExitComplete}>{children}</NativeSheetModal>;
+  return <CustomSheetModal visible={visible} onRequestClose={onRequestClose} onShow={onShow} onDismiss={onDismiss} onExitComplete={onExitComplete} {...props}>{children}</CustomSheetModal>;
+}
+
+function NativeSheetModal({ visible, children, onRequestClose, onDismiss, onExitComplete }: SheetModalProps) {
+  const parentInsets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const visibleRef = useRef(visible);
+  const dismissalPending = useRef(Boolean(visible));
+  useLayoutEffect(() => {
+    if (visible) dismissalPending.current = true;
+    else if (visibleRef.current) Keyboard.dismiss();
+    visibleRef.current = visible;
+  }, [visible]);
+  const close = useCallback(() => {
+    if (visibleRef.current) { Keyboard.dismiss(); onRequestClose?.(); }
+  }, [onRequestClose]);
+  const value = useMemo(() => ({ open: Boolean(visible), ready: true, close, finishExit: () => {} }), [close, visible]);
+  const metrics = { frame: { x: 0, y: 0, width, height }, insets: { ...parentInsets, top: 0, bottom: 0 } };
+  return <AppleSheet visible={Boolean(visible)} onRequestClose={close} onDismiss={() => {
+    if (visibleRef.current || !dismissalPending.current) return;
+    dismissalPending.current = false;
+    onDismiss?.();
+    onExitComplete?.();
+  }}>
+    <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider initialMetrics={metrics}>
+      <NativeSheetPresentationContext.Provider value>
+        <SheetModalContext.Provider value={value}><ModalVisualContext.Provider value><SceneActivityContext.Provider value>
+          <RetainedSheetContent visible={Boolean(visible)}>{children}</RetainedSheetContent>
+        </SceneActivityContext.Provider></ModalVisualContext.Provider></SheetModalContext.Provider>
+        <BubbleNoticeHost />
+      </NativeSheetPresentationContext.Provider>
+    </SafeAreaProvider></GestureHandlerRootView>
+  </AppleSheet>;
+}
+
+function CustomSheetModal({ visible = false, children, onRequestClose, onShow, onDismiss, onExitComplete, ...props }: SheetModalProps) {
   const parentInsets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const [presentation, setPresentation] = useState({ retained: visible, dismissing: false, ready: Platform.OS === 'web' });

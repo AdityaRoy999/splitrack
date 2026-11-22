@@ -3,6 +3,8 @@ import { BackdropBlurTargetProvider } from './src/components/common/BackdropBlur
 import { TransactionSwipeRow } from './src/components/transactions/TransactionSwipeRow';
 import { ItemActionReveal } from './src/components/common/ItemActionReveal';
 import { SettingsAvatarTransitionProvider } from './src/components/common/SettingsAvatarTransition';
+import { MainTabsContext } from './src/navigation/MainTabsContext';
+import { router, useSegments } from 'expo-router';
 import React, { startTransition, useCallback, useMemo, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { errorMessage } from './src/services/api';
@@ -39,7 +41,7 @@ import { renderSolarIcon } from './src/constants/solarIconsCatalog';
 
 // Glass & Modern Nav Components
 import { GradualBlur } from './src/components/effects/GradualBlur';
-import { GlassDock, TabKey } from './src/components/glass/GlassDock';
+import type { TabKey } from './src/components/glass/GlassDock';
 import { GlassCard } from './src/components/glass/GlassCard';
 import { GlassPill } from './src/components/glass/GlassPill';
 import { GlassMetricTile } from './src/components/glass/GlassMetricTile';
@@ -104,6 +106,7 @@ function MainAppContent({
   hideHeaderLogo = false,
   onHeaderLogoLayout,
   onHeaderLogoNode,
+  routedScreens,
 }: {
   userDisplayName?: string;
   userHandle?: string;
@@ -111,11 +114,13 @@ function MainAppContent({
   hideHeaderLogo?: boolean;
   onHeaderLogoLayout?: (rect: HeaderLogoRect) => void;
   onHeaderLogoNode?: (node: ViewRefNode | null) => void;
+  routedScreens?: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const transactionActions = useTransactionActions();
-  const { palette, themeMode, formatAmount, transactionActionStyle } = useLiquidGlass();
+  const { palette, themeMode, formatAmount, transactionActionStyle, isLiquidGlassEnabled } = useLiquidGlass();
+  const nativeTabs = Platform.OS === 'ios' && isLiquidGlassEnabled;
   const {
     totalIncome,
     totalExpenses,
@@ -133,14 +138,9 @@ function MainAppContent({
 
   const isDark = themeMode === 'dark';
   const rootBg = palette.background;
-  const [currentTab, setCurrentTab] = useState<TabKey>('home');
-  const [visitedTabs, setVisitedTabs] = useState<Record<TabKey, boolean>>({
-    home: true,
-    expenses: false,
-    split: false,
-    trips: false,
-    analytics: false,
-  });
+  const segments = useSegments();
+  const lastSegment = segments[segments.length - 1];
+  const currentTab: TabKey = lastSegment === 'expenses' || lastSegment === 'trips' || lastSegment === 'analytics' ? lastSegment : 'home';
 
   const [expenseFilter, setExpenseFilter] = useState<ExpenseFilter>('All');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
@@ -196,8 +196,7 @@ function MainAppContent({
     }
     // Mount the destination and select it in one commit, without a blank frame.
     startTransition(() => {
-      setVisitedTabs((prev) => prev[tab] ? prev : { ...prev, [tab]: true });
-      setCurrentTab(tab);
+      router.navigate(tab === 'home' ? '/' : `/${tab}`);
     });
   }, [openExpenseEditor]);
 
@@ -1042,14 +1041,20 @@ function MainAppContent({
   ), [chipBg, dynamicScrollContent, textColor]);
 
   return (
-    <SettingsAvatarTransitionProvider onOpen={() => setShowSettings(true)}><View style={[styles.container, { backgroundColor: rootBg, paddingTop: 0 }]}>
+    <SettingsAvatarTransitionProvider onOpen={() => setShowSettings(true)}>
+    <MainTabsContext.Provider value={{ render: { home: renderHomeTab, expenses: renderExpensesTab, trips: renderTripsTab, analytics: renderAnalyticsTab },
+      effectsActive: effectsActive && !showSettings, hidden: showSettings || expenseEditorMounted || showAddTrip || showAddMember,
+      settingsVisible: showSettings,
+      openSplit: openQuickExpense, navigate: handleDockTabChange }}>
+    <View style={[styles.container, { backgroundColor: rootBg, paddingTop: 0 }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <CloudStatus />
 
       <View collapsable={false} style={[styles.mainViewport, { backgroundColor: rootBg }]}>
         <View style={[styles.tabPagesContainer, { backgroundColor: rootBg }]}>
+          <View style={styles.nativeTabsHost}>{routedScreens}</View>
           {showSettings ? (
-            <TabScene active duration={340} offsetY={0}><View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
+            <View style={styles.settingsOverlay}><TabScene active duration={340} offsetY={0}><View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
               <SettingsPage
                 onBack={() => setShowSettings(false)}
                 onSignOut={onSignOut}
@@ -1073,26 +1078,11 @@ function MainAppContent({
                   navigateTab('expenses');
                 }}
               />
-            </View></TabScene>
+            </View></TabScene></View>
           ) : null}
-            <View pointerEvents={showSettings ? 'none' : 'box-none'} style={styles.tabPagesContainer}>
-              <TabScene active={!showSettings && currentTab === 'home'} sceneKey={`${homeView}:${selectedMemberId ?? ''}`} effectsActive={effectsActive} render={renderHomeTab} />
-
-              {visitedTabs.expenses && (
-                <TabScene active={!showSettings && currentTab === 'expenses'} effectsActive={effectsActive} render={renderExpensesTab} />
-              )}
-
-              {visitedTabs.trips && (
-                <TabScene active={!showSettings && currentTab === 'trips'} sceneKey={selectedTripId ?? 'groups'} effectsActive={effectsActive} render={renderTripsTab} />
-              )}
-
-              {visitedTabs.analytics && (
-                <TabScene active={!showSettings && currentTab === 'analytics'} effectsActive={effectsActive} render={renderAnalyticsTab} />
-              )}
-            </View>
 
         </View>
-        <GradualBlur
+        {!nativeTabs ? <GradualBlur
           active={effectsActive}
           tint={Platform.OS === 'android' ? rootBg : 'transparent'}
           position="top"
@@ -1101,8 +1091,8 @@ function MainAppContent({
           layers={6}
           curve="bezier"
           zIndex={45}
-        />
-        <GradualBlur
+        /> : null}
+        {!nativeTabs ? <GradualBlur
           active={effectsActive}
           tint={Platform.OS === 'android' ? rootBg : 'transparent'}
           position="bottom"
@@ -1111,20 +1101,10 @@ function MainAppContent({
           layers={6}
           curve="bezier"
           zIndex={45}
-        />
+        /> : null}
       </View>
 
 
-      <View
-        pointerEvents={expenseEditorMounted || showAddTrip || showAddMember ? 'none' : 'box-none'}
-        style={expenseEditorMounted || showAddTrip || showAddMember ? { display: 'none' } : undefined}
-      >
-        <GlassDock
-          currentTab={currentTab}
-          onTabChange={handleDockTabChange}
-          onQuickAdd={openQuickExpense}
-        />
-      </View>
 
       {expenseEditorMounted ? <AddExpenseModal
         key={`${expenseDefaultTripId || 'general'}-${expenseDefaultFriendIds?.join(',') || 'all'}`}
@@ -1184,23 +1164,23 @@ function MainAppContent({
         allowClear={true}
         title="Filter Ledger by Date"
       />
-    </View></SettingsAvatarTransitionProvider>
+    </View></MainTabsContext.Provider></SettingsAvatarTransitionProvider>
   );
 }
 
-export default function App() {
+export default function App({ children }: { children?: React.ReactNode }) {
   return (
     <GestureHandlerRootView style={styles.appRoot}><SafeAreaProvider>
       <ErrorBoundary>
         <AuthProvider>
-          <AppContent />
+          <AppContent routedScreens={children} />
         </AuthProvider>
       </ErrorBoundary>
     </SafeAreaProvider></GestureHandlerRootView>
   );
 }
 
-function AppContent() {
+function AppContent({ routedScreens }: { routedScreens?: React.ReactNode }) {
   const { user, profile, loading, profileError, authenticate, completeProfile, refreshProfile, logout } = useAuth();
   const isAuthenticated = Boolean(user && profile?.username);
   const userDisplayName = profile?.displayName ?? user?.displayName ?? '';
@@ -1247,6 +1227,7 @@ function AppContent() {
                   hideHeaderLogo={hideHeaderLogo}
                   onHeaderLogoLayout={showPreloader ? setHeaderLogoRect : undefined}
                   onHeaderLogoNode={handleHeaderLogoNode}
+                  routedScreens={routedScreens}
                 /></TransactionActionsProvider></BackdropBlurTargetProvider>
               ) : user ? (
                 <OnboardingUsernameScreen
@@ -1292,6 +1273,8 @@ function AppContent() {
 }
 
 const styles = StyleSheet.create({
+  nativeTabsHost: { flex: 1 },
+  settingsOverlay: { ...StyleSheet.absoluteFill, zIndex: 5 },
   tripActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   tripRemoveToggle: { ...COMPACT_ICON_BUTTON_STYLE, borderRadius: 18, borderWidth: 0 },
   tripRemovalHint: { fontSize: 12, lineHeight: 18, marginBottom: 12 },

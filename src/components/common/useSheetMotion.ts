@@ -3,6 +3,7 @@ import { usePanGesture } from 'react-native-gesture-handler';
 import { cancelAnimation, Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { useSheetModal } from './SheetModal';
+import { useNativeSheetPresentation } from './NativeSheetPresentation';
 
 const SHEET_SPRING = {
   stiffness: 420, damping: 36, mass: 0.65,
@@ -13,12 +14,14 @@ const SHEET_SPRING = {
 // the completed dismissal, so rendering the form cannot stall a sheet's motion.
 export function useSheetMotion(distance: number, layoutReady = true) {
   const { open, ready: modalReady, close, finishExit } = useSheetModal();
+  const native = useNativeSheetPresentation();
   const ready = modalReady && layoutReady;
-  const translateY = useSharedValue(distance);
+  const translateY = useSharedValue(native ? 0 : distance);
   const dragStart = useSharedValue(0);
   const closing = useSharedValue(false);
 
   useEffect(() => {
+    if (native) { translateY.set(0); return; }
     closing.set(!open);
     if (!ready) {
       translateY.set(distance);
@@ -31,10 +34,10 @@ export function useSheetMotion(distance: number, layoutReady = true) {
           duration: 210, easing: Easing.in(Easing.cubic), reduceMotion: ReduceMotion.System,
         }, (finished) => { if (finished) scheduleOnRN(finishExit); }));
     return () => cancelAnimation(translateY);
-  }, [closing, distance, finishExit, open, ready, translateY]);
+  }, [closing, distance, finishExit, native, open, ready, translateY]);
 
   const gesture = usePanGesture({
-    enabled: open && ready,
+    enabled: !native && open && ready,
     activeOffsetY: 6,
     failOffsetX: [-24, 24],
     onActivate: () => {

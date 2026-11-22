@@ -1,3 +1,5 @@
+import { SheetCloseButton } from '../common/SheetCloseButton';
+import { SheetHandle } from '../common/SheetHandle';
 import { ModalBackdrop } from '../common/ModalBackdrop';
 import { SheetModal } from '../common/SheetModal';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -9,7 +11,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { MinimalisticMagnifierIcon } from '@solar-icons/react-native/bold/minimalistic-magnifier';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
@@ -86,7 +87,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
 
 
   const cardBg = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
+    ? (Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
     : (isDark ? '#141418' : '#FFFFFF');
   const inputBg = isLiquidGlassEnabled
     ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
@@ -152,14 +153,10 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
       <View style={styles.backdrop}>
         <ModalBackdrop onClose={onClose} shadeColor={isDark ? 'rgba(0,0,0,0.72)' : 'rgba(15,23,42,0.35)'} />
         <GlassModalSheet style={styles.sheet}>
-          <View style={styles.dragHandleWrap}>
-            <View
-              style={[
+          <SheetHandle style={styles.dragHandleWrap} handleStyle={[
                 styles.dragHandle,
                 { backgroundColor: isDark ? 'rgba(255,255,255,0.22)' : 'rgba(15,23,42,0.18)' },
-              ]}
-            />
-          </View>
+              ]} />
 
           <View style={styles.header}>
             <View>
@@ -183,14 +180,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
                   <TrashBinTrashIcon size={18} color="#EF4444" />
                 </AnimatedPressable>
               )}
-              <AnimatedPressable
-                scaleTo={0.9}
-                onPress={onClose}
-                accessibilityLabel="Close category modal"
-                contentStyle={[styles.closeBtn, { backgroundColor: inputBg }]}
-              >
-                <CloseCircleIcon size={20} color={textColor} />
-              </AnimatedPressable>
+          <SheetCloseButton onClose={onClose} />
             </View>
           </View>
 

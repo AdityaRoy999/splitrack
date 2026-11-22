@@ -17,6 +17,7 @@ import { GlassSurface } from '../glass/GlassSurface';
 import { useSheetMotion } from './useSheetMotion';
 import { SheetSizingContext } from './SheetSizingContext';
 import { ScrollEdgeFade } from './ScrollEdgeFade';
+import { useNativeSheetPresentation } from './NativeSheetPresentation';
 
 // Measure fixed sections directly, including their margins. Scroll sections
 // report their intrinsic content, so sheet height never depends on its viewport.
@@ -45,6 +46,7 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { themeMode } = useLiquidGlass();
+  const native = useNativeSheetPresentation();
   const isDark = themeMode === 'dark';
 
   const bgMatte = isDark ? '#09090B' : '#F4F4F8';
@@ -79,6 +81,10 @@ export const GlassModalSheet: React.FC<GlassModalSheetProps> = ({
   // Empty sections (for example a hidden FormError) may never dispatch a native
   // layout event. They must not leave an otherwise laid-out sheet offscreen.
   const { animatedStyle, gesture } = useSheetMotion(windowHeight, laidOut);
+
+  if (native) return <View style={[styles.sheetBase, style, { flex: 1, maxWidth: undefined, paddingBottom: bottomPadding, backgroundColor: 'transparent' }]}>
+    <SheetSizingContext.Provider value={null}>{children}</SheetSizingContext.Provider>
+  </View>;
 
   return (
     <Animated.View

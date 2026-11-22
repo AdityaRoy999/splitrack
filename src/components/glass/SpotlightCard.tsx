@@ -116,7 +116,7 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
         styles.innerPanel,
         {
           backgroundColor: isLiquidGlassEnabled
-            ? isDark
+            ? Platform.OS === 'ios' ? 'transparent' : isDark
               ? 'rgba(255, 255, 255, 0.05)'
               : 'rgba(15, 23, 42, 0.04)'
             : innerBg,
@@ -136,7 +136,7 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
               { transform: [{ scale: photoScale }] },
             ]}
           />
-          <Animated.View
+          {Platform.OS === 'ios' && isLiquidGlassEnabled ? null : <Animated.View
             style={[
               StyleSheet.absoluteFill,
               {
@@ -144,8 +144,8 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
                 opacity: scrimOpacity,
               },
             ]}
-          />
-          {blurCover ? <GradualBlur
+          />}
+          {blurCover && !(Platform.OS === 'ios' && isLiquidGlassEnabled) ? <GradualBlur
             position="bottom" height={120} intensity={85} startOffset={0.05}
             tint={isDark ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.08)'} zIndex={1}
           /> : null}

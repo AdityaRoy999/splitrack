@@ -54,7 +54,7 @@ export const BankIssuerPickerModal: React.FC<BankIssuerPickerModalProps> = ({
   const [customBankInput, setCustomBankInput] = useState('');
   const [showCustomBankForm, setShowCustomBankForm] = useState(false);
 
-  const bgSheet = isDark ? '#000000' : '#F4F4F8';
+  const bgSheet = Platform.OS === 'ios' && isLiquidGlassEnabled ? 'transparent' : isDark ? '#000000' : '#F4F4F8';
   const cardBg = isLiquidGlassEnabled
     ? (isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)')
     : (isDark ? '#141418' : '#FFFFFF');

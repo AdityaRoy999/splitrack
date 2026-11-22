@@ -1,18 +1,21 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
+import { useNativeSheetPresentation } from './NativeSheetPresentation';
+import { AppleGlassButton } from './AppleGlassButton';
 
 export function SheetHeader({ title, subtitle, onClose, disabled }: { title: string; subtitle?: string; onClose(): void; disabled?: boolean }) {
   const { themeMode } = useLiquidGlass();
   const dark = themeMode === 'dark';
+  const native = useNativeSheetPresentation();
   return <View>
-    <View style={styles.handleWrap}><View style={[styles.handle, { backgroundColor: dark ? '#52525B' : '#A1A1AA' }]} /></View>
+    {!native ? <View style={styles.handleWrap}><View style={[styles.handle, { backgroundColor: dark ? '#52525B' : '#A1A1AA' }]} /></View> : null}
     <View style={styles.row}>
       <View style={styles.copy}><Text style={[styles.title, { color: dark ? '#F4F4F5' : '#18181B' }]}>{title}</Text>
         {subtitle ? <Text style={[styles.subtitle, { color: dark ? '#8E8E93' : '#71717A' }]}>{subtitle}</Text> : null}</View>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Close ${title}`} disabled={disabled} onPress={onClose} hitSlop={6} style={[styles.close, { backgroundColor: dark ? '#1C1C22' : '#E5E5EA' }]}>
+      {native ? <AppleGlassButton role="close" onPress={onClose} disabled={disabled} variant="glass" shape="pill" size="md" /> : <Pressable accessibilityRole="button" accessibilityLabel={`Close ${title}`} disabled={disabled} onPress={onClose} hitSlop={6} style={[styles.close, { backgroundColor: dark ? '#1C1C22' : '#E5E5EA' }]}>
         <CloseCircleIcon size={20} color={dark ? '#F4F4F5' : '#18181B'} />
-      </Pressable>
+      </Pressable>}
     </View>
   </View>;
 }

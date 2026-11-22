@@ -170,7 +170,7 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
     }, 260);
   };
 
-  const cardBg = isDark ? '#111114' : '#FFFFFF';
+  const cardBg = useNativeAppleCalendar ? 'transparent' : isDark ? '#111114' : '#FFFFFF';
   const surfaceBg = isDark ? '#1B1B20' : '#F2F3F7';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';

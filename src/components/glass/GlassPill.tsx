@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, StyleSheet, ViewStyle, TextStyle, View } from 'react-native';
+import { Platform, Text, StyleSheet, ViewStyle, TextStyle, View } from 'react-native';
 import { triggerImpact, ImpactStyle } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AnimatedPressable } from '../common/MotionPrimitives';
@@ -7,6 +7,7 @@ import { GlassSurface } from './GlassSurface';
 import { useModalVisual } from '../common/ModalVisualContext';
 import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
 import { ACTION_COLORS } from '../../theme/actionColors';
+import { AppleGlassButton } from '../common/AppleGlassButton';
 
 interface GlassPillProps {
   label?: string;
@@ -44,6 +45,9 @@ export const GlassPill: React.FC<GlassPillProps> = ({
     triggerImpact(ImpactStyle.Light);
     onPress();
   };
+
+  if (Platform.OS === 'ios' && isLiquidGlassEnabled) return <AppleGlassButton label={label} icon={icon}
+    onPress={handlePress} disabled={disabled} active={active} variant={variant} size={size} shape={shape ?? (modal ? 'rounded' : 'pill')} style={style} />;
 
   const getContainerStyle = () => {
     if (backgroundColor) return { backgroundColor };

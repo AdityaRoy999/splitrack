@@ -24,6 +24,7 @@ import { useBackdropBlurTarget } from '../common/BackdropBlurTarget';
 import { SheetModal } from '../common/SheetModal';
 import { ModalBackdrop } from '../common/ModalBackdrop';
 import { usePopupMotion } from '../common/usePopupMotion';
+import { useNativeSheetPresentation } from '../common/NativeSheetPresentation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { buildUpiPaymentUri, formatUpiAmount, type UpiPaymentDetails } from '../../utils/upi';
 import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP, COMPACT_ICON_BUTTON_STYLE } from '../../constants/buttonSizes';
@@ -49,6 +50,7 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
 };
 
 function QrModalContent({ account, amount, note }: { account: UpiAccount } & UpiPaymentDetails) {
+  const native = useNativeSheetPresentation();
   const insets = useSafeAreaInsets();
   const blurTarget = useBackdropBlurTarget();
   const { progress: animVal, close: handleSmoothClose } = usePopupMotion();
@@ -98,7 +100,7 @@ function QrModalContent({ account, amount, note }: { account: UpiAccount } & Upi
 
   return (
       <View style={[styles.modalOverlay, { paddingTop: Math.max(20, insets.top), paddingBottom: Math.max(20, insets.bottom) }]}>
-        {Platform.OS === 'android' ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(9,9,11,0.68)' : 'rgba(244,244,248,0.68)' }]} /> :
+        {native ? null : Platform.OS === 'android' ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(9,9,11,0.68)' : 'rgba(244,244,248,0.68)' }]} /> :
           <BlurView pointerEvents="none" style={StyleSheet.absoluteFill} intensity={55}
             tint={isDark ? 'dark' : 'light'} blurTarget={blurTarget} blurMethod="dimezisBlurView" />}
         <ModalBackdrop label="Close QR modal backdrop" onClose={handleSmoothClose} shadeColor={isDark ? 'rgba(6, 7, 11, 0.44)' : 'rgba(15, 23, 42, 0.24)'} />
@@ -107,7 +109,7 @@ function QrModalContent({ account, amount, note }: { account: UpiAccount } & Upi
           style={[
             styles.contentCardWrap,
             {
-              opacity: animVal,
+              opacity: native ? 1 : animVal,
               transform: [
                 {
                   scale: animVal.interpolate({

@@ -1,3 +1,5 @@
+import { SheetCloseButton } from '../common/SheetCloseButton';
+import { SheetHandle } from '../common/SheetHandle';
 import { SheetModal } from '../common/SheetModal';
 import React, { memo, useMemo, useState } from 'react';
 import {
@@ -561,7 +563,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
   };
 
   const cardBg = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
+    ? (Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
     : (isDark ? '#121216' : '#FFFFFF');
   const inputBg = isLiquidGlassEnabled
     ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
@@ -849,9 +851,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
       <View style={styles.modalOverlay}>
         <ModalBackdrop onClose={onClose} />
         <GlassModalSheet style={styles.sheetContainer}>
-          <View style={styles.dragHandleWrap}>
-            <View style={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
-          </View>
+          <SheetHandle style={styles.dragHandleWrap} handleStyle={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
 
           <View style={styles.headerRow}>
             <View>
@@ -866,15 +866,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   : 'Dynamic share-based expense split'}
               </Text>
             </View>
-            <AnimatedPressable
-              onPress={onClose}
-              hitSlop={COMPACT_BUTTON_HIT_SLOP}
-              scaleTo={0.9}
-              accessibilityLabel="Close expense modal"
-              contentStyle={[styles.closeBtn, { backgroundColor: cardBg }]}
-            >
-              <CloseCircleIcon size={20} color={textColor} />
-            </AnimatedPressable>
+          <SheetCloseButton onClose={onClose} />
           </View>
 
           <ScrollEdgeFade style={styles.scrollAreaWrap}>

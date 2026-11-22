@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { Platform, View, Text, StyleSheet, ScrollView } from 'react-native';
 import Svg, { ClipPath, Defs, ForeignObject, Path } from 'react-native-svg';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
@@ -113,7 +113,7 @@ export const QuickSendTray: React.FC<QuickSendTrayProps> = ({
               contentStyle={styles.friendItem}
             >
               <View style={styles.avatarWrapper}>
-                {isSettled ? (
+                {isSettled && Platform.OS !== 'ios' ? (
                   <Svg
                     width={AVATAR_SIZE}
                     height={AVATAR_SIZE}
