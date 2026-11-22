@@ -18,6 +18,7 @@ import { AnimatedPressable } from './MotionPrimitives';
 import { JellyRadio } from './JellyRadio';
 import { AppleGraphicalCalendar } from './AppleNativeControls';
 import { SheetModal } from './SheetModal';
+import { SheetCloseButton } from './SheetCloseButton';
 import { ModalBackdrop } from './ModalBackdrop';
 import { usePopupMotion } from './usePopupMotion';
 import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP, COMPACT_ICON_BUTTON_STYLE } from '../../constants/buttonSizes';
@@ -289,15 +290,7 @@ const CalendarDialogBody: React.FC<CalendarDatePickerModalProps> = ({
               </Text>
             </View>
           </View>
-          <AnimatedPressable
-            onPress={onClose}
-            hitSlop={COMPACT_BUTTON_HIT_SLOP}
-            scaleTo={0.9}
-            accessibilityLabel="Close calendar modal"
-            contentStyle={[styles.closeBtn, { backgroundColor: surfaceBg }]}
-          >
-            <CloseCircleIcon size={20} color={textColor} />
-          </AnimatedPressable>
+          <SheetCloseButton onClose={onClose} />
         </View>
 
         <View style={[styles.hairline, { backgroundColor: dividerColor }]} />

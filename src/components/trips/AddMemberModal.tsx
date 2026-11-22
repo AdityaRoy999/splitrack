@@ -24,6 +24,8 @@ import { ScrollEdgeFade } from '../common/ScrollEdgeFade';
 import { ModalBackdrop } from '../common/ModalBackdrop';
 import { ModalPage } from '../common/ModalPage';
 import { SheetModal } from '../common/SheetModal';
+import { useNativeSheetPresentation } from '../common/NativeSheetPresentation';
+import { SheetCloseButton } from '../common/SheetCloseButton';
 
 interface AddMemberModalProps {
   visible: boolean;
@@ -50,6 +52,7 @@ export function AddMemberModal({ visible, onClose, tripId, editingFriend }: AddM
 }
 
 function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberModalProps, 'visible'>) {
+  const native = useNativeSheetPresentation();
   const { friends, trips, addFriend, updateFriend, addMemberToTrip } = useSplitTrack();
   const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const insets = useSafeAreaInsets();
@@ -155,13 +158,13 @@ function MemberPageContent({ editingFriend, tripId, onClose }: Omit<AddMemberMod
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.page, { backgroundColor: bg }]}>
       <View style={[styles.header, { paddingTop: insets.top + 28 }]}>
-        <View pointerEvents="none" style={[styles.handle, { top: insets.top + 8, backgroundColor: mutedText }]} />
+        {!native ? <View pointerEvents="none" style={[styles.handle, { top: insets.top + 8, backgroundColor: mutedText }]} /> : null}
         <View style={styles.headerRow}>
           <View style={styles.headerButton} />
           <Text style={[styles.title, { color: textColor }]}>{isEditing ? 'Edit Member' : 'Add Members'}</Text>
-          <TouchableOpacity onPress={onClose} accessibilityLabel="Close member page" style={styles.headerButton}>
+          {native ? <SheetCloseButton onClose={onClose} /> : <TouchableOpacity onPress={onClose} accessibilityLabel="Close member page" style={styles.headerButton}>
             <CloseCircleIcon size={24} color={textColor} />
-          </TouchableOpacity>
+          </TouchableOpacity>}
         </View>
         {!isEditing ? (
           <View style={[styles.searchBar, { backgroundColor: surface }]}>
