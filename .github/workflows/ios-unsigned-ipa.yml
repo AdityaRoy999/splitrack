@@ -3,7 +3,7 @@ name: Build Unsigned iOS IPA
 on:
   push:
     branches:
-      - main
+      - ios
   workflow_dispatch:
 
 permissions:
@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   build-unsigned-ios:
-    if: github.actor != 'github-actions[bot]'
+    if: github.ref == 'refs/heads/ios' && github.actor != 'github-actions[bot]'
     name: Build and publish unsigned iOS IPA
     runs-on: macos-latest
     timeout-minutes: 60
@@ -71,8 +71,8 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Validate Google auth and Firebase configuration
-        run: node --test scripts/android-google-auth.test.mjs
+      - name: Validate Google auth, Firebase configuration and platform build routing
+        run: node --test scripts/android-google-auth.test.mjs scripts/mobile-workflows.test.mjs
 
       - name: Generate native iOS project (Expo Prebuild)
         env:
@@ -220,7 +220,9 @@ jobs:
             export COMMIT_MESSAGE="$(git log -1 --pretty=%s)"
           fi
 
-          # Sync to latest origin/main BEFORE editing apps.json to handle concurrent commits safely
+          # Keep the existing subscribers' feed on main. Main has no mobile push
+          # builds, so this feed update cannot start either platform's workflow.
+          # Fetch the latest main before editing to preserve concurrent changes.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
