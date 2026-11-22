@@ -179,12 +179,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/ios/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.50",
-      "versionDate": "2026-11-22T14:09:36Z",
-      "versionDescription": "Build both platforms on main and publish both SideStore feeds",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-50/Splittrack-unsigned.ipa",
-      "size": 27247999,
+      "version": "1.0.51",
+      "versionDate": "2026-11-22T16:04:03Z",
+      "versionDescription": "Preserve unpaid balances when starting a fresh ledger",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-51/Splittrack-unsigned.ipa",
+      "size": 27248897,
       "versions": [
+        {
+          "version": "1.0.51",
+          "buildVersion": "51",
+          "date": "2026-11-22T16:04:03Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-51/Splittrack-unsigned.ipa",
+          "size": 27248897,
+          "localizedDescription": "Preserve unpaid balances when starting a fresh ledger"
+        },
         {
           "version": "1.0.50",
           "buildVersion": "50",
