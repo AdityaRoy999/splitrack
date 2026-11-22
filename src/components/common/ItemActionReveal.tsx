@@ -1,3 +1,4 @@
+import { ACTION_COLORS } from '../../theme/actionColors';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -17,7 +18,7 @@ function RevealedButton({ progress, label, name, onPress, danger, disabled, comp
     return { opacity: value, transform: [{ scale: 0.8 + value * 0.2 }] };
   });
   const color = danger || dark ? '#FFFFFF' : '#18181B';
-  return <Animated.View style={motion}><Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel={`${label} ${name}`} accessibilityState={{ disabled }} onPress={onPress} style={[styles.button, compact && styles.compactButton, { backgroundColor: danger ? '#E5484D' : dark ? '#1C1C22' : '#E5E5EA' }]}>
+  return <Animated.View style={motion}><Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel={`${label} ${name}`} accessibilityState={{ disabled }} onPress={onPress} style={[styles.button, compact && styles.compactButton, { backgroundColor: danger ? ACTION_COLORS.danger : dark ? '#1C1C22' : '#E5E5EA' }]}>
     {danger ? <TrashBinTrashIcon size={16} color={color} /> : <Pen2Icon size={16} color={color} />}{compact ? null : <Text style={[styles.label, { color }]}>{label}</Text>}
   </Pressable></Animated.View>;
 }

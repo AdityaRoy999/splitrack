@@ -1,3 +1,4 @@
+import { ACTION_COLORS } from './src/theme/actionColors';
 import { BackdropBlurTargetProvider } from './src/components/common/BackdropBlurTarget';
 import { TransactionSwipeRow } from './src/components/transactions/TransactionSwipeRow';
 import { ItemActionReveal } from './src/components/common/ItemActionReveal';
@@ -790,7 +791,7 @@ function MainAppContent({
                   onPress={() => { setRemovingTrips(!removalMode); setTripRemovalError(''); }}
                   accessibilityLabel={removalMode ? 'Finish removing trips' : 'Remove trips'}
                   accessibilityState={{ selected: removalMode }}
-                  contentStyle={[styles.tripRemoveToggle, { backgroundColor: removalMode ? (isDark ? '#18181D' : '#EFEFF4') : '#E5484D' }]}
+                  contentStyle={[styles.tripRemoveToggle, { backgroundColor: removalMode ? (isDark ? '#18181D' : '#EFEFF4') : ACTION_COLORS.danger }]}
                   hitSlop={COMPACT_BUTTON_HIT_SLOP}
                 >
                   {removalMode ? <CheckCircleIcon size={20} color="#10B981" /> : <TrashBinTrashIcon size={20} color="#FFFFFF" />}

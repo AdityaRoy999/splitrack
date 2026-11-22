@@ -1,3 +1,4 @@
+import { ACTION_COLORS } from '../../theme/actionColors';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, LayoutAnimation, Platform, StyleSheet, Text } from 'react-native';
 import type { Friend } from '../../types';
@@ -63,7 +64,7 @@ export function TripMemberPill({ member, removalMode, canRemove, onRemove }: Tri
           disabled={pending}
           accessibilityLabel={`Remove ${member.name} from trip`}
           style={styles.badgePosition}
-          contentStyle={[styles.badge, { backgroundColor: '#E5484D' }]}
+          contentStyle={[styles.badge, { backgroundColor: ACTION_COLORS.danger }]}
           hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
         >
           <TrashBinTrashIcon size={11} color="#FFFFFF" />

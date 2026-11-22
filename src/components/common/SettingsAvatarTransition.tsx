@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { scheduleOnRN } from 'react-native-worklets';
+import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { useAuth } from '../../auth/AuthContext';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { measureNodeInWindow, type ViewRefNode, type WindowRect } from '../../utils/measureWindow';
@@ -32,6 +32,7 @@ export function SettingsAvatarTransitionProvider({ children, onOpen }: { childre
   const measurementTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [flight, setFlight] = useState<AvatarFlight | null>(null);
   const progress = useSharedValue(0);
+  const geometry = useSharedValue<AvatarFlight | null>(null);
   const registerSource = useCallback((node: ViewRefNode | null) => { headerSource.current = node; }, []);
   const finish = useCallback((id: number) => {
     if (sequence.current !== id) return;
@@ -56,7 +57,6 @@ export function SettingsAvatarTransitionProvider({ children, onOpen }: { childre
       measurementTimer.current = null;
       if (rootRect && sourceRect) {
         returnAnchor.current = { root: rootRect, header: sourceRect };
-        progress.set(0);
         setFlight({ id, root: rootRect, from: sourceRect, to: null, direction: 'enter', fromRadius: 14 });
       } else active.current = false;
       onOpen();
@@ -66,7 +66,7 @@ export function SettingsAvatarTransitionProvider({ children, onOpen }: { childre
     measurementTimer.current = setTimeout(() => start(true), 120);
     measureNodeInWindow(root.current, rect => { rootRect = rect; start(); });
     measureNodeInWindow(sourceNode, rect => { sourceRect = rect; start(); });
-  }, [onOpen, progress]);
+  }, [onOpen]);
   const destination = useCallback((node: ViewRefNode | null) => {
     if (!active.current) return;
     const id = sequence.current;
@@ -121,7 +121,6 @@ export function SettingsAvatarTransitionProvider({ children, onOpen }: { childre
       cancelAnimation(progress);
       const visible = from && from.y + from.height > currentRoot.y && from.y < currentRoot.y + currentRoot.height && from.x + from.width > currentRoot.x && from.x < currentRoot.x + currentRoot.width;
       if (from && visible) {
-        progress.set(0);
         setFlight({ id, root: currentRoot, from, to: { ...anchor.header, x: anchor.header.x + currentRoot.x - anchor.root.x, y: anchor.header.y + currentRoot.y - anchor.root.y }, direction: 'exit', fromRadius: radius });
       } else {
         active.current = false;
@@ -137,13 +136,21 @@ export function SettingsAvatarTransitionProvider({ children, onOpen }: { childre
     measureNodeInWindow(source, rect => { sourceRect = rect; start(); });
   }, [flight, progress]);
   useLayoutEffect(() => {
-    if (!flight?.to) return;
-    const id = flight.id;
-    progress.set(withTiming(1, { duration: 340, easing: Easing.bezier(0.22, 1, 0.36, 1), reduceMotion: ReduceMotion.System }, done => {
-      if (done) scheduleOnRN(finish, id);
-    }));
+    // Geometry and progress must change in the same UI-thread task. Otherwise
+    // a reopened flight can paint its new bounds with the old progress of 1.
+    scheduleOnUI(() => {
+      'worklet';
+      cancelAnimation(progress);
+      geometry.set(flight);
+      progress.set(0);
+      if (!flight?.to) return;
+      const id = flight.id;
+      progress.set(withTiming(1, { duration: 340, easing: Easing.bezier(0.22, 1, 0.36, 1), reduceMotion: ReduceMotion.System }, done => {
+        if (done) scheduleOnRN(finish, id);
+      }));
+    });
     return () => cancelAnimation(progress);
-  }, [finish, flight, progress]);
+  }, [finish, flight, geometry, progress]);
   useEffect(() => {
     if (!flight) return;
     const timer = setTimeout(() => finish(flight.id), 900);
@@ -153,14 +160,15 @@ export function SettingsAvatarTransitionProvider({ children, onOpen }: { childre
     sequence.current++;
     if (measurementTimer.current) clearTimeout(measurementTimer.current);
   }, []);
-  const from = flight?.from;
-  const to = flight?.to ?? from;
-  const originX = flight?.root.x ?? 0;
-  const originY = flight?.root.y ?? 0;
-  const fromRadius = flight?.fromRadius ?? 14;
-  const toRadius = flight?.direction === 'exit' ? 14 : 28;
   // Worklets capture serializable coordinates, never native View refs.
   const frame = useAnimatedStyle(() => {
+    const current = geometry.get();
+    const from = current?.from;
+    const to = current?.to ?? from;
+    const originX = current?.root.x ?? 0;
+    const originY = current?.root.y ?? 0;
+    const fromRadius = current?.fromRadius ?? 14;
+    const toRadius = current?.direction === 'exit' ? 14 : 28;
     const p = progress.get();
     const size = from && to ? from.width + (to.width - from.width) * p : 42;
     const scale = size / AVATAR_SIZE;
@@ -168,15 +176,15 @@ export function SettingsAvatarTransitionProvider({ children, onOpen }: { childre
     // would resize/re-layout the native image on every Android frame.
     const x = from && to ? from.x + from.width / 2 + (to.x + to.width / 2 - from.x - from.width / 2) * p - originX - AVATAR_SIZE / 2 : 0;
     const y = from && to ? from.y + from.height / 2 + (to.y + to.height / 2 - from.y - from.height / 2) * p - originY - AVATAR_SIZE / 2 : 0;
-    return { transform: [{ translateX: x }, { translateY: y }, { scale }], borderRadius: (fromRadius + (toRadius - fromRadius) * p) / scale };
+    return { opacity: current ? 1 : 0, transform: [{ translateX: x }, { translateY: y }, { scale }], borderRadius: (fromRadius + (toRadius - fromRadius) * p) / scale };
   });
   const context = useMemo(() => ({ moving: flight !== null, open, close, destination, registerSource }), [flight, open, close, destination, registerSource]);
   return <Context.Provider value={context}>
     <View ref={root} collapsable={false} style={styles.root}>
       {children}
-      {flight ? <Animated.View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.flying, frame]}>
+      <Animated.View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.flying, frame]}>
         <UserAvatar avatarUri={profile?.avatar} name={profile?.displayName} size={AVATAR_SIZE} borderRadius={0} isDark={themeMode === 'dark'} />
-      </Animated.View> : null}
+      </Animated.View>
     </View>
   </Context.Provider>;
 }

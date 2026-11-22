@@ -70,6 +70,7 @@ export const UserAvatar = React.memo(function UserAvatar({
         }
         style={[styles.img, imageStyle]}
         resizeMode="cover"
+        fadeDuration={0}
         onError={hasPhoto ? () => setFailedUri(avatarUri!) : undefined}
       />}
     </View>

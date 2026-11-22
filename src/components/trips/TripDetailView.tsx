@@ -1,3 +1,4 @@
+import { ACTION_COLORS } from '../../theme/actionColors';
 import { TransactionSwipeRow } from '../transactions/TransactionSwipeRow';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -159,7 +160,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
               onPress={() => setRemovingMembers((value) => !value)}
               accessibilityLabel={removalMode ? 'Finish removing trip members' : 'Remove trip members'}
               style={styles.memberControlHitArea}
-              contentStyle={[styles.addMemberBtn, { backgroundColor: removalMode ? pillSurface : '#E5484D' }]}
+              contentStyle={[styles.addMemberBtn, { backgroundColor: removalMode ? pillSurface : ACTION_COLORS.danger }]}
             >
               {removalMode ? <CheckCircleIcon size={18} color="#10B981" /> : <TrashBinTrashIcon size={16} color="#FFFFFF" />}
             </AnimatedPressable> : null}

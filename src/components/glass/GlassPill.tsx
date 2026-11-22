@@ -6,6 +6,7 @@ import { AnimatedPressable } from '../common/MotionPrimitives';
 import { GlassSurface } from './GlassSurface';
 import { useModalVisual } from '../common/ModalVisualContext';
 import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
+import { ACTION_COLORS } from '../../theme/actionColors';
 
 interface GlassPillProps {
   label?: string;
@@ -57,9 +58,9 @@ export const GlassPill: React.FC<GlassPillProps> = ({
           backgroundColor: isDark ? '#FFFFFF' : '#000000',
         };
       case 'danger':
-        return { backgroundColor: '#E5484D' };
+        return { backgroundColor: ACTION_COLORS.danger };
       case 'success':
-        return { backgroundColor: '#BDEBD0' };
+        return { backgroundColor: ACTION_COLORS.success };
       case 'dark':
         return {
           backgroundColor: isDark ? '#1C1C20' : '#E5E5EA',
@@ -75,8 +76,7 @@ export const GlassPill: React.FC<GlassPillProps> = ({
   const getTextColor = () => {
     if (modal && variant !== 'danger' && variant !== 'success') return isDark ? '#F4F4F5' : '#18181B';
     if (variant === 'light') return '#000000';
-    if (variant === 'danger') return '#FFFFFF';
-    if (variant === 'success') return '#174C35';
+    if (variant === 'danger' || variant === 'success') return ACTION_COLORS.onAction;
     if (variant === 'accent') return isDark ? '#000000' : '#FFFFFF';
     return isDark ? '#FFFFFF' : '#000000';
   };

@@ -1,3 +1,4 @@
+import { ACTION_COLORS } from '../../theme/actionColors';
 import React, { useCallback, useContext, useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -116,6 +117,6 @@ const styles = StyleSheet.create({
   actions: { width: ACTION_WIDTH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 4 },
   inlineActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, paddingHorizontal: 12, paddingBottom: 10 },
   action: { width: 66, height: COMPACT_BUTTON_HEIGHT, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 12, borderWidth: 0 },
-  delete: { backgroundColor: '#E5484D' },
+  delete: { backgroundColor: ACTION_COLORS.danger },
   label: { fontSize: 11, fontWeight: '600', color: '#FFFFFF' },
 });

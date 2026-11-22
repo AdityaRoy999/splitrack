@@ -45,11 +45,11 @@ function harness() {
   const reanimated = { default: { View: 'AnimatedView' }, ReduceMotion: { System: 'system' }, Easing: { bezier: () => 'ease' },
     useSharedValue(initial) { return hooks.useMemo(() => {
       const shared = { value: initial, get() { return this.value; }, set(next) {
-        if (typeof next === 'object') { next.shared = shared; animations.push(next); }
+        if (next && typeof next === 'object' && 'config' in next) { next.shared = shared; animations.push(next); }
         else this.value = next;
       } }; return shared;
     }, []); },
-    useAnimatedStyle: callback => callback(),
+    useAnimatedStyle: callback => ({ evaluate: callback }),
     withTiming: (value, config, callback) => ({ value, config, callback }),
     cancelAnimation() {},
   };
@@ -57,7 +57,7 @@ function harness() {
     if (name === 'react') return hooks;
     if (name === 'react-native') return { View: 'View', StyleSheet: { create: value => value } };
     if (name === 'react-native-reanimated') return reanimated;
-    if (name === 'react-native-worklets') return { scheduleOnRN: (callback, ...args) => callback(...args) };
+    if (name === 'react-native-worklets') return { scheduleOnRN: (callback, ...args) => callback(...args), scheduleOnUI: (callback, ...args) => callback(...args) };
     if (name === '../../auth/AuthContext') return { useAuth: () => ({ profile: { displayName: 'Test' } }) };
     if (name === '../../theme/LiquidGlassContext') return { useLiquidGlass: () => ({ themeMode: 'dark' }) };
     if (name === '../../utils/measureWindow') return { measureNodeInWindow: (node, callback) => measurements.push({ node, callback }) };
@@ -81,7 +81,7 @@ function harness() {
   }
   flush();
   return { measurements, animations, flush, get context() { return output.props.value; }, get opened() { return opened; },
-    get frame() { return output.props.children.props.children[1]?.props.style[1]; },
+    get frame() { return output.props.children.props.children[1]?.props.style[1].evaluate(); },
     fireFallback() { const entry = [...timers].find(([, timer]) => timer.ms === 120); timers.delete(entry[0]); entry[1].callback(); flush(); },
   };
 }
@@ -209,4 +209,23 @@ test('a missing or offscreen Settings photo still navigates back without a stran
     h.measurements[4].callback(targetRect); h.flush();
     assert.equal(closed, 1, 'late measurements cannot navigate a second time');
   }
+});
+
+test('a second flight resets stale completion progress before its first painted frame', () => {
+  const h = harness();
+  const start = () => {
+    const index = h.measurements.length;
+    h.context.open('header');
+    h.measurements[index].callback(rootRect); h.measurements[index + 1].callback(sourceRect); h.flush();
+    h.context.destination('settings'); h.measurements[index + 2].callback(targetRect); h.flush();
+  };
+  start();
+  h.animations[0].shared.value = 1;
+  h.animations[0].callback(true); h.flush();
+  assert.equal(h.frame.opacity, 0);
+  start();
+  assert.equal(h.frame.opacity, 1);
+  assert.equal(h.frame.transform[0].translateX, -9);
+  assert.equal(h.frame.transform[1].translateY, -5);
+  assert.equal(h.frame.transform[2].scale, 42 / 92);
 });

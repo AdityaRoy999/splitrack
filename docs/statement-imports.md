@@ -2,6 +2,8 @@
 
 In Settings, open **Import Statement** under **Import from other apps**. Review the valid/skipped counts and paid/received totals, choose a payment profile, then confirm. Nothing is saved while selecting or previewing a file.
 
+If you have no payment profiles, the preview offers **Add payment profile**. Confirming opens that sheet and retains the parsed statement, so you can add a profile and return to the same import. Save errors appear beside the confirmation button; the preview clears only after the device queue acknowledges the entire batch.
+
 Supported formats:
 
 - Paytm XLSX: reads the **Passbook Payment History** transaction table, even when the first sheet is Summary. Signed amounts determine income/expense alongside the explicit payment direction. Real transaction times and provider references are retained.

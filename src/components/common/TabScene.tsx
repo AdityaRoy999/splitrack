@@ -3,6 +3,7 @@ import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SceneActivityContext } from './SceneActivityContext';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
+import { useSettingsAvatarTransition } from './SettingsAvatarTransition';
 
 interface TabSceneProps {
   active: boolean;
@@ -20,13 +21,15 @@ export const TabScene = memo(function TabScene({ active, effectsActive = true, r
   const { width } = useWindowDimensions();
   const { palette } = useLiquidGlass();
   const progress = useSharedValue(0);
+  const avatarMoving = useSettingsAvatarTransition()?.moving ?? false;
+  const slideOffset = avatarMoving ? 0 : offsetY;
 
   useLayoutEffect(() => {
     progress.set(0);
     if (active) progress.set(withTiming(1, { duration, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System }));
   }, [active, duration, progress, sceneKey]);
   const motion = useAnimatedStyle(() => ({
-    transform: [{ translateX: active ? 0 : width * 2 }, { translateY: (1 - progress.get()) * offsetY }],
+    transform: [{ translateX: active ? 0 : width * 2 }, { translateY: (1 - progress.get()) * slideOffset }],
   }));
   // Fade a plain cover instead of a blur ancestor. UIKit backdrop effects
   // keep opacity 1, and cached pages retain their layout while offscreen.

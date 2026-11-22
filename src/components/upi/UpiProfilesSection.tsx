@@ -1,3 +1,4 @@
+import { ACTION_COLORS } from '../../theme/actionColors';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
@@ -842,7 +843,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 999,
-    backgroundColor: '#EF4444',
+    backgroundColor: ACTION_COLORS.danger,
   },
   deleteConfirmText: {
     fontSize: 13,

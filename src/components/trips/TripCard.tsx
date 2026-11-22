@@ -1,3 +1,4 @@
+import { ACTION_COLORS } from '../../theme/actionColors';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
@@ -143,7 +144,7 @@ export const TripCard: React.FC<TripCardProps> = ({ trip, onPress, onRemove }) =
         onPress={remove} disabled={removing} accessibilityLabel={`Remove ${trip.name}`}
         accessibilityState={{ busy: removing, disabled: removing }}
         style={styles.removeAnchor}
-        contentStyle={[styles.removeBadge, { backgroundColor: '#E5484D' }]}
+        contentStyle={[styles.removeBadge, { backgroundColor: ACTION_COLORS.danger }]}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         {removing ? <ActivityIndicator size="small" color="#FFFFFF" /> : <TrashBinTrashIcon size={18} color="#FFFFFF" />}

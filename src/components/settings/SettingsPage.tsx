@@ -28,6 +28,8 @@ import { BottomBubble, type BubbleNotice } from '../common/BottomBubble';
 import { useSettingsAvatarTransition } from '../common/SettingsAvatarTransition';
 import type { ViewRefNode } from '../../utils/measureWindow';
 import { GlassPill } from '../glass/GlassPill';
+import { AddUpiProfileModal } from '../upi/AddUpiProfileModal';
+import { ACTION_COLORS } from '../../theme/actionColors';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AltArrowRightIcon } from '@solar-icons/react-native/bold/alt-arrow-right';
 import { CardSendIcon } from '@solar-icons/react-native/bold/card-send';
@@ -131,11 +133,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [googleNotice, setGoogleNotice] = useState('');
   const [profileNotice, setProfileNotice] = useState<BubbleNotice | null>(null);
   const { run, pending, error } = useAsyncAction();
+  const { run: runImport, pending: importPending, error: importError, setError: setImportError } = useAsyncAction();
+  const [showImportProfile, setShowImportProfile] = useState(false);
 
   const [chosenAccountId, setTargetAccountId] = useState<string>(
     selectedAccountId || accounts[0]?.id || ''
   );
-  const targetAccountId = accounts.some(account => account.id === chosenAccountId) ? chosenAccountId : selectedAccountId || accounts[0]?.id || '';
+  const targetAccountId = accounts.some(account => account.id === chosenAccountId) ? chosenAccountId
+    : accounts.some(account => account.id === selectedAccountId) ? selectedAccountId : accounts[0]?.id || '';
   const [importResult, setImportResult] = useState<ImportParseResult | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [showJsonPaste, setShowJsonPaste] = useState(false);
@@ -233,11 +238,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handlePickFile = async () => {
-    if (isParsing || pending) return;
+    if (isParsing || pending || importPending) return;
     try {
       setIsParsing(true);
       setImportResult(null);
       setImportStatusMsg(null);
+      setImportError('');
       const res = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'application/json', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'text/csv', 'text/plain'],
         copyToCacheDirectory: true,
@@ -277,29 +283,37 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handleParsePastedJson = () => {
-    if (!jsonInputText.trim()) return;
+    if (importPending || !jsonInputText.trim()) return;
     triggerSmoothLayout(260);
     const result = parseAnyTextTransactions(jsonInputText, 'pasted_statement.csv', targetAccountId);
     setImportStatusMsg(null);
+    setImportError('');
     applyImportResult(result);
   };
 
   const handleConfirmImport = () => {
-    if (pending || !importResult || !importResult.success || importResult.transactions.length === 0) {
+    if (pending || importPending || !importResult || !importResult.success || importResult.transactions.length === 0) {
       return;
     }
-    if (!targetAccountId) { setImportStatusMsg({ type: 'error', text: 'Add and choose a UPI/card profile before importing.' }); return; }
-    void run(async () => {
-    const count = await importTransactions(importResult.transactions.map(tx => ({ ...tx, upiAccountId: targetAccountId })));
-    triggerNotification(NotificationType.Success);
-    triggerSmoothLayout(260);
-    setImportStatusMsg({
-      type: 'success',
-      text: `${count} transactions saved on this device. They will sync automatically.`,
-    });
-    setImportResult(null);
-    setJsonInputText('');
-    setShowJsonPaste(false);
+    if (!targetAccountId) {
+      setImportError('Add a UPI/card profile, then confirm this import. Your preview will stay here.');
+      setShowImportProfile(true);
+      return;
+    }
+    setImportStatusMsg(null);
+    void runImport(async () => {
+      // Paint the saving state before validating a large statement batch.
+      await new Promise<void>(resolve => setTimeout(resolve, 16));
+      const count = await importTransactions(importResult.transactions.map(tx => ({ ...tx, upiAccountId: targetAccountId })));
+      triggerNotification(NotificationType.Success);
+      triggerSmoothLayout(260);
+      setImportStatusMsg({
+        type: 'success',
+        text: `${count} transactions saved on this device. They will sync automatically.`,
+      });
+      setImportResult(null);
+      setJsonInputText('');
+      setShowJsonPaste(false);
     });
   };
 
@@ -706,7 +720,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <AnimatedPressable
               scaleTo={0.96}
               onPress={handlePickFile}
-              disabled={isParsing || pending}
+              disabled={isParsing || pending || importPending}
               contentStyle={[styles.importActionBtn, { backgroundColor: cardBg }]}
             >
               {isParsing ? (
@@ -727,6 +741,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 triggerSmoothLayout(240);
                 setShowJsonPaste((prev) => !prev);
               }}
+              disabled={importPending}
               contentStyle={[styles.importSecondaryBtn, { backgroundColor: cardBg }]}
             >
               <FileTextIcon size={15} color={textColor} />
@@ -797,7 +812,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <Text style={[styles.accountPickLabel, { color: mutedText }]}>
                   LINK TO UPI / CARD PROFILE:
                 </Text>
-                <JellyRadio scrollable fadeColor={cardBg} items={accounts.map(account => ({ value: account.id, label: account.title }))} value={targetAccountId} onChange={setTargetAccountId} chipColor={chipBg} activeColor={activeBg} textColor={textColor} activeTextColor={activeText} size="sm" />
+                {accounts.length ? <JellyRadio scrollable fadeColor={cardBg} items={accounts.map(account => ({ value: account.id, label: account.title }))} value={targetAccountId} onChange={id => { setTargetAccountId(id); setImportError(''); }} disabled={importPending} chipColor={chipBg} activeColor={activeBg} textColor={textColor} activeTextColor={activeText} size="sm" />
+                  : <View style={styles.importProfileEmpty}>
+                    <Text style={{ color: mutedText, fontSize: 12, lineHeight: 18 }}>Add a UPI/card profile to link these transactions before saving.</Text>
+                    <GlassPill label="Add payment profile" onPress={() => setShowImportProfile(true)} />
+                  </View>}
 
                 {/* Preview Rows */}
                 <View style={styles.previewEntriesList}>
@@ -824,16 +843,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </View>
 
                 {/* Confirmation Buttons */}
+                <FormError message={importError} />
                 <View style={styles.confirmActionRow}>
                   <AnimatedPressable
                     scaleTo={0.96}
                     onPress={handleConfirmImport}
-                    disabled={pending || !targetAccountId}
-                    contentStyle={[styles.confirmImportBtn, { backgroundColor: '#10B981' }]}
+                    disabled={pending || importPending}
+                    accessibilityLabel={`Confirm and import ${importResult.transactions.length} transactions`}
+                    accessibilityState={{ busy: importPending }}
+                    style={styles.confirmImportWrap}
+                    contentStyle={[styles.confirmImportBtn, { backgroundColor: ACTION_COLORS.success }]}
                   >
-                    <CheckCircleIcon size={16} color="#FFFFFF" />
+                    {importPending ? <ActivityIndicator size="small" color={ACTION_COLORS.onAction} /> : <CheckCircleIcon size={16} color={ACTION_COLORS.onAction} />}
                     <Text style={styles.confirmImportBtnText}>
-                      {pending ? 'Saving on this device…' : `Confirm & Import (${importResult.transactions.length})`}
+                      {importPending ? 'Saving on this device…' : `Confirm & Import (${importResult.transactions.length})`}
                     </Text>
                   </AnimatedPressable>
 
@@ -842,7 +865,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     onPress={() => {
                       triggerSmoothLayout(240);
                       setImportResult(null);
+                      setImportError('');
                     }}
+                    disabled={importPending}
                     contentStyle={[styles.cancelImportBtn, { backgroundColor: cardBg }]}
                   >
                     <Text style={[styles.cancelImportBtnText, { color: mutedText }]}>Cancel</Text>
@@ -871,15 +896,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             style={[
               styles.eraseBtn,
               {
-                backgroundColor: '#E77878',
+                backgroundColor: ACTION_COLORS.danger,
               },
             ]}
             activeOpacity={0.7}
             accessibilityLabel="Start a fresh ledger"
-            disabled={pending}
+            disabled={pending || importPending}
           >
-            <TrashBinTrashIcon size={16} color="#47191D" />
-            <Text style={[styles.eraseBtnTitle, { color: '#47191D' }]}>Start a Fresh Ledger</Text>
+            <TrashBinTrashIcon size={16} color={ACTION_COLORS.onAction} />
+            <Text style={[styles.eraseBtnTitle, { color: ACTION_COLORS.onAction }]}>Start a Fresh Ledger</Text>
           </TouchableOpacity>
 
           {onSignOut && (
@@ -918,6 +943,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </GlassModalSheet>
         </View>
       </SheetModal>
+      <AddUpiProfileModal visible={showImportProfile} onClose={() => { setShowImportProfile(false); setImportError(''); }} />
       <BottomBubble notice={profileNotice} onDismiss={() => setProfileNotice(null)} />
       <SheetModal visible={showGoogleLink} onRequestClose={closeGoogleLink}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
@@ -1243,27 +1269,36 @@ const styles = StyleSheet.create({
   confirmActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 6,
+    gap: 12,
+    marginTop: 16,
+    paddingHorizontal: 8,
+    flexWrap: 'wrap',
   },
+  importProfileEmpty: { gap: 12, paddingVertical: 12 },
+  confirmImportWrap: { flexGrow: 1, flexBasis: 210, minWidth: 0 },
   confirmImportBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 11,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 48,
     borderRadius: 999,
   },
   confirmImportBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   cancelImportBtn: {
     paddingVertical: 11,
     paddingHorizontal: 16,
     borderRadius: 999,
+    minHeight: 48,
+    justifyContent: 'center',
   },
   cancelImportBtnText: {
     fontSize: 12,
