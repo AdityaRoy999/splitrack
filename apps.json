@@ -179,12 +179,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.51",
-      "versionDate": "2026-11-22T16:04:03Z",
-      "versionDescription": "Preserve unpaid balances when starting a fresh ledger",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-51/Splittrack-unsigned.ipa",
-      "size": 27248897,
+      "version": "1.0.54",
+      "versionDate": "2026-11-22T18:55:16Z",
+      "versionDescription": "Use system close controls and grabbers in member and calendar sheets",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-54/Splittrack-unsigned.ipa",
+      "size": 28329844,
       "versions": [
+        {
+          "version": "1.0.54",
+          "buildVersion": "54",
+          "date": "2026-11-22T18:55:16Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-54/Splittrack-unsigned.ipa",
+          "size": 28329844,
+          "localizedDescription": "Use system close controls and grabbers in member and calendar sheets"
+        },
         {
           "version": "1.0.51",
           "buildVersion": "51",
