@@ -179,12 +179,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.47",
-      "versionDate": "2026-11-22T13:31:57Z",
-      "versionDescription": "Android optimization",
-      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-47/Splittrack-unsigned.ipa",
-      "size": 27247938,
+      "version": "1.0.50",
+      "versionDate": "2026-11-22T14:09:36Z",
+      "versionDescription": "Build both platforms on main and publish both SideStore feeds",
+      "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-50/Splittrack-unsigned.ipa",
+      "size": 27247999,
       "versions": [
+        {
+          "version": "1.0.50",
+          "buildVersion": "50",
+          "date": "2026-11-22T14:09:36Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-50/Splittrack-unsigned.ipa",
+          "size": 27247999,
+          "localizedDescription": "Build both platforms on main and publish both SideStore feeds"
+        },
         {
           "version": "1.0.47",
           "buildVersion": "47",
