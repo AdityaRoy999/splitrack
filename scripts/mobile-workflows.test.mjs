@@ -4,15 +4,23 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 const { load } = createRequire(import.meta.url)('js-yaml');
 const docs = await Promise.all(['android-apk.yml', 'ios-unsigned-ipa.yml'].map(async name => load(await readFile(new URL(`../.github/workflows/${name}`, import.meta.url), 'utf8'))));
-test('only manual builds on the matching platform branch can run', () => {
+test('source pushes and manual builds run only on the matching platform branch', () => {
   for (const [i, platform] of ['android', 'ios'].entries()) {
     const doc = docs[i], job = Object.values(doc.jobs)[0];
-    assert.deepEqual(Object.keys(doc.on), ['workflow_dispatch']);
+    assert.deepEqual(Object.keys(doc.on).sort(), ['push', 'workflow_dispatch']);
+    assert.deepEqual(doc.on.push.branches, [platform]);
+    assert.deepEqual(doc.on.push['paths-ignore'], ['apps.json']);
     assert.equal(job.if, `github.ref == 'refs/heads/${platform}' && github.actor != 'github-actions[bot]'`);
     assert.doesNotMatch(job.if, /main/);
     assert.equal(doc.permissions['id-token'], 'write');
     assert.equal(doc.permissions.contents, 'read');
   }
+});
+test('a source push never triggers the other platform or main', () => {
+  const targets = branch => docs.map(doc => doc.on.push.branches.includes(branch));
+  assert.deepEqual(targets('android'), [true, false]);
+  assert.deepEqual(targets('ios'), [false, true]);
+  assert.deepEqual(targets('main'), [false, false]);
 });
 test('platform builds use native runners and separate queues', () => {
   assert.equal(Object.values(docs[0].jobs)[0]['runs-on'], 'ubuntu-latest');
