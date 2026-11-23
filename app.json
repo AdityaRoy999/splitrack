@@ -67,9 +67,13 @@
           "image": "./assets/splash-transparent.png",
           "backgroundColor": "#FFFFFF",
           "imageWidth": 1,
-          "dark": { "image": "./assets/splash-transparent.png", "backgroundColor": "#000000" }
+          "dark": {
+            "image": "./assets/splash-transparent.png",
+            "backgroundColor": "#000000"
+          }
         }
-      ]
+      ],
+      "./plugins/withSplitTrackUpdater.cjs"
     ]
   }
 }

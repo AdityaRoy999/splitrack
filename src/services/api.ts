@@ -1,3 +1,5 @@
+import * as Application from 'expo-application';
+import { Platform } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import { getFirebaseAuth } from './firebase';
 
@@ -39,7 +41,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
       if (getFirebaseAuth().currentUser?.uid !== user.uid) throw new ApiError('Your session changed. Please sign in again.', 401, 'UNAUTHENTICATED');
       const response = await fetch(`${baseUrl}${path}`, {
         method, signal: controller.signal,
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...(id ? { 'idempotency-key': id } : {}) },
+        headers: { 'X-App-Version': `${Platform.OS}/${Application.nativeBuildVersion ?? 0}/${Application.nativeApplicationVersion ?? '0.0.0'}`, 'content-type': 'application/json', authorization: `Bearer ${token}`, ...(id ? { 'idempotency-key': id } : {}) },
         ...(encoded !== undefined ? { body: encoded } : {}),
       });
       const body = await response.json().catch(() => ({}));

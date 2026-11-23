@@ -1,0 +1,13 @@
+import { appendFile } from 'node:fs/promises';
+const repo = process.env.PUBLIC_RELEASE_REPO;
+if (repo !== 'AdityaRoy999/splittrack-releases') throw new Error('Unexpected public release repository.');
+const options = { headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, signal: AbortSignal.timeout(15000) };
+const response = await fetch(`https://api.github.com/repos/${repo}`, options);
+if (!response.ok) throw new Error('The public binary repository must exist before building.');
+const data = await response.json();
+if (data.private) throw new Error('The binary repository must be public.');
+const ref = data.default_branch;
+if (typeof ref !== 'string' || /[\r\n]/.test(ref)) throw new Error('Invalid release repository branch.');
+const branch = await fetch(`https://api.github.com/repos/${repo}/branches/${encodeURIComponent(ref)}`, options);
+if (!branch.ok) throw new Error('Initialize the public binary repository with one commit before building.');
+await appendFile(process.env.GITHUB_OUTPUT, `ref=${ref}\n`);

@@ -1,3 +1,4 @@
+import { ReleaseUpdate } from './src/components/updates/ReleaseUpdate';
 import { ACTION_COLORS } from './src/theme/actionColors';
 import { BackdropBlurTargetProvider } from './src/components/common/BackdropBlurTarget';
 import { TransactionSwipeRow } from './src/components/transactions/TransactionSwipeRow';
@@ -1194,6 +1195,7 @@ export default function App() {
       <ErrorBoundary>
         <AuthProvider>
           <AppContent />
+          <ReleaseUpdate />
         </AuthProvider>
       </ErrorBoundary>
     </SafeAreaProvider></GestureHandlerRootView>
