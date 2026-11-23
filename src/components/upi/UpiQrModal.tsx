@@ -1,3 +1,4 @@
+import { GlassTouchable as TouchableOpacity } from '../common/GlassTouchable';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -6,7 +7,6 @@ import {
   Share,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { CloseCircleIcon } from '@solar-icons/react-native/bold/close-circle';

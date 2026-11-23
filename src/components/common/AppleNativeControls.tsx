@@ -5,6 +5,8 @@ export interface AppleRadioOption {
   value: string;
   label: string;
   disabled?: boolean;
+  icon?: React.ReactNode;
+  color?: string;
 }
 
 export interface AppleGraphicalCalendarProps {

@@ -61,6 +61,7 @@ test('settled iOS Quick Send photos render outside SVG ForeignObject and still o
     '../../store/SplitTrackStore': { useSplitTrack: () => ({ friends: [friend] }) },
     '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark' }) },
     '../common/MotionPrimitives': { AnimatedPressable: 'AnimatedPressable' },
+    '../common/AppleGlassButton': { AppleGlassButton: 'AppleGlassButton' },
     '../common/ScrollEdgeFade': { HorizontalEdgeFade: 'EdgeFade', useHorizontalScrollEdges: () => ({}) },
     '../common/UserAvatar': { UserAvatar: 'UserAvatar' },
     '../../constants/buttonSizes': { COMPACT_ICON_BUTTON_STYLE: {}, COMPACT_BUTTON_HIT_SLOP: {} },
@@ -116,6 +117,7 @@ test('surface changes keep the same navigator and dock action handlers', async (
 
 test('glass buttons retain the supplied icon, one-line label and full-width footer geometry', async () => {
   const Pill = await component('src/components/glass/GlassPill.tsx', {
+    '../common/AppleGlassButton': { AppleGlassButton: 'AppleGlassButton' },
     'react-native': { ...nativeViews, Platform: { OS: 'ios' } },
     '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark', isLiquidGlassEnabled: true }) },
     '../../utils/haptics': { triggerImpact() {}, ImpactStyle: {} },
@@ -127,14 +129,110 @@ test('glass buttons retain the supplied icon, one-line label and full-width foot
   }, 'GlassPill');
   const icon = React.createElement('OriginalSolarIcon');
   const footer = Pill({ label: 'Save & Split Expense', icon, size: 'lg', variant: 'accent', onPress() {} });
-  const outer = nativeViews.StyleSheet.flatten(footer.props.style);
+  assert.equal(footer.type, 'AppleGlassButton');
+  const NativeButton = await component('src/components/common/AppleGlassButton.ios.tsx', {
+    './AppleGlassPressable': { AppleGlassPressable: 'AppleGlassPressable' },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark' }) },
+    '../../theme/actionColors': { ACTION_COLORS: { danger: '#A92F3A', success: '#16734B' } },
+  }, 'AppleGlassButton');
+  const rendered = NativeButton(footer.props);
+  const outer = nativeViews.StyleSheet.flatten(rendered.props.style);
   assert.equal(outer.width, '100%');
-  const label = all(footer, node => node.type === 'Text')[0];
+  const label = all(rendered, node => node.type === 'Text')[0];
   assert.equal(label.props.numberOfLines, 1);
-  assert.equal(all(footer, node => node.type === 'OriginalSolarIcon')[0].type, icon.type);
-  assert.equal(all(footer, node => node.type === 'Host').length, 0, 'button width no longer depends on SwiftUI intrinsic measurement');
+  assert.equal(all(rendered, node => node.type === 'OriginalSolarIcon')[0].type, icon.type);
   const close = Pill({ label: 'Close', size: 'lg', variant: 'dark', onPress() {} });
-  assert.equal(all(close, node => node.type === 'GlassSurface').length, 1);
+  assert.equal(close.type, 'AppleGlassButton');
+});
+
+test('native glass actions use fixed layout and noninteractive untinted material without scaling', async () => {
+  let bounds = { width: 0, height: 36 };
+  const modifier = name => value => ({ name, value });
+  const Native = await component('src/components/common/AppleGlassPressable.ios.tsx', {
+    '../glass/GlassPanel': { GlassPanel: 'GlassPanel' },
+    react: { ...React, useState: () => [bounds, update => { bounds = update(bounds); }] },
+    '@expo/ui/swift-ui': Object.fromEntries(['Button', 'HStack', 'Host', 'RNHostView'].map(name => [name, name])),
+    '@expo/ui/swift-ui/modifiers': Object.fromEntries(['accessibilityLabel', 'buttonStyle', 'disabled', 'frame', 'glassEffect', 'onLongPressGesture'].map(name => [name, modifier(name)])),
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark' }) },
+    '../glass/GlassSurface': { GlassSurface: 'GlassSurface' },
+    '../../theme/actionColors': { ACTION_COLORS: { danger: '#A92F3A', success: '#16734B' } },
+  }, 'AppleGlassPressable');
+  let pressed = 0;
+  const props = { children: React.createElement('Text', { numberOfLines: 1 }, 'Save & Split Expense'), onPress: () => pressed++, style: { width: '100%' }, contentStyle: { height: 48 }, accessibilityLabel: 'Save expense' };
+  const measuring = Native(props);
+  all(measuring, node => node.props.onLayout)[0].props.onLayout({ nativeEvent: { layout: { width: 358, height: 48 } } });
+  const tree = Native(props);
+  const host = all(tree, node => node.type === 'Host')[0];
+  assert.equal(host.props.matchContents, undefined);
+  assert.equal(host.props.ignoreSafeArea, 'all', 'sheet keyboard avoidance owns movement');
+  const frame = all(tree, node => node.type === 'HStack')[0].props.modifiers;
+  assert.equal(frame[0].value.width, 358); assert.equal(frame[0].value.height, 48);
+  assert.equal(frame[1].value.glass.interactive, false);
+  assert.equal(frame[1].value.glass.tint, undefined);
+  const button = all(tree, node => node.type === 'Button')[0];
+  assert.equal(button.props.modifiers[0].value, 'plain');
+  button.props.onPress(); assert.equal(pressed, 1);
+  all(Native({ ...props, disabled: true }), node => node.type === 'Button')[0].props.onPress();
+  assert.equal(pressed, 1, 'disabled native action cannot submit');
+});
+
+test('Glass adapters preserve Matte styles, event and press feedback unchanged', async () => {
+  const mode = { isLiquidGlassEnabled: false };
+  const Touchable = await component('src/components/common/GlassTouchable.tsx', {
+    'react-native': { ...nativeViews, Platform: { OS: 'ios' }, TouchableOpacity: 'TouchableOpacity' },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => mode },
+    './AppleGlassPressable': { AppleGlassPressable: 'AppleGlassPressable' },
+  }, 'GlassTouchable');
+  const style = { backgroundColor: '#A92F3A', marginTop: 12, paddingHorizontal: 16 };
+  const onPress = () => {};
+  const matte = Touchable({ children: 'Reset', activeOpacity: 0.7, style, onPress });
+  assert.equal(matte.type, 'TouchableOpacity'); assert.equal(matte.props.style, style);
+  assert.equal(matte.props.onPress, onPress); assert.equal(matte.props.activeOpacity, 0.7);
+  mode.isLiquidGlassEnabled = true;
+  assert.equal(Touchable({ children: 'Reset', style, onPress }).type, 'AppleGlassPressable');
+});
+
+test('native selection retains original icons and ignores disabled or stale indices', async () => {
+  const Selector = await component('src/components/common/AppleSlidingSelector.ios.tsx', {
+    expo: { requireNativeView: () => 'NativeSelection' },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark' }) },
+  }, 'AppleSlidingSelector');
+  const icon = React.createElement('OriginalSolarIcon', { color: '#fff' });
+  const selected = [];
+  const props = { items: [{ value: 'equal', label: 'Equal', icon }, { value: 'exact', label: 'Exact', disabled: true }], value: 'equal', onChange: value => selected.push(value) };
+  const tree = Selector(props);
+  assert.equal(all(tree, node => node.type === 'OriginalSolarIcon').length, 1);
+  const native = all(tree, node => node.type === 'NativeSelection')[0];
+  assert.equal(native.props.selection, 0);
+  for (const index of [0, 1, 40]) native.props.onSelectionChange({ nativeEvent: { index } });
+  assert.deepEqual(selected, ['equal']);
+  all(Selector({ ...props, disabled: true }), node => node.type === 'NativeSelection')[0].props.onSelectionChange({ nativeEvent: { index: 0 } });
+  assert.deepEqual(selected, ['equal']);
+});
+
+test('Glass swipe Edit runs immediately even when the swipe close callback does not fire', async () => {
+  let editCount = 0, closeCount = 0;
+  const rowRef = { current: { close: () => closeCount++ } };
+  let refIndex = 0;
+  const shared = () => ({ get: () => 0, set() {} });
+  const Row = await component('src/components/transactions/TransactionSwipeRow.tsx', {
+    react: { ...React, useRef: initial => refIndex++ === 0 ? rowRef : { current: initial }, useCallback: callback => callback, useContext: () => null, useEffect() {} },
+    'react-native': { ...nativeViews, Platform: { OS: 'ios' } },
+    '../common/GlassTouchable': { GlassPressable: 'GlassPressable' },
+    '../../theme/actionColors': { ACTION_COLORS: { danger: '#A92F3A' } },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ isLiquidGlassEnabled: true, themeMode: 'dark', transactionActionStyle: 'swipe' }) },
+    '../common/BackdropSurfaceContext': { BackdropSurfaceContext: React.createContext(null) },
+    '../../constants/buttonSizes': { COMPACT_BUTTON_HEIGHT: 36, COMPACT_BUTTON_HIT_SLOP: {} },
+    './TransactionActions': { useTransactionActions: () => ({ canManage: () => true, edit: () => editCount++ }) },
+    'react-native-gesture-handler/ReanimatedSwipeable': { default: 'Swipeable' },
+    'react-native-reanimated': { default: { View: 'AnimatedView' }, ReduceMotion: {}, useSharedValue: shared, useAnimatedStyle: () => ({}), interpolate() {}, interpolateColor() {}, Extrapolation: {} },
+    '@solar-icons/react-native/bold/pen-2': { Pen2Icon: 'Pen2Icon' },
+    '@solar-icons/react-native/bold/trash-bin-trash': { TrashBinTrashIcon: 'TrashBinTrashIcon' },
+  }, 'TransactionSwipeRow');
+  const tree = Row({ transaction: { id: 'synthetic', title: 'Dinner' }, children: 'row' });
+  tree.props.renderLeftActions(shared(), shared()).props.requestAction('edit');
+  assert.equal(closeCount, 1); assert.equal(editCount, 1);
+  tree.props.onSwipeableClose(); assert.equal(editCount, 1, 'late close must not open a second editor');
 });
 
 test('sheet viewport uses native keyboard progress and a single avoidance owner', async () => {
@@ -171,6 +269,8 @@ test('expense form keeps its three cards, payment profiles and pinned save actio
     ...Object.fromEntries(['close-circle', 'check-circle', 'add-circle', 'calendar-date', 'alt-arrow-right', 'map-point', 'magnifier', 'pen-2'].map(name => [`@solar-icons/react-native/bold/${name}`, new Proxy({}, { get: (_, key) => String(key) })])),
     ...Object.fromEntries(['SheetFooter', 'SheetCloseButton', 'SheetHandle', 'SheetModal', 'ScrollEdgeFade', 'GlassModalSheet', 'ModalBackdrop', 'JellyRadio', 'SpringCheck', 'UserAvatar'].map(name => [`../common/${name}`, { [name]: name }])),
     '../common/MotionPrimitives': { AnimatedPressable: 'AnimatedPressable' },
+    '../common/GlassTouchable': { GlassTouchable: 'GlassTouchable' },
+    '../glass/GlassPanel': { GlassPanel: 'GlassPanel' },
     '../common/SmoothCollapsible': { SmoothCollapsible: 'SmoothCollapsible' },
     '../glass/GlassSurface': { GlassSurface: 'GlassSurface' }, '../glass/GlassPill': { GlassPill: 'GlassPill' },
     '../categories/AddCategoryModal': { AddCategoryModal: 'AddCategoryModal' },
@@ -196,6 +296,8 @@ test('iOS dock keeps four original tabs and a separate plus in both surface mode
     '../../utils/haptics': { triggerImpact() {}, ImpactStyle: {} },
     './GlassSurface': { GlassSurface: 'GlassSurface' },
     '../common/AppleNativeControls': { NativeGlassContainer: 'NativeGlassContainer' },
+    '../common/AppleSlidingSelector': { AppleSlidingSelector: 'AppleSlidingSelector' },
+    './GlassPill': { GlassPill: 'GlassPill' },
     '../../utils/measureWindow': {},
     ...Object.fromEntries(['home-2', 'bill-list', 'add-circle', 'users-group-two-rounded', 'pie-chart-2'].map(name => [`@solar-icons/react-native/bold/${name}`, new Proxy({}, { get: (_, key) => String(key) })])),
   }, 'GlassDock');
@@ -203,6 +305,15 @@ test('iOS dock keeps four original tabs and a separate plus in both surface mode
     mode.isLiquidGlassEnabled = glass;
     let opened = 0, selected;
     const tree = Dock({ currentTab: 'home', onQuickAdd: () => opened++, onTabChange: tab => { selected = tab; } });
+    if (glass) {
+      const selector = all(tree, node => node.type === 'AppleSlidingSelector')[0];
+      assert.deepEqual(Array.from(selector.props.items, item => item.value), ['home', 'expenses', 'trips', 'analytics']);
+      assert.deepEqual(Array.from(selector.props.items, item => item.icon.type), ['Home2Icon', 'BillListIcon', 'UsersGroupTwoRoundedIcon', 'PieChart2Icon']);
+      selector.props.onChange('expenses'); assert.equal(selected, 'expenses');
+      const plus = all(tree, node => node.type === 'GlassPill')[0];
+      assert.equal(plus.props.icon.type, 'AddCircleIcon'); plus.props.onPress(); assert.equal(opened, 1);
+      continue;
+    }
     const tabs = all(tree, node => node.props.item);
     assert.deepEqual(tabs.map(node => node.props.item.key), ['home', 'expenses', 'trips', 'analytics']);
     assert.deepEqual(tabs.map(node => node.props.item.icon('#fff').type), ['Home2Icon', 'BillListIcon', 'UsersGroupTwoRoundedIcon', 'PieChart2Icon']);

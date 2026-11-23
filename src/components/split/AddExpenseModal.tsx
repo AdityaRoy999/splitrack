@@ -1,3 +1,5 @@
+import { GlassPanel } from '../glass/GlassPanel';
+import { GlassTouchable as TouchableOpacity } from '../common/GlassTouchable';
 import { SheetFooter } from '../common/SheetFooter';
 import { GlassSurface } from '../glass/GlassSurface';
 import { SheetCloseButton } from '../common/SheetCloseButton';
@@ -13,7 +15,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import * as Location from 'expo-location';
@@ -64,6 +65,7 @@ interface AddExpenseModalProps {
   defaultTripId?: string;
   defaultFriendIds?: string[];
   transactionToEdit?: Transaction;
+  embedded?: boolean;
 }
 
 export const AddExpenseModal = memo(function AddExpenseModal({
@@ -73,6 +75,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
   defaultTripId,
   defaultFriendIds,
   transactionToEdit,
+  embedded = false,
 }: AddExpenseModalProps) {
   const { accounts, friends, trips, transactions, categories, addTransaction, editTransaction, selectedAccountId } =
     useSplitTrack();
@@ -663,7 +666,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
         : friendMeta?.handle || `@${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
 
     return (
-      <View
+      <GlassPanel
         key={id}
         style={[
           styles.memberSplitCard,
@@ -709,7 +712,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
           {splitType === 'exact' && (
             <View style={styles.dynamicControlsWrap}>
               <View style={styles.exactInputRow}>
-                <View style={[styles.exactInputBox, { backgroundColor: cardBg }]}>
+                <GlassPanel style={[styles.exactInputBox, { backgroundColor: cardBg }]}>
                   <Text style={[styles.exactCurrPrefix, { color: mutedText }]}>{currSym}</Text>
                   <TextInput
                     style={[
@@ -732,7 +735,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                       setCustomAmounts((prev) => ({ ...prev, [id]: txt }));
                     }}
                   />
-                </View>
+                </GlassPanel>
 
                 <View style={styles.marginChipsRow}>
                   {[-50, -10, 10, 50].map((delta) => (
@@ -756,7 +759,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
           {splitType === 'percentage' && (
             <View style={styles.dynamicControlsWrap}>
               <View style={styles.exactInputRow}>
-                <View style={[styles.exactInputBox, { backgroundColor: cardBg }]}>
+                <GlassPanel style={[styles.exactInputBox, { backgroundColor: cardBg }]}>
                   <TextInput
                     style={[
                       styles.exactTextInput,
@@ -779,7 +782,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                     }}
                   />
                   <Text style={[styles.exactCurrPrefix, { color: mutedText }]}>%</Text>
-                </View>
+                </GlassPanel>
 
                 <View style={styles.marginChipsRow}>
                   {[-10, -5, 5, 10].map((delta) => (
@@ -812,11 +815,11 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   >
                     <Text style={[styles.shareStepBtnText, { color: textColor }]}>−</Text>
                   </AnimatedPressable>
-                  <View style={[styles.shareCountBox, { backgroundColor: cardBg }]}>
+                  <GlassPanel style={[styles.shareCountBox, { backgroundColor: cardBg }]}>
                     <Text style={[styles.shareCountText, { color: textColor }]}>
                       {customShares[id] ?? 1} {(customShares[id] ?? 1) === 1 ? 'share' : 'shares'}
                     </Text>
-                  </View>
+                  </GlassPanel>
                   <AnimatedPressable
                     scaleTo={0.9}
                     hitSlop={COMPACT_BUTTON_HIT_SLOP}
@@ -834,21 +837,19 @@ export const AddExpenseModal = memo(function AddExpenseModal({
             </View>
           )}
         </SmoothCollapsible>
-      </View>
+      </GlassPanel>
     );
   };
 
   // Preserve the draft state without mounting hidden native controls or sheets.
 
+  const Presentation = embedded ? React.Fragment : SheetModal;
   return (
-    <SheetModal
-      visible={visible}
-      transparent
-      animationType="none"
-      presentationStyle="overFullScreen"
-      statusBarTranslucent
-      onRequestClose={onClose}
-      onExitComplete={onExitComplete}
+    <Presentation {...(embedded ? {} : {
+      visible, transparent: true, animationType: 'none' as const,
+      presentationStyle: 'overFullScreen' as const, statusBarTranslucent: true,
+      onRequestClose: onClose, onExitComplete,
+    })}
     >
       <View style={styles.modalOverlay}>
         <ModalBackdrop onClose={onClose} />
@@ -875,7 +876,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {/* Amount, Description & Category */}
             <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>
-              <View style={[styles.amountInputBox, { backgroundColor: inputBg }]}>
+              <GlassPanel style={[styles.amountInputBox, { backgroundColor: inputBg }]}>
                 <Text style={[styles.currencySymbol, { color: textColor }]}>{currSym}</Text>
                 <TextInput
                   style={[
@@ -896,7 +897,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   value={amountStr}
                   onChangeText={setAmountStr}
                 />
-              </View>
+              </GlassPanel>
 
               <Text style={[styles.fieldLabel, { color: mutedText, marginTop: 14 }]}>
                 DESCRIPTION
@@ -1003,7 +1004,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
               <Text style={[styles.fieldLabel, { color: mutedText, marginTop: 14 }]}>
                 LOCATION (OPTIONAL)
               </Text>
-              <View style={[styles.locationInputWrap, { backgroundColor: inputBg }]}>
+              <GlassPanel style={[styles.locationInputWrap, { backgroundColor: inputBg }]}>
                 <MapPointIcon size={15} color={location.trim() ? textColor : mutedText} />
                 <TextInput
                   style={[
@@ -1052,7 +1053,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                     <LocateFixed size={16} color={isDark ? '#60A5FA' : '#2563EB'} />
                   )}
                 </AnimatedPressable>
-              </View>
+              </GlassPanel>
               {locationSuggestions.length > 0 && (
                 <JellyRadio
                   scrollable
@@ -1279,7 +1280,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                       color={showFriendSearch ? activeText : textColor}
                     />
                   </AnimatedPressable>
-                  <View style={[styles.splitSummaryBadge, { backgroundColor: chipBg }]}>
+                  <GlassPanel style={[styles.splitSummaryBadge, { backgroundColor: chipBg }]}>
                     <Text style={[styles.splitPerPersonNote, { color: textColor }]}>
                       {splitType === 'equal'
                         ? parsedAmount > 0
@@ -1291,7 +1292,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                         ? `${splitCalculations.totalPct}% allocated`
                         : `${splitCalculations.totalShares} total shares`}
                     </Text>
-                  </View>
+                  </GlassPanel>
                 </View>
               </View>
 
@@ -1316,7 +1317,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
 
               {/* Dynamic Allocation & Balance Indicator */}
               <SmoothCollapsible expanded={splitType !== 'equal'}>
-                <View style={[styles.balanceCard, { backgroundColor: inputBg }]}>
+                <GlassPanel style={[styles.balanceCard, { backgroundColor: inputBg }]}>
                   <View style={styles.balanceHeaderRow}>
                     <View style={styles.balanceHeaderLeft}>
                       <Text style={[styles.balanceSmallLabel, { color: mutedText }]}>
@@ -1377,7 +1378,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                       </Text>
                     </AnimatedPressable>
                   )}
-                </View>
+                </GlassPanel>
               </SmoothCollapsible>
 
               {showFriendSearch && (
@@ -1449,11 +1450,11 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                 {visibleScopedFriends.map((f) => renderParticipantRow(f.id, f.name))}
 
                 {!showUserFiltered && visibleScopedFriends.length === 0 && (
-                  <View style={[styles.springCheckRow, { backgroundColor: inputBg }]}>
+                  <GlassPanel style={[styles.springCheckRow, { backgroundColor: inputBg }]}>
                     <Text style={[styles.memberShareText, { color: mutedText, textAlign: 'center' }]}>
                       No matching members found
                     </Text>
-                  </View>
+                  </GlassPanel>
                 )}
               </View>
             </GlassSurface>
@@ -1497,7 +1498,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
         onUpdated={(updated) => setCategory(updated.name)}
         onDeleted={() => setCategory(categories[0]?.name || 'Food & Drinks')}
       />
-    </SheetModal>
+    </Presentation>
   );
 });
 

@@ -28,7 +28,7 @@ export const StackedCardDeck: React.FC<{
 }> = ({ onSelectAccount, onOpenQr }) => {
   const { accounts, selectedAccountId, setSelectedAccountId } = useSplitTrack();
   const { run, error } = useAsyncAction();
-  const { formatAmount, themeMode } = useLiquidGlass();
+  const { formatAmount, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [copiedUpi, setCopiedUpi] = useState<string | null>(null);
 
@@ -150,7 +150,7 @@ export const StackedCardDeck: React.FC<{
                   matteColor="#111114"
                   style={styles.cardGradient}
                 >
-                  <Aurora
+                  {Platform.OS === 'ios' && isLiquidGlassEnabled ? null : <Aurora
                     colorStops={auroraStops}
                     amplitude={1.05}
                     blend={0.55}
@@ -163,7 +163,7 @@ export const StackedCardDeck: React.FC<{
                     opacity={0.78}
                     lightMode={false}
                     style={{ borderRadius: 24 }}
-                  />
+                  />}
                   <View style={styles.cardInner}>
                   {/* Top Row: Cardholder & VISA */}
                   <View style={styles.cardTopRow}>

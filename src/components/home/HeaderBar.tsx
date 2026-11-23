@@ -79,7 +79,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     <View style={styles.container}>
       {/* User Avatar + Greeting */}
       <View style={styles.userSection}>
-        <AnimatedPressable scaleTo={1} accessibilityLabel="Open profile settings" onPress={handleSettings} style={styles.avatarWrapper}>
+        <AnimatedPressable nativeGlass={false} scaleTo={1} accessibilityLabel="Open profile settings" onPress={handleSettings} style={styles.avatarWrapper}>
           <View
             ref={setLogoRef}
             collapsable={false}

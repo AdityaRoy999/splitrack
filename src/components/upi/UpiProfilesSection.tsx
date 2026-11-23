@@ -1,6 +1,8 @@
+import { GlassPanel } from '../glass/GlassPanel';
+import { GlassPressable as Pressable } from '../common/GlassTouchable';
 import { ACTION_COLORS } from '../../theme/actionColors';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { CopyIcon } from '@solar-icons/react-native/bold/copy';
 import { QrCodeIcon } from '@solar-icons/react-native/bold/qr-code';
@@ -133,7 +135,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const { transactionActionStyle } = useLiquidGlass();
+  const { transactionActionStyle, isLiquidGlassEnabled } = useLiquidGlass();
   const targetTop = isExpanded ? rank * (CARD_HEIGHT + EXPAND_GAP) : rank * STACK_PEEK;
   const targetScale = isExpanded ? 1 : Math.max(0.82, 1 - rank * 0.035);
   const targetFooterOpacity = isExpanded || rank === 0 ? 1 : 0;
@@ -187,7 +189,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
         matteColor={cardBaseBg}
         style={styles.upiCardGradient}
       >
-        <Aurora
+        {Platform.OS === 'ios' && isLiquidGlassEnabled ? null : <Aurora
           colorStops={auroraStops}
           amplitude={0.88}
           blend={0.5}
@@ -200,10 +202,11 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
           opacity={isCardProfile ? (isDark ? 0.88 : 0.72) : isDark ? 0.82 : 0.68}
           lightMode={!isDark}
           style={{ borderRadius: 24 }}
-        />
+        />}
 
         {/* Full-card tap layer (expands stack or collapses default card) */}
         <Pressable
+          nativeGlass={false}
           onPress={() => onCardPress(acc)}
           accessibilityLabel={`${acc.title} card`}
           style={StyleSheet.absoluteFill}
@@ -345,7 +348,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
                   </Text>
                 </AnimatedPressable>
 
-                <View style={[styles.networkBadge, { backgroundColor: pillSurface }]}>
+                <GlassPanel style={[styles.networkBadge, { backgroundColor: pillSurface }]}>
                   {acc.cardType === 'Mastercard' && (
                     <View style={styles.mcCircles}>
                       <View style={[styles.mcCircle, { backgroundColor: '#EB001B' }]} />
@@ -358,7 +361,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
                     </View>
                   )}
                   <Text style={[styles.networkText, { color: textColor }]}>{acc.cardType}</Text>
-                </View>
+                </GlassPanel>
               </>
             ) : (
               <>

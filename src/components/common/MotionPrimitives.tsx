@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Animated, Platform, TouchableOpacity, ViewStyle, StyleProp, type AccessibilityState } from 'react-native';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
+import { AppleGlassPressable } from './AppleGlassPressable';
 
 interface AnimatedPressableProps {
   children: React.ReactNode;
@@ -15,6 +16,7 @@ interface AnimatedPressableProps {
   hitSlop?: { top?: number; bottom?: number; left?: number; right?: number };
   accessibilityLabel?: string;
   accessibilityState?: AccessibilityState;
+  nativeGlass?: boolean;
 }
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -35,6 +37,7 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   hitSlop,
   accessibilityLabel,
   accessibilityState,
+  nativeGlass = true,
 }) => {
   const { isLiquidGlassEnabled } = useLiquidGlass();
   const [scaleAnim] = useState(() => new Animated.Value(1));
@@ -48,9 +51,13 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
     }).start();
   };
 
+  if (Platform.OS === 'ios' && isLiquidGlassEnabled && nativeGlass && onPress) return <AppleGlassPressable
+    onPress={onPress} onLongPress={onLongPress} disabled={disabled} style={style} contentStyle={contentStyle}
+    accessibilityLabel={accessibilityLabel} selected={accessibilityState?.selected === true || accessibilityState?.checked === true}>{children}</AppleGlassPressable>;
+
   return (
     <Animated.View
-      style={[style, { transform: [{ scale: scaleAnim }] }]}
+      style={[style, { transform: [{ scale: Platform.OS === 'ios' && isLiquidGlassEnabled ? 1 : scaleAnim }] }]}
       {...(Platform.OS === 'web' && (onHoverIn || onHoverOut)
         ? ({ onMouseEnter: onHoverIn, onMouseLeave: onHoverOut } as any)
         : {})}
@@ -61,7 +68,7 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
         onPress={onPress}
         onLongPress={onLongPress}
         delayLongPress={350}
-        onPressIn={() => !disabled && animateTo(scaleTo)}
+        onPressIn={() => !disabled && !(Platform.OS === 'ios' && isLiquidGlassEnabled) && animateTo(scaleTo)}
         onPressOut={() => animateTo(1)}
         hitSlop={hitSlop}
         accessibilityLabel={accessibilityLabel}

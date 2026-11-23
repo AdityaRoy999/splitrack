@@ -1,7 +1,8 @@
+import { GlassTouchable as TouchableOpacity } from '../common/GlassTouchable';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList, Platform, ScrollView, StyleSheet,
-  Text, TextInput, TouchableOpacity, View, type ViewStyle,
+  Text, TextInput, View, type ViewStyle,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { pickedImageUri } from '../../utils/pickedImage';

@@ -7,12 +7,14 @@ import {
   Pressable,
   StyleProp,
   StyleSheet,
+  Text,
   View,
   ViewStyle,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { triggerSelection } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
+import { AppleToggleSwitch } from './AppleNativeControls';
 
 export type StrikeSide = 'left' | 'center' | 'right' | 'none';
 
@@ -61,7 +63,7 @@ export const SpringCheck: React.FC<SpringCheckProps> = ({
   style,
   trailing,
 }) => {
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const controlled = checked !== undefined;
   const [inner, setInner] = useState(defaultChecked);
   const on = controlled ? !!checked : inner;
@@ -71,6 +73,7 @@ export const SpringCheck: React.FC<SpringCheckProps> = ({
   const [labelWidth, setLabelWidth] = useState(0);
 
   useEffect(() => {
+    if (Platform.OS === 'ios' && isLiquidGlassEnabled) return;
     const bounciness = Math.max(0, Math.min(1, bounce)) * 18;
     Animated.parallel([
       Animated.spring(progress, {
@@ -100,7 +103,7 @@ export const SpringCheck: React.FC<SpringCheckProps> = ({
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
     ]).start();
-  }, [on, bounce, progress, boxSwell]);
+  }, [on, bounce, progress, boxSwell, isLiquidGlassEnabled]);
 
   const handleToggle = () => {
     if (disabled) return;
@@ -173,6 +176,12 @@ export const SpringCheck: React.FC<SpringCheckProps> = ({
   const accessibleName =
     ariaLabel || (typeof label === 'string' ? label : 'Checkbox');
 
+
+  if (Platform.OS === 'ios' && isLiquidGlassEnabled) return <View style={[styles.row, { gap }, style]}>
+    <View style={{ flex: 1 }}>{typeof label === 'string' ? <Text style={{ color, fontSize }}>{label}</Text> : label}</View>
+    {trailing}
+    <AppleToggleSwitch checked={on} onChange={next => { if (!disabled) { if (!controlled) setInner(next); triggerSelection(); onChange?.(next); } }} disabled={disabled} isDark={themeMode === 'dark'} />
+  </View>;
 
   return (
     <Pressable

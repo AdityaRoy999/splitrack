@@ -1,3 +1,4 @@
+import { GlassTouchable as TouchableOpacity } from '../common/GlassTouchable';
 import { ModalPage } from '../common/ModalPage';
 import { SheetModal } from '../common/SheetModal';
 import { JellyRadio } from '../common/JellyRadio';
@@ -9,7 +10,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

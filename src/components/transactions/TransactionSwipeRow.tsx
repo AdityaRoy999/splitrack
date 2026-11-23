@@ -1,6 +1,7 @@
+import { GlassPressable as Pressable } from '../common/GlassTouchable';
 import { ACTION_COLORS } from '../../theme/actionColors';
 import React, { useCallback, useContext, useEffect, useRef } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Animated, { Extrapolation, interpolate, interpolateColor, ReduceMotion, useAnimatedReaction, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { Pen2Icon } from '@solar-icons/react-native/bold/pen-2';
@@ -19,16 +20,18 @@ function SwipeActions({ progress, translation, rowProgress, side, dark, transact
   progress: SharedValue<number>; translation: SharedValue<number>; rowProgress: SharedValue<number>; side: 'left' | 'right'; dark: boolean;
   transaction: Transaction; requestAction(action: 'edit' | 'remove'): void;
 }) {
+  const { isLiquidGlassEnabled } = useLiquidGlass();
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
   // Both panels receive the same row translation. Use one writer for the card,
   // and each panel's own progress so the hidden panel stays still.
   useAnimatedReaction(() => Math.max(-1, Math.min(1, translation.get() / ACTION_WIDTH)), value => { if (side === 'left') rowProgress.set(value); });
   const editMotion = useAnimatedStyle(() => {
     const reveal = Math.max(0, Math.min(1, (progress.get() - 0.08) / 0.82));
-    return { opacity: reveal, transform: [{ scale: 0.78 + 0.22 * reveal }, { translateX: (side === 'right' ? 8 : -8) * (1 - reveal) }] };
+    return nativeGlass ? { transform: [{ translateX: (side === 'right' ? 8 : -8) * (1 - reveal) }] } : { opacity: reveal, transform: [{ scale: 0.78 + 0.22 * reveal }, { translateX: (side === 'right' ? 8 : -8) * (1 - reveal) }] };
   });
   const deleteMotion = useAnimatedStyle(() => {
     const reveal = Math.max(0, Math.min(1, (progress.get() - 0.2) / 0.8));
-    return { opacity: reveal, transform: [{ scale: 0.78 + 0.22 * reveal }, { translateX: (side === 'right' ? 10 : -10) * (1 - reveal) }] };
+    return nativeGlass ? { transform: [{ translateX: (side === 'right' ? 10 : -10) * (1 - reveal) }] } : { opacity: reveal, transform: [{ scale: 0.78 + 0.22 * reveal }, { translateX: (side === 'right' ? 10 : -10) * (1 - reveal) }] };
   });
   return <View style={styles.actions}>
     <Animated.View style={editMotion}><Pressable accessibilityRole="button" accessibilityLabel={`Edit ${transaction.title}`}
@@ -66,9 +69,15 @@ export function TransactionSwipeRow({ transaction, children }: { transaction: Tr
     return () => { if (openRow === row) openRow = null; };
   }, []);
   const requestAction = useCallback((action: 'edit' | 'remove') => {
+    if (Platform.OS === 'ios' && isLiquidGlassEnabled) {
+      pendingAction.current = null;
+      swipeable.current?.close();
+      actions[action](transaction);
+      return;
+    }
     pendingAction.current = () => actions[action](transaction);
     swipeable.current?.close();
-  }, [actions, transaction]);
+  }, [actions, isLiquidGlassEnabled, transaction]);
   const finishClose = useCallback(() => {
     if (openRow === swipeable.current) openRow = null;
     const action = pendingAction.current;

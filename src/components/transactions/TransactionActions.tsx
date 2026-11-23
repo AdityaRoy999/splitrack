@@ -1,5 +1,6 @@
+import { GlassPanel } from '../glass/GlassPanel';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import { useAuth } from '../../auth/AuthContext';
 import { useSplitTrack } from '../../store/SplitTrackStore';
@@ -24,11 +25,12 @@ export const useTransactionActions = () => useContext(Context);
 export function TransactionActionsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { transactions, friends, selectedAccountId, settleTransaction, deleteTransaction, restoreTransaction, getTransactionBin, editTransaction, revision } = useSplitTrack();
-  const { themeMode, formatAmount } = useLiquidGlass();
+  const { themeMode, formatAmount, isLiquidGlassEnabled } = useLiquidGlass();
   const { runWithIntent, pending, error, setError } = useAsyncAction();
   const [detail, setDetail] = useState<Transaction | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [editingOpen, setEditingOpen] = useState(false);
+  const [detailExpenseEditor, setDetailExpenseEditor] = useState<Transaction | null>(null);
   const [editSession, setEditSession] = useState(0);
   const detailPresented = useRef(false);
   const [detailMounted, setDetailMounted] = useState(false);
@@ -57,6 +59,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
     detailPresented.current = true;
     setDetailMounted(true);
     setError('');
+    setDetailExpenseEditor(null);
     setEditRequested(false); setConfirmDelete(false);
     setAmounts({}); setEditTitle(tx.title); setEditAmount(String(Math.abs(tx.amount))); setEditDate(tx.date); setDetail(tx);
   }, [pending, setError]);
@@ -83,6 +86,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
   const finishDetailExit = useCallback(() => {
     detailPresented.current = false;
     setDetailMounted(false);
+    setDetailExpenseEditor(null);
     const tx = queuedExpense.current;
     queuedExpense.current = null;
     if (tx) presentExpenseEditor(tx);
@@ -94,8 +98,12 @@ export function TransactionActionsProvider({ children }: { children: React.React
     setError('');
     if (tx.type === 'expense') {
       if (detailPresented.current) {
-        queuedExpense.current = tx;
-        setDetail(null); setConfirmDelete(false);
+        if (Platform.OS === 'ios' && isLiquidGlassEnabled) {
+          setDetailExpenseEditor(tx); setConfirmDelete(false);
+        } else {
+          queuedExpense.current = tx;
+          setDetail(null); setConfirmDelete(false);
+        }
       } else presentExpenseEditor(tx);
     } else {
       detailPresented.current = true;
@@ -103,7 +111,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
       setEditRequested(true); setConfirmDelete(false);
       setEditTitle(tx.title); setEditAmount(String(Math.abs(tx.amount))); setEditDate(tx.date); setDetail(tx);
     }
-  }, [owner, pending, presentExpenseEditor, setError]);
+  }, [isLiquidGlassEnabled, owner, pending, presentExpenseEditor, setError]);
   const requestDelete = useCallback((tx: Transaction) => {
     if (pending || !owner(tx)) return;
     queuedExpense.current = null;
@@ -125,25 +133,25 @@ export function TransactionActionsProvider({ children }: { children: React.React
   return <Context.Provider value={context}>
     {children}
     <SheetModal visible={Boolean(current) || confirmDelete} onRequestClose={closeDetail} onExitComplete={finishDetailExit}>
-      <View style={styles.fill}><ModalBackdrop onClose={closeDetail} /><GlassModalSheet>
+      {detailExpenseEditor ? <AddExpenseModal visible embedded transactionToEdit={detailExpenseEditor} onClose={closeDetail} /> : <View style={styles.fill}><ModalBackdrop onClose={closeDetail} /><GlassModalSheet>
         <SheetHeader title={confirmDelete ? 'Delete transaction?' : editRequested ? 'Edit transaction' : current?.type === 'settlement' ? 'Payment details' : 'Transaction details'}
           subtitle={confirmDelete ? 'Restore deleted entries in Settings within 7 days.' : editRequested ? 'Update the details and save your changes.' : 'Shared balances and individual payments'} onClose={closeDetail} disabled={pending} />
         <ScrollEdgeFade>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            {current ? <View style={[styles.summaryCard, { backgroundColor: surface }]}>
+            {current ? <GlassPanel style={[styles.summaryCard, { backgroundColor: surface }]}>
               <View style={styles.summaryHeading}><View style={[styles.summaryIcon, { backgroundColor: dark ? '#1C1C22' : '#DADAE0' }]}>
                 {confirmDelete ? <TrashBinTrashIcon size={20} color="#E5484D" /> : <BillListIcon size={20} color={color} />}
               </View><View style={{ flex: 1 }}><Text numberOfLines={2} style={[styles.recordTitle, { color }]}>{current.title}</Text><Text style={[styles.caption, { color: dark ? '#8E8E93' : '#71717A' }]}>{current.date} · {current.type === 'settlement' ? 'Payment' : current.category}</Text></View></View>
               <Text style={[styles.summaryAmount, { color }]}>{formatAmount(Math.abs(current.amount))}</Text>
               {!confirmDelete ? <Text style={[styles.caption, { color: dark ? '#8E8E93' : '#71717A' }]}>{current.id.startsWith('offline-') ? 'Saved on this device. Waiting to sync.' : current.settled ? 'Settled' : `${formatAmount(current.remainingAmount || 0)} remaining`}</Text> : null}
-            </View> : null}
+            </GlassPanel> : null}
             {confirmDelete ? <>
-              <View style={[styles.sectionCard, { backgroundColor: surface }]}><Text style={[styles.sectionLabel, { color: dark ? '#8E8E93' : '#71717A' }]}>BEFORE YOU DELETE</Text><Text style={[styles.body, { color }]}>Balances update for everyone involved. You can restore this entry from Deleted transactions in Settings for 7 days.</Text></View>
+              <GlassPanel style={[styles.sectionCard, { backgroundColor: surface }]}><Text style={[styles.sectionLabel, { color: dark ? '#8E8E93' : '#71717A' }]}>BEFORE YOU DELETE</Text><Text style={[styles.body, { color }]}>Balances update for everyone involved. You can restore this entry from Deleted transactions in Settings for 7 days.</Text></GlassPanel>
               <GlassPill label={pending ? 'Deleting…' : 'Delete transaction'} size="lg" shape="rounded" variant="danger" disabled={pending} onPress={remove} />
             </> : current ? <>
               {current.settlementVector?.map(vector => {
                 const member = friends.find(friend => friend.id === vector.memberId);
-                return <View key={vector.memberId} style={[styles.sectionCard, { backgroundColor: surface }]}>
+                return <GlassPanel key={vector.memberId} style={[styles.sectionCard, { backgroundColor: surface }]}>
                   <View style={styles.summaryHeading}><UserAvatar avatarUri={member?.avatar} name={vector.memberId === 'user' ? 'You' : member?.name || 'Member'} size={36} borderRadius={12} isDark={dark} /><View style={{ flex: 1 }}><Text style={[styles.recordTitle, { color }]}>{vector.memberId === 'user' ? 'You' : member?.name || 'Member'}</Text><Text style={[styles.caption, { color: dark ? '#8E8E93' : '#71717A' }]}>{formatAmount(vector.remainingAmount)} remaining</Text></View></View>
                   {vector.balances.map((balance, index) => <Text key={index} style={[styles.body, { color }]}>{balance.creditorId === 'user' ? 'Owes you' : balance.debtorId === 'user' ? 'You owe' : 'Outstanding'} {formatAmount(balance.amount)}</Text>)}
                   {current.paidBy === 'user' && vector.balances.some(balance => balance.creditorId === 'user') ? <>
@@ -157,10 +165,10 @@ export function TransactionActionsProvider({ children }: { children: React.React
                       });
                     }} />
                   </> : null}
-                </View>;
+                </GlassPanel>;
               })}
               {owner(current) ? <>
-                {current.type !== 'expense' && editRequested ? <View style={[styles.sectionCard, { backgroundColor: surface }]}>
+                {current.type !== 'expense' && editRequested ? <GlassPanel style={[styles.sectionCard, { backgroundColor: surface }]}>
                   <Text style={[styles.sectionLabel, { color: dark ? '#8E8E93' : '#71717A' }]}>DESCRIPTION</Text>
                   <TextInput accessibilityLabel="Transaction title" value={editTitle} onChangeText={setEditTitle} style={[styles.input, { color, backgroundColor: dark ? '#1C1C22' : '#DADAE0' }]} />
                   <Text style={[styles.sectionLabel, { color: dark ? '#8E8E93' : '#71717A' }]}>AMOUNT</Text>
@@ -174,7 +182,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
                       await editTransaction(draft.id, { title: draft.title, amount: draft.amount, date: draft.date }, intent); setDetail(null);
                     });
                   }} />
-                </View> : <GlassPill label="Edit transaction" size="lg" variant="dark" backgroundColor={dark ? '#111114' : undefined} onPress={() => edit(current)} />}
+                </GlassPanel> : <GlassPill label="Edit transaction" size="lg" variant="dark" backgroundColor={dark ? '#111114' : undefined} onPress={() => edit(current)} />}
                 <GlassPill label="Delete transaction" size="lg" variant="danger" onPress={() => setConfirmDelete(true)} />
               </> : <Text style={[styles.body, { color }]}>{current.id.startsWith('offline-') ? 'Reconnect before editing, deleting or settling this transaction.' : 'Only the transaction owner can edit, delete or mark its members settled.'}</Text>}
             </> : null}
@@ -182,7 +190,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
           </ScrollView>
         </ScrollEdgeFade>
         <SheetFooter><GlassPill label={confirmDelete ? 'Cancel' : 'Close'} size="lg" variant="dark" disabled={pending} onPress={closeDetail} /></SheetFooter>
-      </GlassModalSheet></View>
+      </GlassModalSheet></View>}
     </SheetModal>
     <SheetModal visible={binOpen} onRequestClose={() => !pending && setBinOpen(false)} onExitComplete={finishBinExit}>
       <View style={styles.fill}><ModalBackdrop onClose={() => !pending && setBinOpen(false)} /><GlassModalSheet>
@@ -195,11 +203,11 @@ export function TransactionActionsProvider({ children }: { children: React.React
             <Text style={[styles.emptyTitle, { color }]}>No deleted transactions</Text>
             <Text style={[styles.caption, { color: dark ? '#A1A1AA' : '#71717A' }]}>Transactions you delete will appear here.</Text>
           </View> : null}
-          {bin.map(tx => <View key={tx.id} style={[styles.member, { backgroundColor: surface }]}>
+          {bin.map(tx => <GlassPanel key={tx.id} style={[styles.member, { backgroundColor: surface }]}>
             <View style={styles.deletedRow}><Text numberOfLines={2} style={[styles.deletedTitle, { color }]}>{tx.title}</Text><Text style={{ color, fontWeight: '600' }}>{formatAmount(Math.abs(tx.amount))}</Text></View>
             <Text style={[styles.caption, { color: dark ? '#A1A1AA' : '#71717A' }]}>Permanently deleted {new Date((tx.expiresAt || 0) * 1000).toLocaleDateString()}</Text>
             {tx.canRestore ? <GlassPill label="Restore" size="lg" variant="success" disabled={pending} onPress={() => { void runWithIntent(tx.id, async (id, intent) => { await restoreTransaction(id, intent); setBin(old => old.filter(item => item.id !== id)); }); }} /> : <Text style={{ color }}>The transaction owner can restore this entry.</Text>}
-          </View>)}
+          </GlassPanel>)}
           <FormError message={binError || error} />
         </ScrollView>
         </ScrollEdgeFade>

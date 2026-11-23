@@ -1,3 +1,4 @@
+import { GlassTouchable as TouchableOpacity } from '../common/GlassTouchable';
 import { SheetFooter } from '../common/SheetFooter';
 import { GlassSurface } from '../glass/GlassSurface';
 import { SheetCloseButton } from '../common/SheetCloseButton';
@@ -11,7 +12,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { MagnifierIcon } from '@solar-icons/react-native/bold/magnifier';

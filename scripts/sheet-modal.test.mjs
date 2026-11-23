@@ -123,12 +123,12 @@ function sheetHarness(platform, code = compiled, componentName = 'CustomSheetMod
   };
 }
 
-function transactionHarness() {
+function transactionHarness(platform = 'android', glass = false) {
   const tx = { id: 'expense-1', type: 'expense', title: 'Dinner', amount: -100, paidBy: 'user', date: '2026-11-21', splits: [] };
-  const actions = sheetHarness('android', compiledActions, 'TransactionActionsProvider', {
+  const actions = sheetHarness(platform, compiledActions, 'TransactionActionsProvider', {
     '../../auth/AuthContext': { useAuth: () => ({ user: { uid: 'signed-in-user' } }) },
     '../../store/SplitTrackStore': { useSplitTrack: () => ({ transactions: [tx], friends: [], selectedAccountId: 'wallet', revision: 0, getTransactionBin: () => new Promise(() => {}) }) },
-    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'light', formatAmount: amount => String(amount) }) },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'light', isLiquidGlassEnabled: glass, formatAmount: amount => String(amount) }) },
     '../../services/api': { api: () => new Promise(() => {}), errorMessage: error => String(error) },
     '../../hooks/useAsyncAction': { useAsyncAction: () => ({ pending: false, error: '', setError() {} }), FormError: 'FormError' },
     '@solar-icons/react-native/bold/close-circle': { CloseCircleIcon: 'CloseCircleIcon' },
@@ -139,6 +139,7 @@ function transactionHarness() {
     '../common/ModalBackdrop': { ModalBackdrop: 'ModalBackdrop' },
     '../common/GlassModalSheet': { GlassModalSheet: 'GlassModalSheet' },
     '../glass/GlassPill': { GlassPill: 'GlassPill' },
+    '../glass/GlassPanel': { GlassPanel: 'GlassPanel' },
     '../split/AddExpenseModal': { AddExpenseModal: 'AddExpenseModal' },
     '../common/BottomBubble': { BottomBubble: 'BottomBubble' },
     '../common/ScrollEdgeFade': { ScrollEdgeFade: 'ScrollEdgeFade' },
@@ -161,6 +162,23 @@ test('Liquid Glass selects native presentation only for enabled iOS', () => {
     sheet.update({ visible: true });
     assert.equal(sheet.output.type.name, platform === 'ios' && enabled ? 'NativeSheetModal' : 'CustomSheetModal');
   }
+});
+
+test('Liquid Glass expense Edit replaces details inside the same native sheet immediately', () => {
+  const h = transactionHarness('ios', true);
+  h.context.open(h.tx); h.actions.flush();
+  const originalSheet = h.sheets[0];
+  h.context.edit(h.tx); h.actions.flush();
+  assert.equal(h.sheets[0].props.visible, true, 'no dismiss-and-present gap');
+  const editor = h.sheets[0].props.children;
+  assert.equal(editor.type, 'AddExpenseModal');
+  assert.equal(editor.props.embedded, true);
+  assert.equal(editor.props.transactionToEdit, h.tx);
+  assert.equal(h.editor, undefined, 'no second native presentation');
+  editor.props.onClose(); h.actions.flush();
+  assert.equal(h.sheets[0].props.visible, false);
+  originalSheet.props.onExitComplete(); h.actions.flush();
+  assert.equal(h.context.modalVisible, false);
 });
 
 test('native sheet retains edits through dismissal and completes a handoff once', () => {

@@ -5,6 +5,7 @@ import { AltArrowDownIcon } from '@solar-icons/react-native/bold/alt-arrow-down'
 import { CheckCircleIcon } from '@solar-icons/react-native/bold/check-circle';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { measureNodeInWindow, type WindowRect } from '../../utils/measureWindow';
+import { AppleRadioControl } from './AppleNativeControls';
 
 export interface DropdownOption {
   value: string; label: string; icon?: React.ReactNode; color?: string; disabled?: boolean; accessibilityLabel?: string;
@@ -17,7 +18,7 @@ interface DropdownSelectProps {
 }
 
 export function DropdownSelect({ items, value, onChange, disabled, label = 'Choose an option', backgroundColor, textColor, style, triggerHeight = 38 }: DropdownSelectProps) {
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const dark = themeMode === 'dark';
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -65,6 +66,9 @@ export function DropdownSelect({ items, value, onChange, disabled, label = 'Choo
   const maxHeight = Math.min(menuHeight, Math.max(96, opensBelow ? below - 12 : Math.min(above, bottomEdge - insets.top - 24)));
   const left = Math.max(12, Math.min(rect?.x ?? 12, width - menuWidth - 12));
   const top = Math.max(insets.top + 8, Math.min(bottomEdge - maxHeight - 12, opensBelow ? (rect?.y ?? 0) + (rect?.height ?? 0) + 8 : (rect?.y ?? 0) - maxHeight - 8));
+
+  if (Platform.OS === 'ios' && isLiquidGlassEnabled) return <AppleRadioControl menu items={items} value={value}
+    onChange={onChange} disabled={disabled} isDark={dark} style={style} />;
 
   return (
     <View ref={anchor} collapsable={false} style={[styles.anchor, style]}>

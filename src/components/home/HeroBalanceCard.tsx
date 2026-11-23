@@ -1,3 +1,4 @@
+import { GlassPanel } from '../glass/GlassPanel';
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, Platform, View, Text, StyleSheet } from 'react-native';
 import { Aurora } from '../effects/Aurora';
@@ -182,7 +183,7 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
 
           {/* Monthly Expense Tracker Summary Strip */}
           <View style={styles.summaryRow}>
-            <View
+            <GlassPanel
               style={[
                 styles.summaryBadge,
                 {
@@ -199,9 +200,9 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
               <Text style={[styles.summaryText, { color: isDark ? '#F4F4F5' : '#18181B' }]}>
                 Spent {formatAmount(monthlyExpenses)} this month
               </Text>
-            </View>
+            </GlassPanel>
 
-            <View
+            <GlassPanel
               style={[
                 styles.summaryBadge,
                 {
@@ -235,7 +236,7 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
                 {netFriendBalance >= 0 ? 'Owed ' : 'You owe '}
                 {formatAmount(Math.abs(netFriendBalance))}
               </Text>
-            </View>
+            </GlassPanel>
           </View>
 
           {/* Expense Tracker Action Pills */}

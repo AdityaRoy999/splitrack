@@ -15,6 +15,8 @@ import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { HorizontalEdgeFade, useHorizontalScrollEdges } from './ScrollEdgeFade';
 import { DropdownSelect } from './DropdownSelect';
 import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
+import { AppleSlidingSelector } from './AppleSlidingSelector';
+import { AppleGlassPressable } from './AppleGlassPressable';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -122,6 +124,8 @@ const JellyChip: React.FC<JellyChipProps> = ({
   groupDisabled,
   onSelect,
 }) => {
+  const { isLiquidGlassEnabled } = useLiquidGlass();
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
   const [scaleX] = useState(() => new Animated.Value(1));
   const [scaleY] = useState(() => new Animated.Value(1));
 
@@ -134,6 +138,7 @@ const JellyChip: React.FC<JellyChipProps> = ({
   const isDisabled = groupDisabled || !!item.disabled;
 
   useEffect(() => {
+    if (nativeGlass) { scaleX.setValue(1); scaleY.setValue(1); return; }
     if (selectionSeq === 0) return;
 
     scaleX.stopAnimation();
@@ -231,6 +236,7 @@ const JellyChip: React.FC<JellyChipProps> = ({
     jelly,
     scaleX,
     scaleY,
+    nativeGlass,
   ]);
 
   const handlePressIn = () => {
@@ -278,6 +284,19 @@ const JellyChip: React.FC<JellyChipProps> = ({
       ? { flex: 1, minWidth: 0 }
       : undefined;
   const swatchSize = { xs: 22, sm: 26, md: 30, lg: 34 }[size];
+
+  if (nativeGlass) return <AppleGlassPressable onPress={() => onSelect(index)} disabled={isDisabled}
+    selected={isSelected} accessibilityLabel={item.accessibilityLabel ?? item.label} borderRadius={radius}
+    style={columnWrapStyle} contentStyle={[
+      styles.chip, { borderRadius: radius, paddingHorizontal: metrics.paddingHorizontal, height: COMPACT_BUTTON_HEIGHT, gap: metrics.iconGap },
+      columns && columns > 1 ? { width: '100%' } : undefined,
+      variant === 'tile' ? styles.tile : undefined,
+      variant === 'swatch' ? { width: swatchSize, height: swatchSize, paddingHorizontal: 0 } : undefined,
+    ]}>
+    {item.icon ? <View style={styles.iconSlot}>{item.icon}</View> : null}
+    {variant === 'swatch' && item.color ? <View style={{ width: swatchSize - 10, height: swatchSize - 10, borderRadius: 999, backgroundColor: item.color }} /> : null}
+    {item.label ? <Text numberOfLines={1} style={[styles.chipLabel, { color: textColor, fontSize: variant === 'tile' ? 11 : metrics.fontSize }]}>{item.label}</Text> : null}
+  </AppleGlassPressable>;
 
   return (
     <Animated.View
@@ -366,7 +385,7 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   dropdownHeight,
 }) => {
   const scrollEdges = useHorizontalScrollEdges();
-  const { themeMode, selectionStyle } = useLiquidGlass();
+  const { themeMode, selectionStyle, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
   const normalizedItems: JellyRadioItem[] =
     items === 'levels'
@@ -397,6 +416,13 @@ export const JellyRadio: React.FC<JellyRadioProps> = ({
   };
 
   const gridColumns = !scrollable && columns && columns > 1 ? Math.floor(columns) : 0;
+  if (Platform.OS === 'ios' && isLiquidGlassEnabled && variant === 'chip' && !gridColumns && normalizedItems.length > 1
+    && !(presentation === 'auto' && selectionStyle === 'dropdown')) {
+    const width = normalizedItems.reduce((sum, item) => sum + Math.max(76, item.label.length * 7 + (item.icon ? 48 : 24)), 0);
+    const selector = <AppleSlidingSelector items={normalizedItems} value={currentValue} disabled={disabled}
+      onChange={(_, index) => handleSelect(index)} height={COMPACT_BUTTON_HEIGHT} style={scrollable ? { width } : style} />;
+    return scrollable ? <ScrollView horizontal style={style} contentContainerStyle={{ paddingVertical: 6 }} showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">{selector}</ScrollView> : selector;
+  }
   const renderChip = (item: JellyRadioItem, idx: number) => (
     <JellyChip
       key={item.value}

@@ -1,3 +1,5 @@
+import { GlassPanel } from '../glass/GlassPanel';
+import { GlassTouchable as TouchableOpacity } from '../common/GlassTouchable';
 import { SheetFooter } from '../common/SheetFooter';
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
@@ -8,7 +10,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -354,6 +355,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         {/* User Profile Card Header */}
         <GlassSurface style={[styles.profileCard, { backgroundColor: cardBg }]}>
           <TouchableOpacity
+            nativeGlass={false}
             activeOpacity={0.8}
             onPress={handlePickAvatar}
             style={styles.profileAvatarWrap}
@@ -376,9 +378,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           <View style={styles.joinedSection}><Text style={[styles.sectionHeader, { color: mutedText }]}>ACCOUNT SIGN-IN</Text></View>
           <TouchableOpacity activeOpacity={0.7} style={styles.navRowItem} onPress={openGoogleLink}
             disabled={googleLinked || googlePending || pending} accessibilityRole="button" accessibilityLabel={googleLinked ? 'Google account synced' : 'Sync with Google'}>
-            <View style={[styles.navIconBox, { backgroundColor: chipBg }]}>
+            <GlassPanel style={[styles.navIconBox, { backgroundColor: chipBg }]}>
               <Image source={require('../../../assets/auth/google-g.png')} style={{ width: 20, height: 20 }} resizeMode="contain" />
-            </View>
+            </GlassPanel>
             <View style={styles.navTextCol}>
               <Text style={[styles.navRowTitle, { color: textColor }]}>{googleLinked ? 'Google synced' : 'Sync with Google'}</Text>
               <Text style={[styles.navRowSubtitle, { color: mutedText }]}>{googleLinked ? 'Continue with Google opens this account' : 'Use Google to sign in to your existing account'}</Text>
@@ -415,9 +417,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             }}
             style={styles.navRowItem}
           >
-            <View style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)' }]}>
+            <GlassPanel style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)' }]}>
               <CardSendIcon size={18} color="#10B981" />
-            </View>
+            </GlassPanel>
             <View style={styles.navTextCol}>
               <Text style={[styles.navRowTitle, { color: textColor }]}>Manage Cards &amp; UPI Profiles</Text>
               <Text style={[styles.navRowSubtitle, { color: mutedText }]}>
@@ -438,9 +440,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             }}
             style={styles.navRowItem}
           >
-            <View style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)' }]}>
+            <GlassPanel style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)' }]}>
               <UsersGroupTwoRoundedIcon size={18} color="#3B82F6" />
-            </View>
+            </GlassPanel>
             <View style={styles.navTextCol}>
               <Text style={[styles.navRowTitle, { color: textColor }]}>Trips &amp; Shared Groups</Text>
               <Text style={[styles.navRowSubtitle, { color: mutedText }]}>
@@ -462,9 +464,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             }}
             style={styles.navRowItem}
           >
-            <View style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(168, 85, 247, 0.15)' : 'rgba(168, 85, 247, 0.1)' }]}>
+            <GlassPanel style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(168, 85, 247, 0.15)' : 'rgba(168, 85, 247, 0.1)' }]}>
               <UsersGroupTwoRoundedIcon size={18} color="#A855F7" />
-            </View>
+            </GlassPanel>
             <View style={styles.navTextCol}>
               <Text style={[styles.navRowTitle, { color: textColor }]}>People &amp; Members</Text>
               <Text style={[styles.navRowSubtitle, { color: mutedText }]}>
@@ -486,9 +488,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             }}
             style={styles.navRowItem}
           >
-            <View style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.1)' }]}>
+            <GlassPanel style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.1)' }]}>
               <AddCircleIcon size={18} color="#F59E0B" />
-            </View>
+            </GlassPanel>
             <View style={styles.navTextCol}>
               <Text style={[styles.navRowTitle, { color: textColor }]}>Split &amp; Record Expense</Text>
               <Text style={[styles.navRowSubtitle, { color: mutedText }]}>
@@ -509,9 +511,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             }}
             style={styles.navRowItem}
           >
-            <View style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(6, 182, 212, 0.15)' : 'rgba(6, 182, 212, 0.1)' }]}>
+            <GlassPanel style={[styles.navIconBox, { backgroundColor: isDark ? 'rgba(6, 182, 212, 0.15)' : 'rgba(6, 182, 212, 0.1)' }]}>
               <PieChart2Icon size={18} color="#06B6D4" />
-            </View>
+            </GlassPanel>
             <View style={styles.navTextCol}>
               <Text style={[styles.navRowTitle, { color: textColor }]}>Expense Ledger &amp; Analytics</Text>
               <Text style={[styles.navRowSubtitle, { color: mutedText }]}>
@@ -658,7 +660,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           <View style={styles.joinedSection}>
             <Text style={[styles.sectionHeader, { color: mutedText }]}>PREFERENCES</Text>
             <View style={styles.checkList}>
-              <View style={[styles.checkRow, { backgroundColor: chipBg }]}>
+              <GlassPanel style={[styles.checkRow, { backgroundColor: chipBg }]}>
                 <SpringCheck
                   label="Hide Balances & Amounts"
                   checked={hideAmounts}
@@ -672,7 +674,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   strike="none"
                   doneOpacity={1}
                 />
-              </View>
+              </GlassPanel>
             </View>
           </View>
         </GlassSurface>
@@ -788,11 +790,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <View style={styles.previewHeaderRow}>
                   <View style={{ flex: 1 }}>
                     <View style={styles.sourceTagRow}>
-                      <View style={[styles.sourceBadge, { backgroundColor: activeBg }]}>
+                      <GlassPanel style={[styles.sourceBadge, { backgroundColor: activeBg }]}>
                         <Text style={[styles.sourceBadgeText, { color: activeText }]}>
                           {importResult.sourceApp}
                         </Text>
-                      </View>
+                      </GlassPanel>
                       <Text style={[styles.previewCountText, { color: textColor }]}>
                         {importResult.transactions.length} entries detected
                       </Text>
@@ -823,7 +825,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 {/* Preview Rows */}
                 <View style={styles.previewEntriesList}>
                   {importResult.transactions.slice(0, 3).map((item, idx) => (
-                    <View key={idx} style={[styles.previewEntryRow, { backgroundColor: cardBg }]}>
+                    <GlassPanel key={idx} style={[styles.previewEntryRow, { backgroundColor: cardBg }]}>
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text numberOfLines={1} style={[styles.previewEntryTitle, { color: textColor }]}>
                           {item.title}
@@ -835,7 +837,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <Text style={[styles.previewEntryAmount, { color: textColor }]}>
                         {item.type === 'income' ? '+' : '−'}{currSym}{Math.abs(item.amount).toFixed(2)}
                       </Text>
-                    </View>
+                    </GlassPanel>
                   ))}
                   {importResult.transactions.length > 3 && (
                     <Text style={[styles.previewMoreNote, { color: mutedText }]}>

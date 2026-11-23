@@ -7,6 +7,7 @@ import {
   HStack,
   Host,
   Picker,
+  RNHostView,
   ScrollView as SwiftUIScrollView,
   Spacer,
   Text as SwiftUIText,
@@ -24,6 +25,9 @@ import {
   scrollIndicators,
   tag,
   toggleStyle,
+  glassEffect,
+  lineLimit,
+  padding,
 } from '@expo/ui/swift-ui/modifiers';
 import { GlassContainer, isLiquidGlassAvailable } from 'expo-glass-effect';
 
@@ -31,6 +35,8 @@ export interface AppleRadioOption {
   value: string;
   label: string;
   disabled?: boolean;
+  icon?: React.ReactNode;
+  color?: string;
 }
 
 export interface AppleGraphicalCalendarProps {
@@ -100,22 +106,20 @@ export const AppleGraphicalCalendar: React.FC<AppleGraphicalCalendarProps> = ({
 }) => {
   const hasGlass = isLiquidGlassAvailable();
   const selectionDate = parseISODateSafe(selectedDate);
-  const secondaryStyle = buttonStyle(hasGlass ? 'glass' : 'bordered');
-  const primaryStyle = buttonStyle(hasGlass ? 'glassProminent' : 'borderedProminent');
 
   const actionButtons = (
     <HStack spacing={10}>
       <Button
         label="Today"
         onPress={onToday}
-        modifiers={[secondaryStyle, buttonBorderShape('capsule'), controlSize('regular')]}
+        modifiers={[buttonStyle('plain'), padding({ horizontal: 16, vertical: 10 }), glassEffect({ glass: { variant: 'regular', interactive: false }, shape: 'capsule' })]}
       />
       <Spacer />
       {allowClear && onClear ? (
         <Button
           label="All Dates"
           onPress={onClear}
-          modifiers={[primaryStyle, buttonBorderShape('capsule'), controlSize('regular')]}
+          modifiers={[buttonStyle('plain'), padding({ horizontal: 16, vertical: 10 }), glassEffect({ glass: { variant: 'regular', interactive: false }, shape: 'capsule' })]}
         />
       ) : null}
     </HStack>
@@ -158,13 +162,19 @@ export const AppleRadioControl: React.FC<AppleRadioControlProps> = ({
   const colorScheme = isDark ? 'dark' : 'light';
   const ctrlSize = size === 'xs' || size === 'sm' ? 'small' : size === 'lg' ? 'large' : 'regular';
 
-  if (menu) return <Host matchContents colorScheme={colorScheme} style={style}>
-    <Picker label="Selection" selection={value} onSelectionChange={selected => {
+  const chosen = items.find(item => item.value === value);
+  const optionLabel = (item: AppleRadioOption) => <HStack spacing={6}>
+    {item.icon || item.color ? <RNHostView matchContents><View pointerEvents="none" style={{ width: 20, height: 20, alignItems: 'center', justifyContent: 'center', ...(item.color ? { backgroundColor: item.color, borderRadius: 10 } : {}) }}>{item.icon}</View></RNHostView> : null}
+    <SwiftUIText modifiers={[lineLimit(1)]}>{item.label}</SwiftUIText>
+  </HStack>;
+  if (menu) return <Host matchContents colorScheme={colorScheme} style={style} ignoreSafeArea="all">
+    <Picker label={chosen ? optionLabel(chosen) : 'Selection'} selection={value} onSelectionChange={selected => {
       const index = items.findIndex(item => item.value === String(selected));
       if (!disabled && index >= 0 && !items[index].disabled) onChange(items[index].value, index);
-    }} modifiers={[pickerStyle('menu'), labelsHidden(), buttonStyle(hasGlass ? 'glass' : 'bordered'), buttonBorderShape('capsule'),
+    }} modifiers={[pickerStyle('menu'), buttonStyle('plain'), padding({ horizontal: 12, vertical: 8 }),
+      glassEffect({ glass: { variant: 'regular', interactive: false }, shape: 'capsule' }),
       ...(disabled ? [disabledModifier(true)] : [])]}>
-      {items.map(item => <SwiftUIText key={item.value} modifiers={[tag(item.value), ...(item.disabled ? [disabledModifier(true)] : [])]}>{item.label}</SwiftUIText>)}
+      {items.map(item => <HStack key={item.value} modifiers={[tag(item.value), ...(item.disabled ? [disabledModifier(true)] : [])]}>{optionLabel(item)}</HStack>)}
     </Picker>
   </Host>;
 
@@ -292,7 +302,6 @@ export const AppleToggleSwitch: React.FC<AppleToggleSwitchProps> = ({
   isDark,
 }) => (
   <Host
-    matchContents
     colorScheme={isDark ? 'dark' : 'light'}
     style={{ width: 58, height: 32 }}
   >

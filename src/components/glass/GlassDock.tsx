@@ -20,6 +20,8 @@ import { ImpactStyle, triggerImpact } from '../../utils/haptics';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassSurface } from './GlassSurface';
 import { NativeGlassContainer } from '../common/AppleNativeControls';
+import { AppleSlidingSelector } from '../common/AppleSlidingSelector';
+import { GlassPill } from './GlassPill';
 import { measureNodeInWindow, type ViewRefNode } from '../../utils/measureWindow';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -284,6 +286,16 @@ export const GlassDock = memo(function GlassDock({
     : isDark
       ? '#23232A'
       : '#EFEFF5';
+
+  if (Platform.OS === 'ios' && isLiquidGlassEnabled) return <View style={[styles.outerContainer, { bottom: bottomOffset }]} pointerEvents="box-none">
+    <View style={styles.dockGroup}>
+      <AppleSlidingSelector dock height={64} style={{ width: capsuleWidth }} value={currentTab}
+        items={mainNavItems.map(item => ({ value: item.key, label: item.label, icon: item.icon(isDark ? '#FFFFFF' : '#09090B') }))}
+        onChange={value => { triggerImpact(ImpactStyle.Light); onTabChange(value as TabKey); }} />
+      <GlassPill icon={<AddCircleIcon size={24} color={isDark ? '#FFFFFF' : '#09090B'} />} variant="glass" shape="pill"
+        style={{ width: 64, height: 64 }} accessibilityLabel="Add split expense" onPress={handleSplitAction} />
+    </View>
+  </View>;
 
   return (
     <View style={[styles.outerContainer, { bottom: bottomOffset }]} pointerEvents="box-none">

@@ -7,6 +7,7 @@ import { GlassSurface } from './GlassSurface';
 import { useModalVisual } from '../common/ModalVisualContext';
 import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
 import { ACTION_COLORS } from '../../theme/actionColors';
+import { AppleGlassButton } from '../common/AppleGlassButton';
 
 interface GlassPillProps {
   label?: string;
@@ -108,6 +109,10 @@ export const GlassPill: React.FC<GlassPillProps> = ({
       ) : null}
     </>
   );
+
+  if (Platform.OS === 'ios' && isLiquidGlassEnabled) return <AppleGlassButton label={label} icon={icon} onPress={handlePress}
+    disabled={disabled} active={active} variant={variant} size={size} shape={radius === 999 ? 'pill' : 'rounded'}
+    style={style} textStyle={textStyle} accessibilityLabel={accessibilityLabel} />;
 
   return (
     <AnimatedPressable

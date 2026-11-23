@@ -1,6 +1,7 @@
+import { GlassPressable as Pressable } from './GlassTouchable';
 import { ACTION_COLORS } from '../../theme/actionColors';
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Animated, { ReduceMotion, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { Pen2Icon } from '@solar-icons/react-native/bold/pen-2';
@@ -11,11 +12,11 @@ let openItem: SwipeableMethods | null = null;
 const SPRING = { mass: 0.7, damping: 32, stiffness: 420, overshootClamping: true, reduceMotion: ReduceMotion.System };
 
 function RevealedButton({ progress, label, name, onPress, danger, disabled, compact }: { progress?: SharedValue<number>; label: string; name: string; onPress(): void; danger?: boolean; disabled?: boolean; compact?: boolean }) {
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const dark = themeMode === 'dark';
   const motion = useAnimatedStyle(() => {
     const value = progress ? Math.max(0, Math.min(1, (progress.get() - 0.08) / 0.92)) : 1;
-    return { opacity: value, transform: [{ scale: 0.8 + value * 0.2 }] };
+    return Platform.OS === 'ios' && isLiquidGlassEnabled ? { transform: [{ translateX: 6 * (1 - value) }] } : { opacity: value, transform: [{ scale: 0.8 + value * 0.2 }] };
   });
   const color = danger || dark ? '#FFFFFF' : '#18181B';
   return <Animated.View style={motion}><Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel={`${label} ${name}`} accessibilityState={{ disabled }} onPress={onPress} style={[styles.button, compact && styles.compactButton, { backgroundColor: danger ? ACTION_COLORS.danger : dark ? '#1C1C22' : '#E5E5EA' }]}>
@@ -27,7 +28,7 @@ export function ItemActionReveal({ children, name, onEdit, onDelete, disabled = 
   children: React.ReactNode; name: string; onEdit?: () => void; onDelete?: () => void; disabled?: boolean;
   style?: StyleProp<ViewStyle>; borderRadius?: number; buttons?: boolean; compact?: boolean;
 }) {
-  const { transactionActionStyle } = useLiquidGlass();
+  const { transactionActionStyle, isLiquidGlassEnabled } = useLiquidGlass();
   const swipeable = useRef<SwipeableMethods>(null);
   const pendingAction = useRef<(() => void) | null>(null);
   useEffect(() => {
@@ -36,10 +37,11 @@ export function ItemActionReveal({ children, name, onEdit, onDelete, disabled = 
   }, [transactionActionStyle]);
   const request = useCallback((action?: () => void) => {
     if (disabled || !action) return;
+    if (Platform.OS === 'ios' && isLiquidGlassEnabled) { pendingAction.current = null; swipeable.current?.close(); action(); return; }
     if (!swipeable.current) { action(); return; }
     pendingAction.current = action;
     swipeable.current.close();
-  }, [disabled]);
+  }, [disabled, isLiquidGlassEnabled]);
   const finishClose = useCallback(() => {
     if (openItem === swipeable.current) openItem = null;
     const action = pendingAction.current; pendingAction.current = null; action?.();

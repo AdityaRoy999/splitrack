@@ -1,3 +1,4 @@
+import { GlassTouchable as TouchableOpacity } from '../common/GlassTouchable';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -5,7 +6,6 @@ import {
   Platform,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   useWindowDimensions,
 } from 'react-native';
