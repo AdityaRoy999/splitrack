@@ -1,11 +1,11 @@
 name: Build Unsigned iOS IPA
 "on":
-  push:
-    branches:
-      - ios
-    paths-ignore:
-      - apps.json
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      control_request:
+        description: Approved build request from the release control API
+        required: true
+        type: string
 permissions:
   contents: read
   id-token: write
@@ -37,11 +37,20 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Authorize dashboard build request
+        env:
+          CONTROL_BUILD_REQUEST: ${{ inputs.control_request }}
+          BUILD_LOG_STEP: Authorize dashboard build request
+          BUILD_LOG_INDEX: "2"
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
+          node scripts/authorize-build.mjs
+          SPLITTRACK_BUILD_SCRIPT
       - name: Validate release control configuration
         env:
           RELEASE_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
           BUILD_LOG_STEP: Validate release control configuration
-          BUILD_LOG_INDEX: "2"
+          BUILD_LOG_INDEX: "3"
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
           test -n "$RELEASE_CONTROL_URL" && test -n "$PUBLIC_RELEASE_REPO" && test -n "$EXPO_PUBLIC_UPDATE_MANIFEST_URL" && test -n "$RELEASE_TOKEN" || { echo 'Complete the release repository variables and secret before building.'; exit 1; }
@@ -54,7 +63,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Resolve binary release commit
-          BUILD_LOG_INDEX: "3"
+          BUILD_LOG_INDEX: "4"
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -67,7 +76,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Validate cloud app configuration
-          BUILD_LOG_INDEX: "5"
+          BUILD_LOG_INDEX: "6"
       - name: Read app version and prepare build number
         id: app
         run: |-
@@ -76,7 +85,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Read app version and prepare build number
-          BUILD_LOG_INDEX: "6"
+          BUILD_LOG_INDEX: "7"
       - name: Install npm dependencies
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
@@ -84,7 +93,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Install npm dependencies
-          BUILD_LOG_INDEX: "7"
+          BUILD_LOG_INDEX: "8"
       - name: Lint and typecheck iOS frontend
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
@@ -93,7 +102,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Lint and typecheck iOS frontend
-          BUILD_LOG_INDEX: "8"
+          BUILD_LOG_INDEX: "9"
       - name: Validate mobile auth, build routing, native glass and settled-only ledger reset
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
@@ -101,12 +110,12 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Validate mobile auth, build routing, native glass and settled-only ledger reset
-          BUILD_LOG_INDEX: "9"
+          BUILD_LOG_INDEX: "10"
       - name: Generate native iOS project (Expo Prebuild)
         env:
           CI: "1"
           BUILD_LOG_STEP: Generate native iOS project (Expo Prebuild)
-          BUILD_LOG_INDEX: "10"
+          BUILD_LOG_INDEX: "11"
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
           npx expo prebuild --platform ios --no-install
@@ -117,7 +126,7 @@ jobs:
           BUILD_NUMBER: ${{ steps.app.outputs.build_number }}
           BUNDLE_ID: ${{ steps.app.outputs.bundle_id }}
           BUILD_LOG_STEP: Sync iOS Info.plist version and numeric build number
-          BUILD_LOG_INDEX: "11"
+          BUILD_LOG_INDEX: "12"
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
           set -euo pipefail
@@ -141,13 +150,13 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Install CocoaPods dependencies
-          BUILD_LOG_INDEX: "12"
+          BUILD_LOG_INDEX: "13"
       - name: Build unsigned iOS Release app
         env:
           APP_VERSION: ${{ steps.app.outputs.version }}
           BUILD_NUMBER: ${{ steps.app.outputs.build_number }}
           BUILD_LOG_STEP: Build unsigned iOS Release app
-          BUILD_LOG_INDEX: "13"
+          BUILD_LOG_INDEX: "14"
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
           set -euo pipefail
@@ -182,7 +191,7 @@ jobs:
           BUILD_NUMBER: ${{ steps.app.outputs.build_number }}
           BUNDLE_ID: ${{ steps.app.outputs.bundle_id }}
           BUILD_LOG_STEP: Package .app into unsigned .ipa and verify bundle metadata
-          BUILD_LOG_INDEX: "14"
+          BUILD_LOG_INDEX: "15"
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
           set -euo pipefail
@@ -250,7 +259,7 @@ jobs:
           APP_VERSION: ${{ steps.app.outputs.version }}
           BUILD_NUMBER: ${{ steps.app.outputs.build_number }}
           BUILD_LOG_STEP: Register build for release approval
-          BUILD_LOG_INDEX: "17"
+          BUILD_LOG_INDEX: "18"
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
           node scripts/register-release-build.mjs
