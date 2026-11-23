@@ -3,7 +3,7 @@ name: Build Android APK
   workflow_dispatch:
     inputs:
       control_request:
-        description: Approved build request from the release control API
+        description: Approved build request identifier
         required: true
         type: string
 permissions:
@@ -36,10 +36,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Authorize dashboard build request
+      - name: Authorize build request
         env:
           CONTROL_BUILD_REQUEST: ${{ inputs.control_request }}
-          BUILD_LOG_STEP: Authorize dashboard build request
+          BUILD_LOG_STEP: Authorize build request
           BUILD_LOG_INDEX: "2"
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'

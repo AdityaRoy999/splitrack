@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 const { load } = createRequire(import.meta.url)('js-yaml');
 const docs = await Promise.all(['android-apk.yml', 'ios-unsigned-ipa.yml'].map(async name => load(await readFile(new URL(`../.github/workflows/${name}`, import.meta.url), 'utf8'))));
-test('only dashboard-requested manual builds run on the matching platform branch', () => {
+test('only approved manual builds run on the matching platform branch', () => {
   for (const [i, platform] of ['android', 'ios'].entries()) {
     const doc = docs[i], job = Object.values(doc.jobs)[0];
     assert.deepEqual(Object.keys(doc.on), ['workflow_dispatch']);
@@ -33,7 +33,7 @@ test('configuration fails early and release uploads precede pending registration
     const setup = steps.findIndex(s => s.name === 'Validate release control configuration');
     const install = steps.findIndex(s => /Install.*dependencies/.test(s.name));
     assert.ok(setup >= 0 && setup < install);
-    const approval = steps.findIndex(s => s.name === 'Authorize dashboard build request');
+    const approval = steps.findIndex(s => s.name === 'Authorize build request');
     assert.ok(approval >= 0 && approval < setup && approval < install);
     assert.equal(steps[approval].env.CONTROL_BUILD_REQUEST, '${{ inputs.control_request }}');
     const release = steps.findIndex(s => s.uses?.startsWith('softprops/action-gh-release'));
