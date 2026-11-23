@@ -1,5 +1,10 @@
 name: Build Android APK
 "on":
+  push:
+    branches:
+      - android
+    paths-ignore:
+      - apps.json
   workflow_dispatch: {}
 permissions:
   contents: read

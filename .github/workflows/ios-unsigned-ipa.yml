@@ -1,5 +1,10 @@
 name: Build Unsigned iOS IPA
 "on":
+  push:
+    branches:
+      - ios
+    paths-ignore:
+      - apps.json
   workflow_dispatch: {}
 permissions:
   contents: read
