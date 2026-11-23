@@ -1,11 +1,11 @@
 name: Build Android APK
 "on":
-  push:
-    branches:
-      - android
-    paths-ignore:
-      - apps.json
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      control_request:
+        description: Approved build request from the release control API
+        required: true
+        type: string
 permissions:
   contents: read
   id-token: write
@@ -36,11 +36,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Authorize dashboard build request
+        env:
+          CONTROL_BUILD_REQUEST: ${{ inputs.control_request }}
+          BUILD_LOG_STEP: Authorize dashboard build request
+          BUILD_LOG_INDEX: "2"
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
+          node scripts/authorize-build.mjs
+          SPLITTRACK_BUILD_SCRIPT
       - name: Validate release control configuration
         env:
           RELEASE_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
           BUILD_LOG_STEP: Validate release control configuration
-          BUILD_LOG_INDEX: "2"
+          BUILD_LOG_INDEX: "3"
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
           test -n "$RELEASE_CONTROL_URL" && test -n "$PUBLIC_RELEASE_REPO" && test -n "$EXPO_PUBLIC_UPDATE_MANIFEST_URL" && test -n "$RELEASE_TOKEN" || { echo 'Complete the release repository variables and secret before building.'; exit 1; }
@@ -53,7 +62,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Resolve binary release commit
-          BUILD_LOG_INDEX: "3"
+          BUILD_LOG_INDEX: "4"
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -66,7 +75,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Validate cloud app configuration
-          BUILD_LOG_INDEX: "5"
+          BUILD_LOG_INDEX: "6"
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
@@ -85,7 +94,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Configure Android SDK & accept licenses
-          BUILD_LOG_INDEX: "7"
+          BUILD_LOG_INDEX: "8"
       - name: Install dependencies
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
@@ -93,7 +102,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Install dependencies
-          BUILD_LOG_INDEX: "8"
+          BUILD_LOG_INDEX: "9"
       - name: Validate Android auth and offline transactions
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
@@ -101,7 +110,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Validate Android auth and offline transactions
-          BUILD_LOG_INDEX: "9"
+          BUILD_LOG_INDEX: "10"
       - name: Stamp Android build version
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
@@ -110,7 +119,7 @@ jobs:
         id: app
         env:
           BUILD_LOG_STEP: Stamp Android build version
-          BUILD_LOG_INDEX: "10"
+          BUILD_LOG_INDEX: "11"
       - name: Prebuild Android native project
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
@@ -118,7 +127,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Prebuild Android native project
-          BUILD_LOG_INDEX: "11"
+          BUILD_LOG_INDEX: "12"
       - name: Build Android Release APK
         working-directory: android
         run: |-
@@ -128,7 +137,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Build Android Release APK
-          BUILD_LOG_INDEX: "12"
+          BUILD_LOG_INDEX: "13"
       - name: Package and verify Android APK
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
@@ -167,7 +176,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Package and verify Android APK
-          BUILD_LOG_INDEX: "13"
+          BUILD_LOG_INDEX: "14"
       - name: Verify native GL callbacks in optimized APK
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
@@ -175,7 +184,7 @@ jobs:
           SPLITTRACK_BUILD_SCRIPT
         env:
           BUILD_LOG_STEP: Verify native GL callbacks in optimized APK
-          BUILD_LOG_INDEX: "14"
+          BUILD_LOG_INDEX: "15"
       - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -204,7 +213,7 @@ jobs:
         env:
           BUILD_PLATFORM: android
           BUILD_LOG_STEP: Register build for release approval
-          BUILD_LOG_INDEX: "17"
+          BUILD_LOG_INDEX: "18"
         run: |-
           node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
           node scripts/register-release-build.mjs

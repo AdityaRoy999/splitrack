@@ -4,22 +4,22 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 const { load } = createRequire(import.meta.url)('js-yaml');
 const docs = await Promise.all(['android-apk.yml', 'ios-unsigned-ipa.yml'].map(async name => load(await readFile(new URL(`../.github/workflows/${name}`, import.meta.url), 'utf8'))));
-test('source pushes and manual builds run only on the matching platform branch', () => {
+test('only dashboard-requested manual builds run on the matching platform branch', () => {
   for (const [i, platform] of ['android', 'ios'].entries()) {
     const doc = docs[i], job = Object.values(doc.jobs)[0];
-    assert.deepEqual(Object.keys(doc.on).sort(), ['push', 'workflow_dispatch']);
-    assert.deepEqual(doc.on.push.branches, [platform]);
-    assert.deepEqual(doc.on.push['paths-ignore'], ['apps.json']);
+    assert.deepEqual(Object.keys(doc.on), ['workflow_dispatch']);
+    assert.equal(doc.on.workflow_dispatch.inputs.control_request.required, true);
+    assert.equal(doc.on.workflow_dispatch.inputs.control_request.type, 'string');
     assert.equal(job.if, `github.ref == 'refs/heads/${platform}' && github.actor != 'github-actions[bot]'`);
     assert.doesNotMatch(job.if, /main/);
     assert.equal(doc.permissions['id-token'], 'write');
     assert.equal(doc.permissions.contents, 'read');
   }
 });
-test('a source push never triggers the other platform or main', () => {
-  const targets = branch => docs.map(doc => doc.on.push.branches.includes(branch));
-  assert.deepEqual(targets('android'), [true, false]);
-  assert.deepEqual(targets('ios'), [false, true]);
+test('commits to android, ios and main never start a build', () => {
+  const targets = branch => docs.map(doc => doc.on.push?.branches?.includes(branch) ?? false);
+  assert.deepEqual(targets('android'), [false, false]);
+  assert.deepEqual(targets('ios'), [false, false]);
   assert.deepEqual(targets('main'), [false, false]);
 });
 test('platform builds use native runners and separate queues', () => {
@@ -33,6 +33,9 @@ test('configuration fails early and release uploads precede pending registration
     const setup = steps.findIndex(s => s.name === 'Validate release control configuration');
     const install = steps.findIndex(s => /Install.*dependencies/.test(s.name));
     assert.ok(setup >= 0 && setup < install);
+    const approval = steps.findIndex(s => s.name === 'Authorize dashboard build request');
+    assert.ok(approval >= 0 && approval < setup && approval < install);
+    assert.equal(steps[approval].env.CONTROL_BUILD_REQUEST, '${{ inputs.control_request }}');
     const release = steps.findIndex(s => s.uses?.startsWith('softprops/action-gh-release'));
     const register = steps.findIndex(s => s.name === 'Register build for release approval');
     assert.ok(release >= 0 && register > release);
