@@ -1,0 +1,14 @@
+import { readFile, writeFile, appendFile } from 'node:fs/promises';
+import { buildIdentity } from './build-identity.mjs';
+const platform = process.argv[2];
+const identity = buildIdentity(platform, Number(process.env.GITHUB_RUN_NUMBER), Number(process.env.GITHUB_RUN_ATTEMPT));
+const config = JSON.parse(await readFile('app.json', 'utf8'));
+const [major, minor] = config.expo.version.split('.');
+if (!/^\d+$/.test(major) || !/^\d+$/.test(minor)) throw new Error('Invalid app version.');
+const version = `${major}.${minor}.${identity.build}`;
+config.expo.version = version;
+if (platform === 'android') config.expo.android.versionCode = identity.build;
+else config.expo.ios.buildNumber = String(identity.build);
+await writeFile('app.json', JSON.stringify(config, null, 2) + '\n');
+await appendFile(process.env.GITHUB_OUTPUT, `version=${version}\nbundle_id=${config.expo.ios.bundleIdentifier}\nbuild_number=${identity.build}\nrelease_tag=${identity.tag}\n`);
+console.log(`${platform} version ${version}, native build ${identity.build}`);

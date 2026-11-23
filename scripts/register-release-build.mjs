@@ -1,13 +1,14 @@
 import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { buildIdentity } from './build-identity.mjs';
 const platform = process.env.BUILD_PLATFORM;
 if (!['android', 'ios'].includes(platform)) throw new Error('Invalid platform.');
 const app = JSON.parse(await readFile('app.json', 'utf8')).expo;
 const file = platform === 'android' ? 'artifacts/Splittrack-release.apk' : 'Splittrack-unsigned.ipa';
 const build = platform === 'android' ? app.android.versionCode : Number(process.env.BUILD_NUMBER);
 const version = platform === 'android' ? app.version : process.env.APP_VERSION;
-const tag = platform === 'android' ? `splittrack-android-${process.env.GITHUB_RUN_NUMBER}` : `splittrack-ios-${process.env.GITHUB_RUN_NUMBER}`;
+const { tag } = buildIdentity(platform, Number(process.env.GITHUB_RUN_NUMBER), Number(process.env.GITHUB_RUN_ATTEMPT));
 const api = new URL(process.env.RELEASE_CONTROL_URL);
 if (api.protocol !== 'https:' || !api.hostname.endsWith('.cloudfront.net')) throw new Error('RELEASE_CONTROL_URL must be the deployed HTTPS CloudFront address.');
 if (process.env.GITHUB_REF !== `refs/heads/${platform}`) throw new Error('Only the matching platform branch can register a release.');

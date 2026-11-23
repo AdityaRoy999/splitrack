@@ -64,18 +64,8 @@ jobs:
       - name: Validate Android auth and offline transactions
         run: node --test scripts/*.test.mjs
       - name: Stamp Android build version
-        run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-          const config = JSON.parse(fs.readFileSync('app.json', 'utf8'));
-          const build = Number(process.env.GITHUB_RUN_NUMBER);
-          if (!Number.isSafeInteger(build) || build < 1) throw new Error('Invalid Android build number');
-          config.expo.android.versionCode = (config.expo.android.versionCode || 1) + build;
-          const [major, minor] = config.expo.version.split('.');
-          config.expo.version = `${major}.${minor}.${build}`;
-          fs.writeFileSync('app.json', JSON.stringify(config, null, 2) + '\n');
-          console.log(`Android version ${config.expo.version}, versionCode ${config.expo.android.versionCode}`);
-          NODE
+        run: node scripts/stamp-release-version.mjs android
+        id: app
       - name: Prebuild Android native project
         run: CI=1 npx expo prebuild --platform android --no-install
       - name: Build Android Release APK
@@ -131,8 +121,8 @@ jobs:
       - name: Publish APK as a GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: splittrack-android-${{ github.run_number }}
-          name: Splittrack Android (build ${{ github.run_number }})
+          tag_name: ${{ steps.app.outputs.release_tag }}
+          name: SplitTrack Android ${{ steps.app.outputs.version }} (build ${{ steps.app.outputs.build_number }})
           body: |-
             Automated android build from commit ${{ github.sha }}.
             Availability is controlled by the public version manifest.
