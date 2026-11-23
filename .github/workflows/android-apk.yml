@@ -39,24 +39,42 @@ jobs:
       - name: Validate release control configuration
         env:
           RELEASE_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
-        run: test -n "$RELEASE_CONTROL_URL" && test -n "$PUBLIC_RELEASE_REPO" && test -n "$EXPO_PUBLIC_UPDATE_MANIFEST_URL" && test -n "$RELEASE_TOKEN" || { echo 'Complete the release repository variables and secret before building.'; exit 1; }
+          BUILD_LOG_STEP: Validate release control configuration
+          BUILD_LOG_INDEX: "2"
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
+          test -n "$RELEASE_CONTROL_URL" && test -n "$PUBLIC_RELEASE_REPO" && test -n "$EXPO_PUBLIC_UPDATE_MANIFEST_URL" && test -n "$RELEASE_TOKEN" || { echo 'Complete the release repository variables and secret before building.'; exit 1; }
+          SPLITTRACK_BUILD_SCRIPT
       - name: Resolve binary release commit
         id: release_repo
-        run: node scripts/prepare-release-ref.mjs
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
+          node scripts/prepare-release-ref.mjs
+          SPLITTRACK_BUILD_SCRIPT
+        env:
+          BUILD_LOG_STEP: Resolve binary release commit
+          BUILD_LOG_INDEX: "3"
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - name: Validate cloud app configuration
-        run: node scripts/validate-build-env.mjs
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
+          node scripts/validate-build-env.mjs
+          SPLITTRACK_BUILD_SCRIPT
+        env:
+          BUILD_LOG_STEP: Validate cloud app configuration
+          BUILD_LOG_INDEX: "5"
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
       - name: Configure Android SDK & accept licenses
-        run: |
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
@@ -64,22 +82,56 @@ jobs:
           if [ -n "$SDKMANAGER" ]; then
             yes | "$SDKMANAGER" --licenses >/dev/null || true
           fi
+          SPLITTRACK_BUILD_SCRIPT
+        env:
+          BUILD_LOG_STEP: Configure Android SDK & accept licenses
+          BUILD_LOG_INDEX: "7"
       - name: Install dependencies
-        run: npm ci
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
+          npm ci
+          SPLITTRACK_BUILD_SCRIPT
+        env:
+          BUILD_LOG_STEP: Install dependencies
+          BUILD_LOG_INDEX: "8"
       - name: Validate Android auth and offline transactions
-        run: node --test scripts/*.test.mjs
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
+          node --test scripts/*.test.mjs
+          SPLITTRACK_BUILD_SCRIPT
+        env:
+          BUILD_LOG_STEP: Validate Android auth and offline transactions
+          BUILD_LOG_INDEX: "9"
       - name: Stamp Android build version
-        run: node scripts/stamp-release-version.mjs android
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
+          node scripts/stamp-release-version.mjs android
+          SPLITTRACK_BUILD_SCRIPT
         id: app
+        env:
+          BUILD_LOG_STEP: Stamp Android build version
+          BUILD_LOG_INDEX: "10"
       - name: Prebuild Android native project
-        run: CI=1 npx expo prebuild --platform android --no-install
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
+          CI=1 npx expo prebuild --platform android --no-install
+          SPLITTRACK_BUILD_SCRIPT
+        env:
+          BUILD_LOG_STEP: Prebuild Android native project
+          BUILD_LOG_INDEX: "11"
       - name: Build Android Release APK
         working-directory: android
-        run: |
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon -x lint -x test
+          SPLITTRACK_BUILD_SCRIPT
+        env:
+          BUILD_LOG_STEP: Build Android Release APK
+          BUILD_LOG_INDEX: "12"
       - name: Package and verify Android APK
-        run: |
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
           RAW_APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
           if [ -z "$RAW_APK" ]; then
             echo "ERROR: No APK found under android/app/build/outputs/apk/release"
@@ -112,8 +164,18 @@ jobs:
           node scripts/verify-android-google.mjs artifacts/android-signing-certificate.txt
           ls -lh artifacts/Splittrack-release.apk
           sha256sum artifacts/Splittrack-release.apk >> "$GITHUB_STEP_SUMMARY"
+          SPLITTRACK_BUILD_SCRIPT
+        env:
+          BUILD_LOG_STEP: Package and verify Android APK
+          BUILD_LOG_INDEX: "13"
       - name: Verify native GL callbacks in optimized APK
-        run: python3 scripts/verify-android-release.py artifacts/Splittrack-release.apk
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
+          python3 scripts/verify-android-release.py artifacts/Splittrack-release.apk
+          SPLITTRACK_BUILD_SCRIPT
+        env:
+          BUILD_LOG_STEP: Verify native GL callbacks in optimized APK
+          BUILD_LOG_INDEX: "14"
       - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -141,4 +203,11 @@ jobs:
       - name: Register build for release approval
         env:
           BUILD_PLATFORM: android
-        run: node scripts/register-release-build.mjs
+          BUILD_LOG_STEP: Register build for release approval
+          BUILD_LOG_INDEX: "17"
+        run: |-
+          node "$GITHUB_WORKSPACE/scripts/stream-build.mjs" <<'SPLITTRACK_BUILD_SCRIPT'
+          node scripts/register-release-build.mjs
+          SPLITTRACK_BUILD_SCRIPT
+    env:
+      BUILD_LOG_PLATFORM: android

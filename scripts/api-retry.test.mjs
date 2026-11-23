@@ -7,6 +7,8 @@ import { stripTypeScriptTypes } from 'node:module';
 process.env.EXPO_PUBLIC_API_URL = 'https://splittrack.example.invalid';
 let source = await readFile(new URL('../src/services/api.ts', import.meta.url), 'utf8');
 source = source.replace("import { randomUUID } from 'expo-crypto';", "const randomUUID = () => 'generated_request_id';")
+  .replace("import * as Application from 'expo-application';", "const Application = { nativeBuildVersion: '4201', nativeApplicationVersion: '2.5.0' };")
+  .replace("import { Platform } from 'react-native';", "const Platform = { OS: 'android' };")
   .replace("import { getFirebaseAuth } from './firebase';", 'const getFirebaseAuth = () => globalThis.__androidApiAuth;');
 const { api, ApiError } = await import(`data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(source, { mode: 'transform' })).toString('base64')}`);
 function user(getIdToken = async () => 'token') { const next = { uid: 'alice', getIdToken }; globalThis.__androidApiAuth = { currentUser: next }; return next; }
@@ -17,6 +19,7 @@ test('the outbox sends exact durable JSON/key and surfaces duplicate metadata', 
   const rawBody = '{"title":"Dinner","amount":-70.30,"duplicateCheck":true}';
   globalThis.fetch = async (_, options) => {
     called++; assert.equal(options.body, rawBody);
+    assert.equal(options.headers['X-App-Version'], 'android/4201/2.5.0');
     assert.equal(options.headers['idempotency-key'], 'offline_request_1');
     return reply(409, { code: 'DUPLICATE_TRANSACTION', message: 'Already recorded', details: { existingTransaction: { id: 'existing', amount: -70.3 } } });
   };
