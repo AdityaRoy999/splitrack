@@ -46,3 +46,13 @@ test('configuration fails early and release uploads precede pending registration
     assert.ok(!steps.some(s => /git push/.test(s.run ?? '')));
   }
 });
+
+test('iOS verifies the packaged archive without an early-exit listing pipeline', () => {
+  const steps = Object.values(docs[1].jobs)[0].steps;
+  const packaging = steps.find(step => step.name === 'Package .app into unsigned .ipa and verify bundle metadata').run;
+  assert.match(packaging, /python3 scripts\/verify-ios-release\.py Splittrack-unsigned\.ipa/);
+  for (const argument of ['--bundle-id "$BUNDLE_ID"', '--version "$APP_VERSION"', '--build-number "$BUILD_NUMBER"']) assert.ok(packaging.includes(argument));
+  assert.doesNotMatch(packaging, /unzip[^\n]*\|[^\n]*grep -q/, 'grep must not terminate an archive listing under pipefail');
+  const validation = steps.find(step => step.name === 'Validate mobile auth, build routing, native glass and settled-only ledger reset').run;
+  assert.match(validation, /python3 scripts\/verify-ios-release\.test\.py/);
+});
