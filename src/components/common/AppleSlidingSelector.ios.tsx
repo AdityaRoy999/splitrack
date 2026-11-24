@@ -12,7 +12,7 @@ const NativeSelection = requireNativeView<ViewProps & {
 export function AppleSlidingSelector({ items, value, onChange, disabled = false, dock = false, height = 36, style }: AppleSlidingSelectorProps) {
   const { themeMode } = useLiquidGlass();
   const dark = themeMode === 'dark';
-  return <View style={[{ height, width: '100%' }, style]}>
+  return <View style={[{ height, width: '100%', minWidth: 0, flexShrink: 1, alignSelf: 'stretch' }, style]}>
     <NativeSelection style={StyleSheet.absoluteFill} labels={items.map(item => item.accessibilityLabel ?? item.label)}
       colorScheme={themeMode} selection={items.findIndex(item => item.value === value)} disabled={disabled}
       disabledIndices={items.flatMap((item, index) => item.disabled ? [index] : [])}

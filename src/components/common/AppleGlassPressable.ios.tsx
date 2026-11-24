@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Button, HStack, Host, RNHostView } from '@expo/ui/swift-ui';
-import { accessibilityLabel as nativeLabel, buttonStyle, disabled as nativeDisabled, frame, glassEffect, onLongPressGesture } from '@expo/ui/swift-ui/modifiers';
+import { Button, HStack, Host } from '@expo/ui/swift-ui';
+import { accessibilityLabel as nativeLabel, buttonStyle, contentShape, disabled as nativeDisabled, frame, glassEffect, onLongPressGesture, shapes } from '@expo/ui/swift-ui/modifiers';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassSurface } from '../glass/GlassSurface';
 import type { AppleGlassPressableProps } from './AppleGlassPressable';
 import { ACTION_COLORS } from '../../theme/actionColors';
 import { GlassPanel } from '../glass/GlassPanel';
 
-// Yoga preserves the existing layout; SwiftUI gets an explicit label frame.
+// Render the RN label once in Yoga. SwiftUI owns only the button's material
+// and hit area, avoiding a second label tree and nested native layout passes.
 export function AppleGlassPressable({ children, onPress, onLongPress, disabled = false, style, contentStyle, accessibilityLabel, borderRadius, selected }: AppleGlassPressableProps) {
   const { themeMode } = useLiquidGlass();
   const layout = StyleSheet.flatten(style) ?? {};
@@ -33,26 +34,27 @@ export function AppleGlassPressable({ children, onPress, onLongPress, disabled =
   });
   // The native button owns the material of an existing glass icon action.
   const labelContent = adaptLabel(children);
+  const labelText = (nodes: React.ReactNode): string => React.Children.toArray(nodes).map(child =>
+    typeof child === 'string' || typeof child === 'number' ? String(child)
+      : React.isValidElement<{ children?: React.ReactNode }>(child) ? labelText(child.props.children) : '').filter(Boolean).join(' ');
+  const accessibleName = accessibilityLabel ?? labelText(children);
   return <View style={[style, neutralStyle]}>
-    <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
-      style={[content, neutralStyle, { opacity: 0, alignSelf: 'stretch' }]}
-      onLayout={({ nativeEvent: { layout: measured } }) => {
-        if (measured.width > 0 && measured.height > 0) setBounds(previous => Math.abs(previous.width - measured.width) < 0.5 && Math.abs(previous.height - measured.height) < 0.5 ? previous : { width: measured.width, height: measured.height });
-      }}>{labelContent}</View>
     {bounds.width > 0 ? <Host colorScheme={themeMode} ignoreSafeArea="all" alignment="center" style={StyleSheet.absoluteFill}>
       <Button onPress={() => { if (!disabled) onPress(); }} modifiers={[
         buttonStyle('plain'), nativeDisabled(disabled),
-        ...(accessibilityLabel ? [nativeLabel(accessibilityLabel)] : []),
+        ...(accessibleName ? [nativeLabel(accessibleName)] : []),
         ...(onLongPress ? [onLongPressGesture(() => { if (!disabled) onLongPress(); }, 0.35)] : []),
       ]}>
         <HStack modifiers={[frame({ width: bounds.width, height: bounds.height }),
-          glassEffect({ glass: { variant: 'regular', interactive: false }, shape: radius >= 100 ? 'capsule' : 'roundedRectangle', cornerRadius: radius })]}>
-        <RNHostView>
-          <View pointerEvents="none" style={[content, neutralStyle, { width: bounds.width, height: bounds.height, opacity: disabled ? 0.45 : 1 }]}>{labelContent}</View>
-        </RNHostView>
-        </HStack>
+          glassEffect({ glass: { variant: 'regular', interactive: false }, shape: radius >= 100 ? 'capsule' : 'roundedRectangle', cornerRadius: radius }),
+          contentShape(shapes.roundedRectangle({ cornerRadius: radius }))]}>{null}</HStack>
       </Button>
     </Host> : null}
-    {selected ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, borderWidth: 1.5, borderColor: themeMode === 'dark' ? '#F4F4F5' : '#18181B' }]} /> : null}
+    {selected ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, backgroundColor: themeMode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' }]} /> : null}
+    <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+      style={[content, neutralStyle, { opacity: disabled ? 0.6 : 1, alignSelf: 'stretch' }]}
+      onLayout={({ nativeEvent: { layout: measured } }) => {
+        if (measured.width > 0 && measured.height > 0) setBounds(previous => Math.abs(previous.width - measured.width) < 0.5 && Math.abs(previous.height - measured.height) < 0.5 ? previous : { width: measured.width, height: measured.height });
+      }}>{labelContent}</View>
   </View>;
 }

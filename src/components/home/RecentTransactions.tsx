@@ -1,6 +1,6 @@
 import { TransactionSwipeRow } from '../transactions/TransactionSwipeRow';
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useSplitTrack } from '../../store/SplitTrackStore';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { useTransactionActions } from '../transactions/TransactionActions';
@@ -18,10 +18,11 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
   onViewAll,
 }) => {
   const { transactions, categories } = useSplitTrack();
-  const { formatAmount, themeMode, palette } = useLiquidGlass();
+  const { formatAmount, themeMode, palette, isLiquidGlassEnabled } = useLiquidGlass();
   const actions = useTransactionActions();
 
   const isDarkSheet = themeMode === 'dark';
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
 
   const resolveTxIcon = (tx: Transaction) => {
     if (tx.type === 'income') return 'dollar-minimalistic';
@@ -38,8 +39,9 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
           <Text style={[styles.title, { color: palette.sheetTextPrimary }]}>
             Recent Transactions
           </Text>
-          <AnimatedPressable onPress={onViewAll} scaleTo={0.94} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={[styles.viewAllText, { color: isDarkSheet ? '#71717A' : '#64748B' }]}>
+          <AnimatedPressable nativeGlass={false} onPress={onViewAll} scaleTo={0.94} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            contentStyle={nativeGlass ? styles.viewAllTouch : undefined}>
+            <Text style={[styles.viewAllText, { color: nativeGlass ? palette.sheetTextPrimary : isDarkSheet ? '#71717A' : '#64748B' }]}>
               View All
             </Text>
           </AnimatedPressable>
@@ -59,6 +61,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
             return (
               <React.Fragment key={tx.id}>
                 <TransactionSwipeRow transaction={tx}><AnimatedPressable
+                  nativeGlass={false}
                   scaleTo={0.985}
                   onPress={() => actions.open(tx)}
                   contentStyle={styles.txRow}
@@ -145,6 +148,12 @@ const styles = StyleSheet.create({
   viewAllText: {
     fontSize: 13,
     fontWeight: '400',
+  },
+  viewAllTouch: {
+    minHeight: 44,
+    paddingHorizontal: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   list: {
     gap: 2,

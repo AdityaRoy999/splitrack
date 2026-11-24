@@ -37,7 +37,7 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   hitSlop,
   accessibilityLabel,
   accessibilityState,
-  nativeGlass = true,
+  nativeGlass = false,
 }) => {
   const { isLiquidGlassEnabled } = useLiquidGlass();
   const [scaleAnim] = useState(() => new Animated.Value(1));

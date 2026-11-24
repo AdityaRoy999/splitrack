@@ -36,12 +36,13 @@ test('native material ignores custom tints and painted backing in cards and shee
     '../../theme/LiquidGlassContext': { useLiquidGlass: () => mode },
     '../common/BackdropSurfaceContext': { BackdropSurfaceContext: React.createContext(null) },
   }, 'GlassSurface');
-  const props = { tintColor: 'rgba(18,18,24,0.88)', style: { backgroundColor: '#17171C' }, matteColor: '#111114', children: 'rows' };
+  const props = { interactive: true, tintColor: 'rgba(18,18,24,0.88)', style: { backgroundColor: '#17171C' }, matteColor: '#111114', children: 'rows' };
   const card = Surface(props);
   assert.equal(nativeViews.StyleSheet.flatten(card.props.style).backgroundColor, 'transparent');
   const glass = all(card, node => node.type === 'GlassView')[0];
   assert.equal(glass.props.tintColor, undefined);
   assert.equal(glass.props.glassEffectStyle, 'regular');
+  assert.equal(glass.props.isInteractive, false, 'surface buttons do not stretch or merge on press');
   assert.equal(all(card, node => node.props.value === 'transparent').length, 1, 'rows inherit transparent backing');
   mode.isLiquidGlassEnabled = false;
   const matte = Surface(props);
@@ -152,7 +153,7 @@ test('native glass actions use fixed layout and noninteractive untinted material
     '../glass/GlassPanel': { GlassPanel: 'GlassPanel' },
     react: { ...React, useState: () => [bounds, update => { bounds = update(bounds); }] },
     '@expo/ui/swift-ui': Object.fromEntries(['Button', 'HStack', 'Host', 'RNHostView'].map(name => [name, name])),
-    '@expo/ui/swift-ui/modifiers': Object.fromEntries(['accessibilityLabel', 'buttonStyle', 'disabled', 'frame', 'glassEffect', 'onLongPressGesture'].map(name => [name, modifier(name)])),
+    '@expo/ui/swift-ui/modifiers': { ...Object.fromEntries(['accessibilityLabel', 'buttonStyle', 'contentShape', 'disabled', 'frame', 'glassEffect', 'onLongPressGesture'].map(name => [name, modifier(name)])), shapes: { roundedRectangle: value => ({ type: 'roundedRectangle', ...value }) } },
     '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark' }) },
     '../glass/GlassSurface': { GlassSurface: 'GlassSurface' },
     '../../theme/actionColors': { ACTION_COLORS: { danger: '#A92F3A', success: '#16734B' } },
@@ -169,11 +170,16 @@ test('native glass actions use fixed layout and noninteractive untinted material
   assert.equal(frame[0].value.width, 358); assert.equal(frame[0].value.height, 48);
   assert.equal(frame[1].value.glass.interactive, false);
   assert.equal(frame[1].value.glass.tint, undefined);
+  assert.equal(frame[2].name, 'contentShape', 'the full material area receives presses');
+  assert.equal(all(tree, node => node.type === 'Text').length, 1, 'the label mounts exactly once');
+  assert.equal(all(tree, node => node.type === 'RNHostView').length, 0, 'label layout stays in Yoga');
   const button = all(tree, node => node.type === 'Button')[0];
   assert.equal(button.props.modifiers[0].value, 'plain');
   button.props.onPress(); assert.equal(pressed, 1);
   all(Native({ ...props, disabled: true }), node => node.type === 'Button')[0].props.onPress();
   assert.equal(pressed, 1, 'disabled native action cannot submit');
+  const disabledLabel = all(Native({ ...props, disabled: true }), node => node.props.onLayout)[0];
+  assert.equal(nativeViews.StyleSheet.flatten(disabledLabel.props.style).opacity, 0.6, 'one readable disabled treatment');
 });
 
 test('Glass adapters preserve Matte styles, event and press feedback unchanged', async () => {
@@ -189,7 +195,10 @@ test('Glass adapters preserve Matte styles, event and press feedback unchanged',
   assert.equal(matte.type, 'TouchableOpacity'); assert.equal(matte.props.style, style);
   assert.equal(matte.props.onPress, onPress); assert.equal(matte.props.activeOpacity, 0.7);
   mode.isLiquidGlassEnabled = true;
-  assert.equal(Touchable({ children: 'Reset', style, onPress }).type, 'AppleGlassPressable');
+  const row = Touchable({ children: 'Reset', style, onPress });
+  assert.equal(row.type, 'TouchableOpacity', 'ordinary rows retain one content tree');
+  assert.equal(row.props.onPress, onPress, 'ordinary rows preserve real responder events');
+  assert.equal(Touchable({ nativeGlass: true, children: 'Reset', style, onPress }).type, 'AppleGlassPressable');
 });
 
 test('native selection retains original icons and ignores disabled or stale indices', async () => {
@@ -276,7 +285,13 @@ test('expense form keeps its three cards, payment profiles and pinned save actio
     '../categories/AddCategoryModal': { AddCategoryModal: 'AddCategoryModal' },
   }, 'AddExpenseModal');
   const tree = Form({ visible: true, onClose() {} });
-  assert.equal(all(tree, node => node.type === 'GlassSurface').length, 3);
+  const groups = all(tree, node => node.type?.name === 'ExpenseSection');
+  assert.equal(groups.length, 3, 'all form groups remain present');
+  for (const group of groups) {
+    const surface = group.type(group.props);
+    assert.equal(surface.type, 'View', 'native sheet groups do not add another glass layer');
+    assert.equal(group.type({ ...group.props, nativeGlass: false }).type, 'GlassSurface', 'Matte retains its card structure');
+  }
   const profiles = all(tree, node => node.type === 'JellyRadio' && node.props.items?.some(item => item.value === 'bank'))[0];
   assert.equal(profiles.props.items[0].label, 'synthetic@bank');
   const footer = all(tree, node => node.type === 'SheetFooter')[0];
@@ -322,4 +337,78 @@ test('iOS dock keeps four original tabs and a separate plus in both surface mode
     assert.equal(all(plus, node => node.type === 'AddCircleIcon').length, 1);
     plus.props.onPress(); assert.equal(opened, 1);
   }
+});
+
+test('closed Glass swipe panels are invisible and only the revealed side shows actions', async () => {
+  const shared = value => ({ get: () => value, set() {} });
+  const modules = {
+    react: { ...React, useAnimatedReaction() {} },
+    'react-native': { ...nativeViews, Platform: { OS: 'ios' } },
+    '../common/GlassTouchable': { GlassPressable: 'GlassPressable' },
+    './GlassTouchable': { GlassPressable: 'GlassPressable' },
+    '../../theme/actionColors': { ACTION_COLORS: { danger: '#A92F3A' } },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ isLiquidGlassEnabled: true, themeMode: 'dark' }) },
+    '../common/BackdropSurfaceContext': { BackdropSurfaceContext: React.createContext(null) },
+    '../../constants/buttonSizes': { COMPACT_BUTTON_HEIGHT: 36, COMPACT_BUTTON_HIT_SLOP: {} },
+    './TransactionActions': { useTransactionActions: () => ({}) },
+    'react-native-gesture-handler/ReanimatedSwipeable': { default: 'Swipeable' },
+    'react-native-reanimated': { __esModule: true, default: { View: 'AnimatedView' }, ReduceMotion: {}, useAnimatedStyle: callback => callback(), useAnimatedReaction() {} },
+    '@solar-icons/react-native/bold/pen-2': { Pen2Icon: 'Pen2Icon' },
+    '@solar-icons/react-native/bold/trash-bin-trash': { TrashBinTrashIcon: 'TrashBinTrashIcon' },
+  };
+  const Actions = await component('src/components/transactions/TransactionSwipeRow.tsx', modules, 'SwipeActions', '\nmodule.exports.SwipeActions = SwipeActions;');
+  const ItemButton = await component('src/components/common/ItemActionReveal.tsx', modules, 'RevealedButton', '\nmodule.exports.RevealedButton = RevealedButton;');
+  const ItemPanel = await component('src/components/common/ItemActionReveal.tsx', modules, 'ItemSwipeActions', '\nmodule.exports.ItemSwipeActions = ItemSwipeActions;');
+  for (const side of ['left', 'right']) {
+    for (const progress of [0, 1]) {
+      const tree = Actions({ progress: shared(progress), translation: shared(side === 'left' ? 180 * progress : -180 * progress), rowProgress: shared(0), side, dark: true, transaction: { title: 'Dinner' }, requestAction() {} });
+      const buttons = all(tree, node => node.type === 'AnimatedView' && node.props.style.opacity !== undefined);
+      assert.equal(buttons.length, 2);
+      const panel = all(tree, node => node.type === 'AnimatedView' && Array.isArray(node.props.style))[0];
+      const translation = nativeViews.StyleSheet.flatten(panel.props.style).transform[0].translateX;
+      assert.equal(translation, (side === 'left' ? -1 : 1) * 180 * (1 - progress), 'only the physically exposed strip can contain actions');
+      for (const button of buttons) {
+        assert.equal(button.props.style.opacity, progress, `${side} panel visibility follows its own progress`);
+        assert.ok(button.props.style.transform.every(value => !('scale' in value)), 'Glass actions do not stretch');
+        assert.equal(button.props.children.props.nativeGlass, false, 'revealed actions are flat and can fade safely');
+      }
+      const item = ItemButton({ progress: shared(progress), label: 'Edit', name: 'Bank card', onPress() {} });
+      assert.equal(item.props.style.opacity, progress);
+      assert.equal(item.props.children.props.nativeGlass, false);
+      const itemPanel = ItemPanel({ progress: shared(progress), translation: shared((side === 'left' ? 1 : -1) * 104 * progress), side, width: 104, compact: true, name: 'Bank card', disabled: false, onEdit() {} });
+      assert.equal(itemPanel.props.style.overflow, 'hidden');
+      assert.equal(nativeViews.StyleSheet.flatten(itemPanel.props.children.props.style).transform[0].translateX, (side === 'left' ? -1 : 1) * 104 * (1 - progress));
+    }
+  }
+});
+
+test('long dynamic Glass selections keep full labels while short fixed groups slide natively', async () => {
+  const Value = class { stopAnimation() {} setValue() {} };
+  const mode = { isLiquidGlassEnabled: true, themeMode: 'dark', selectionStyle: 'chips' };
+  const modules = {
+    react: { ...React, useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}], useEffect() {} },
+    'react-native': { ...nativeViews, Platform: { OS: 'ios' }, Animated: { Value } },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => mode },
+    '../../utils/haptics': { triggerSelection() {} },
+    './ScrollEdgeFade': { HorizontalEdgeFade: 'EdgeFade', useHorizontalScrollEdges: () => ({}) },
+    './DropdownSelect': { DropdownSelect: 'Dropdown' },
+    './AppleSlidingSelector': { AppleSlidingSelector: 'SlidingSelector' },
+    '../../constants/buttonSizes': { COMPACT_BUTTON_HEIGHT: 36, COMPACT_BUTTON_HIT_SLOP: {} },
+  };
+  const Radio = await component('src/components/common/JellyRadio.tsx', modules, 'JellyRadio');
+  let selected;
+  const name = 'Sai Ardhendu Kar';
+  const dynamic = Radio({ scrollable: true, items: ['You', name, 'Pranjal'], value: 'You', onChange: value => { selected = value; } });
+  assert.equal(all(dynamic, node => node.type === 'SlidingSelector').length, 0, 'dynamic labels never share equal-width native slots');
+  const chips = all(dynamic, node => node.props.item);
+  const chip = chips[1].type(chips[1].props);
+  assert.equal(all(chip, node => node.type === 'Text')[0].props.children, name);
+  assert.equal(nativeViews.StyleSheet.flatten(chip.props.style).width, undefined, 'chip width follows its label');
+  chip.props.onPress(); assert.equal(selected, name);
+  const periods = Radio({ items: ['All', 'Date', 'Month', 'Year'], value: 'All' });
+  assert.equal(periods.type, 'SlidingSelector');
+  const preferences = Radio({ presentation: 'chips', items: ['Liquid Glass', 'Matte Surface'], value: 'Liquid Glass', onChange: value => { selected = value; } });
+  preferences.props.onChange('Matte Surface', 1); assert.equal(selected, 'Matte Surface', 'surface preference commits on native selection');
+  mode.selectionStyle = 'dropdown';
+  assert.equal(Radio({ scrollable: true, items: ['You', name], value: 'You' }).type, 'Dropdown');
 });

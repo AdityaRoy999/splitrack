@@ -118,6 +118,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setTransactionActionStyle,
   } = useLiquidGlass();
   const transactionActions = useTransactionActions();
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
 
   const {
     eraseAllData,
@@ -324,11 +325,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     <View style={[styles.pageContainer, { backgroundColor: rootBg }]}>
       <ScrollView
         style={styles.scrollView}
+        automaticallyAdjustContentInsets={nativeGlass ? false : undefined}
+        contentInsetAdjustmentBehavior={nativeGlass ? 'never' : undefined}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: Math.max(16, insets.top + 10),
+            paddingTop: nativeGlass ? Math.max(10, 16 - insets.top) : Math.max(16, insets.top + 10),
             paddingBottom: Math.max(128, insets.bottom + 88),
           },
         ]}
@@ -336,6 +339,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         {/* Natural Scrolling Header Bar (not stuck) */}
         <View style={styles.headerRow}>
           <AnimatedPressable
+            nativeGlass
             scaleTo={0.92}
             onPress={() => {
               triggerImpact(ImpactStyle.Light);
@@ -376,7 +380,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
         <GlassSurface style={[styles.joinedCard, { backgroundColor: cardBg }]}>
           <View style={styles.joinedSection}><Text style={[styles.sectionHeader, { color: mutedText }]}>ACCOUNT SIGN-IN</Text></View>
-          <TouchableOpacity activeOpacity={0.7} style={styles.navRowItem} onPress={openGoogleLink}
+          <TouchableOpacity nativeGlass={false} activeOpacity={0.7} style={styles.navRowItem} onPress={openGoogleLink}
             disabled={googleLinked || googlePending || pending} accessibilityRole="button" accessibilityLabel={googleLinked ? 'Google account synced' : 'Sync with Google'}>
             <GlassPanel style={[styles.navIconBox, { backgroundColor: chipBg }]}>
               <Image source={require('../../../assets/auth/google-g.png')} style={{ width: 20, height: 20 }} resizeMode="contain" />
@@ -722,6 +726,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           {/* Action Buttons Row */}
           <View style={styles.importButtonsRow}>
             <AnimatedPressable
+              nativeGlass
               scaleTo={0.96}
               onPress={handlePickFile}
               disabled={isParsing || pending || importPending}
@@ -740,6 +745,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </AnimatedPressable>
 
             <AnimatedPressable
+              nativeGlass
               scaleTo={0.96}
               onPress={() => {
                 triggerSmoothLayout(240);
@@ -772,6 +778,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 onChangeText={setJsonInputText}
               />
               <AnimatedPressable
+                nativeGlass
                 scaleTo={0.96}
                 onPress={handleParsePastedJson}
                 contentStyle={[styles.parseJsonBtn, { backgroundColor: activeBg }]}
@@ -850,6 +857,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <FormError message={importError} />
                 <View style={styles.confirmActionRow}>
                   <AnimatedPressable
+                    nativeGlass
                     scaleTo={0.96}
                     onPress={handleConfirmImport}
                     disabled={pending || importPending}
@@ -865,6 +873,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   </AnimatedPressable>
 
                   <AnimatedPressable
+                    nativeGlass
                     scaleTo={0.96}
                     onPress={() => {
                       triggerSmoothLayout(240);
@@ -886,6 +895,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         {/* Data Management Section */}
         <View style={styles.dataActionsSection}>
           <TouchableOpacity
+            nativeGlass
             onPress={transactionActions.openDeleted}
             style={[styles.resetBtn, { backgroundColor: cardBg }]}
             activeOpacity={0.7} accessibilityRole="button"
@@ -896,6 +906,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </TouchableOpacity>
           {/* Erase All Data Button */}
           <TouchableOpacity
+            nativeGlass
             onPress={handleEraseAllData}
             style={[
               styles.eraseBtn,
@@ -913,6 +924,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {onSignOut && (
             <TouchableOpacity
+              nativeGlass
               onPress={onSignOut}
               disabled={googlePending}
               style={[styles.resetBtn, { backgroundColor: cardBg }]}

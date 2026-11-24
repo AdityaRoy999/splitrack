@@ -95,7 +95,8 @@ function computeSmoothCurve(points: PointCoord[]): {
 export const SplineChart: React.FC = () => {
   const { width: windowWidth } = useWindowDimensions();
   const { chartData, transactions } = useSplitTrack();
-  const { themeMode, formatAmount } = useLiquidGlass();
+  const { themeMode, formatAmount, isLiquidGlassEnabled } = useLiquidGlass();
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
 
   const [granularity, setGranularity] = useState<CashFlowGranularity>('Month');
   const [requestedGranularity, setRequestedGranularity] = useState<CashFlowGranularity>('Month');
@@ -296,7 +297,7 @@ export const SplineChart: React.FC = () => {
   ] }));
 
   const textColor = isDark ? '#F4F4F5' : '#09090B';
-  const mutedText = isDark ? '#8E8E93' : '#71717A';
+  const mutedText = isDark ? nativeGlass ? '#A1A1AA' : '#8E8E93' : '#71717A';
   const surfacePill = isDark ? '#18181D' : '#F3F4F6';
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';
@@ -316,13 +317,13 @@ export const SplineChart: React.FC = () => {
       <View>
       <FormError message={analytics.error} />
         {/* Header with Stats on left + Calendar Button & Date/Month/Year Selector on right */}
-        <View style={styles.header} {...gestureHandlers}>
-          <View style={styles.headerLeft}>
+        <View style={[styles.header, nativeGlass && styles.glassHeader]} {...gestureHandlers}>
+          <View style={[styles.headerLeft, nativeGlass && styles.glassHeaderStats]}>
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.8}
-              style={[styles.statSublabel, { color: isDark ? '#FFFFFF' : '#18181B' }]}
+              style={[styles.statSublabel, { color: isDark ? '#FFFFFF' : '#18181B' }, nativeGlass && styles.glassStat]}
             >
               {activePoint ? `${formatAmount(activePoint.income)} Income` : `${formatAmount(0)} Income`}
             </Text>
@@ -330,14 +331,16 @@ export const SplineChart: React.FC = () => {
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.8}
-              style={[styles.statSublabelExpense, { color: mutedText }]}
+              style={[styles.statSublabelExpense, { color: mutedText }, nativeGlass && styles.glassStat]}
             >
               {activePoint ? `${formatAmount(activePoint.expense)} Expenses` : `${formatAmount(0)} Expenses`}
             </Text>
           </View>
 
-          <View style={styles.headerRightControls}>
+          <View style={[styles.headerRightControls, nativeGlass && styles.glassHeaderControls]}>
             <AnimatedPressable
+              nativeGlass
+              style={nativeGlass ? { flexShrink: 0 } : undefined}
               scaleTo={0.92}
               onPress={() => setShowCalendar(true)}
               accessibilityLabel="Open calendar date picker for cash flow"
@@ -359,6 +362,7 @@ export const SplineChart: React.FC = () => {
             </AnimatedPressable>
 
             <JellyRadio
+              style={nativeGlass ? styles.glassSelector : undefined}
               items={['Date', 'Month', 'Year']}
               value={requestedGranularity}
               onChange={(val) => {
@@ -403,6 +407,7 @@ export const SplineChart: React.FC = () => {
               numberOfLines={1}
               style={[
                 styles.gestureHintText,
+                nativeGlass && { fontSize: 12 },
                 { color: isMonthHoldReady ? '#10B981' : mutedText },
               ]}
             >
@@ -479,7 +484,7 @@ export const SplineChart: React.FC = () => {
                 <Text style={[styles.tooltipAmount, { color: isDark ? '#000000' : '#FFFFFF' }]}>
                   {formatAmount(activePoint.expense)}
                 </Text>
-                <Text style={[styles.tooltipDate, { color: isDark ? '#71717A' : '#A1A1AA' }]}>
+                <Text style={[styles.tooltipDate, { color: isDark ? '#71717A' : '#A1A1AA' }, nativeGlass && { fontSize: 11 }]}>
                   {activePoint.fullLabel}
                 </Text>
                 </Reanimated.View>
@@ -599,6 +604,7 @@ export const SplineChart: React.FC = () => {
 
                 return (
                   <TouchableOpacity
+                    nativeGlass={false}
                     key={`${d.key}-${i}`}
                     onPress={() => handleSelectPoint(i)}
                     {...(Platform.OS === 'web'
@@ -610,6 +616,7 @@ export const SplineChart: React.FC = () => {
                       numberOfLines={1}
                       style={[
                         styles.axisLabel,
+                        nativeGlass && { fontSize: 12 },
                         {
                           textAlign: 'center',
                           color:
@@ -617,7 +624,9 @@ export const SplineChart: React.FC = () => {
                               ? isDark
                                 ? '#FFFFFF'
                                 : '#000000'
-                              : isDark
+                              : nativeGlass
+                                ? mutedText
+                                : isDark
                                 ? '#52525B'
                                 : '#9CA3AF',
                           fontWeight: safeIndex === i ? '600' : '400',
@@ -692,6 +701,11 @@ const styles = StyleSheet.create({
     gap: 5,
     flexShrink: 0,
   },
+  glassHeader: { flexDirection: 'column', alignItems: 'stretch', gap: 10 },
+  glassHeaderStats: { flex: 0, flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  glassStat: { flex: 1, minWidth: 0 },
+  glassHeaderControls: { width: '100%', minWidth: 0 },
+  glassSelector: { flex: 1, minWidth: 0, width: undefined },
   calendarIconBtn: {
     ...COMPACT_ICON_BUTTON_STYLE,
     borderRadius: 18,

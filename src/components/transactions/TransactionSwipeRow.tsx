@@ -25,24 +25,28 @@ function SwipeActions({ progress, translation, rowProgress, side, dark, transact
   // Both panels receive the same row translation. Use one writer for the card,
   // and each panel's own progress so the hidden panel stays still.
   useAnimatedReaction(() => Math.max(-1, Math.min(1, translation.get() / ACTION_WIDTH)), value => { if (side === 'left') rowProgress.set(value); });
+  const panelMotion = useAnimatedStyle(() => {
+    const exposed = Math.max(0, Math.min(ACTION_WIDTH, side === 'left' ? translation.get() : -translation.get()));
+    return nativeGlass ? { transform: [{ translateX: (side === 'left' ? -1 : 1) * (ACTION_WIDTH - exposed) }] } : {};
+  });
   const editMotion = useAnimatedStyle(() => {
     const reveal = Math.max(0, Math.min(1, (progress.get() - 0.08) / 0.82));
-    return nativeGlass ? { transform: [{ translateX: (side === 'right' ? 8 : -8) * (1 - reveal) }] } : { opacity: reveal, transform: [{ scale: 0.78 + 0.22 * reveal }, { translateX: (side === 'right' ? 8 : -8) * (1 - reveal) }] };
+    return nativeGlass ? { opacity: reveal, transform: [{ translateX: (side === 'right' ? 8 : -8) * (1 - reveal) }] } : { opacity: reveal, transform: [{ scale: 0.78 + 0.22 * reveal }, { translateX: (side === 'right' ? 8 : -8) * (1 - reveal) }] };
   });
   const deleteMotion = useAnimatedStyle(() => {
     const reveal = Math.max(0, Math.min(1, (progress.get() - 0.2) / 0.8));
-    return nativeGlass ? { transform: [{ translateX: (side === 'right' ? 10 : -10) * (1 - reveal) }] } : { opacity: reveal, transform: [{ scale: 0.78 + 0.22 * reveal }, { translateX: (side === 'right' ? 10 : -10) * (1 - reveal) }] };
+    return nativeGlass ? { opacity: reveal, transform: [{ translateX: (side === 'right' ? 10 : -10) * (1 - reveal) }] } : { opacity: reveal, transform: [{ scale: 0.78 + 0.22 * reveal }, { translateX: (side === 'right' ? 10 : -10) * (1 - reveal) }] };
   });
-  return <View style={styles.actions}>
-    <Animated.View style={editMotion}><Pressable accessibilityRole="button" accessibilityLabel={`Edit ${transaction.title}`}
+  return <View style={[styles.actionViewport, nativeGlass && { overflow: 'hidden' }]}><Animated.View style={[styles.actions, panelMotion]}>
+    <Animated.View style={editMotion}><Pressable nativeGlass={false} accessibilityRole="button" accessibilityLabel={`Edit ${transaction.title}`}
       hitSlop={COMPACT_BUTTON_HIT_SLOP} onPress={() => requestAction('edit')} style={[styles.action, { backgroundColor: dark ? '#1C1C22' : '#E5E5EA' }]}>
       <Pen2Icon size={16} color={dark ? '#FFFFFF' : '#18181B'} /><Text style={[styles.label, { color: dark ? '#FFFFFF' : '#18181B' }]}>Edit</Text>
     </Pressable></Animated.View>
-    <Animated.View style={deleteMotion}><Pressable accessibilityRole="button" accessibilityLabel={`Delete ${transaction.title}`}
+    <Animated.View style={deleteMotion}><Pressable nativeGlass={false} accessibilityRole="button" accessibilityLabel={`Delete ${transaction.title}`}
       hitSlop={COMPACT_BUTTON_HIT_SLOP} onPress={() => requestAction('remove')} style={[styles.action, styles.delete]}>
       <TrashBinTrashIcon size={16} color="#FFFFFF" /><Text style={styles.label}>Delete</Text>
     </Pressable></Animated.View>
-  </View>;
+  </Animated.View></View>;
 }
 
 // The installed gesture library animates and tracks the row on the UI thread.
@@ -123,6 +127,7 @@ export function TransactionSwipeRow({ transaction, children }: { transaction: Tr
 const styles = StyleSheet.create({
   row: { borderWidth: 0 },
   card: { overflow: 'hidden', borderWidth: 0 },
+  actionViewport: { width: ACTION_WIDTH, justifyContent: 'center' },
   actions: { width: ACTION_WIDTH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 4 },
   inlineActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, paddingHorizontal: 12, paddingBottom: 10 },
   action: { width: 66, height: COMPACT_BUTTON_HEIGHT, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 12, borderWidth: 0 },

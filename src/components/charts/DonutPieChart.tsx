@@ -77,8 +77,9 @@ function DonutSegment({ selected, focused, strokeWidth, ...props }: React.Compon
 export const DonutPieChart: React.FC = () => {
   const { width: windowWidth } = useWindowDimensions();
   const { categoryMetrics, categories, transactions } = useSplitTrack();
-  const { formatAmount, themeMode } = useLiquidGlass();
+  const { formatAmount, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
 
   const [granularity, setGranularity] = useState<DistributionGranularity>('All');
   const [requestedGranularity, setRequestedGranularity] = useState<DistributionGranularity>('All');
@@ -310,7 +311,7 @@ export const DonutPieChart: React.FC = () => {
           : `Year ${selectedYear}`;
 
   const textColor = isDark ? '#F4F4F5' : '#09090B';
-  const mutedText = isDark ? '#8E8E93' : '#71717A';
+  const mutedText = isDark ? nativeGlass ? '#A1A1AA' : '#8E8E93' : '#71717A';
   const surfacePill = isDark ? '#1B1B20' : '#F3F4F6';
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';
@@ -327,6 +328,7 @@ export const DonutPieChart: React.FC = () => {
             Category distribution
           </Text>
           <AnimatedPressable
+            nativeGlass={false}
             scaleTo={0.94}
             disabled={!selectedSegment}
             onPress={() => selectedSegment && handleSelect(selectedSegment.id)}
@@ -343,6 +345,7 @@ export const DonutPieChart: React.FC = () => {
             <Text
               style={[
                 styles.shareBadgeText,
+                nativeGlass && { fontSize: 12 },
                 {
                   color:
                     selectedSegment && selectedColor ? textColor : mutedText,
@@ -358,8 +361,10 @@ export const DonutPieChart: React.FC = () => {
 
         {/* Inline Calendar Icon Button + Granularity JellyRadio */}
         <View style={styles.filterSection} {...gestureHandlers}>
-          <View style={styles.filterInlineRow}>
+          <View style={[styles.filterInlineRow, nativeGlass && styles.glassFilterRow]}>
             <AnimatedPressable
+              nativeGlass
+              style={nativeGlass ? { flexShrink: 0 } : undefined}
               scaleTo={0.92}
               onPress={() => setShowCalendar(true)}
               accessibilityLabel="Open calendar date picker for category distribution"
@@ -381,6 +386,7 @@ export const DonutPieChart: React.FC = () => {
             </AnimatedPressable>
 
             <JellyRadio
+              style={nativeGlass ? styles.glassSelector : undefined}
               items={['All', 'Date', 'Month', 'Year']}
               value={requestedGranularity}
               onChange={(val) => {
@@ -421,6 +427,7 @@ export const DonutPieChart: React.FC = () => {
             <Text
               style={[
                 styles.gestureHintText,
+                nativeGlass && { fontSize: 12 },
                 { color: isMonthHoldReady ? '#10B981' : mutedText },
               ]}
             >
@@ -552,20 +559,23 @@ export const DonutPieChart: React.FC = () => {
 
               {/* Center Focus Readout */}
               <AnimatedPressable
+                nativeGlass={false}
                 scaleTo={0.96}
                 disabled={!selectedSegment}
                 onPress={() => {
                   setHoveredId(null);
                   if (selectedId) setSelectedId(null);
                 }}
-                style={styles.centerTouchable}
+                style={[styles.centerTouchable, nativeGlass && { width: size - strokeWidth * 2 - 12 }]}
                 contentStyle={styles.centerContainer}
               >
-                <Reanimated.View key={`${activeId ?? 'total'}:${centerDisplay}`} entering={READOUT_ENTER} style={styles.readout}>
+                <Reanimated.View key={`${activeId ?? 'total'}:${centerDisplay}`} entering={READOUT_ENTER}
+                  style={[styles.readout, nativeGlass && { width: '100%' }]}>
                 <Text style={[styles.centerCaption, { color: mutedText }]}>
                   {selectedSegment ? `${selectedSegment.pct}% OF SPEND` : 'TOTAL SPEND'}
                 </Text>
-                <Text style={[styles.centerAmount, { color: textColor }]}>
+                <Text numberOfLines={nativeGlass ? 1 : undefined} adjustsFontSizeToFit={nativeGlass}
+                  minimumFontScale={0.7} style={[styles.centerAmount, { color: textColor }, nativeGlass && { width: '100%', textAlign: 'center' }]}>
                   {centerDisplay}
                 </Text>
                 <Text style={[styles.centerLabel, { color: mutedText }]} numberOfLines={1}>
@@ -581,6 +591,7 @@ export const DonutPieChart: React.FC = () => {
                 const isSelected = activeId === seg.id;
                 return (
                   <AnimatedPressable
+                    nativeGlass={false}
                     key={seg.id}
                     scaleTo={0.94}
                     onPress={() => handleSelect(seg.id)}
@@ -709,6 +720,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
+  glassFilterRow: { width: '100%', minWidth: 0 },
+  glassSelector: { flex: 1, minWidth: 0, width: undefined },
   calendarIconBtn: {
     ...COMPACT_ICON_BUTTON_STYLE,
     borderRadius: 18,

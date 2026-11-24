@@ -239,11 +239,11 @@ function MainAppContent({
     () => [
       styles.scrollContent,
       {
-        paddingTop: insets.top + 10,
+        paddingTop: nativeTabs ? 10 : insets.top + 10,
         paddingBottom: 114,
       },
     ],
-    [insets.top]
+    [insets.top, nativeTabs]
   );
 
   const categoryFilterItems = useMemo(
@@ -272,6 +272,8 @@ function MainAppContent({
         <ScrollView
           key={`member-detail-scroll-${activeMember.id}`}
           style={styles.scrollView}
+          automaticallyAdjustContentInsets={nativeTabs ? false : undefined}
+          contentInsetAdjustmentBehavior={nativeTabs ? 'never' : undefined}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={dynamicScrollContent}
         >
@@ -308,6 +310,8 @@ function MainAppContent({
         <ScrollView
           key="members-page-scroll"
           style={styles.scrollView}
+          automaticallyAdjustContentInsets={nativeTabs ? false : undefined}
+          contentInsetAdjustmentBehavior={nativeTabs ? 'never' : undefined}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={dynamicScrollContent}
         >
@@ -343,6 +347,8 @@ function MainAppContent({
       <ScrollView
         key="home-tab-scroll"
         style={styles.scrollView}
+        automaticallyAdjustContentInsets={nativeTabs ? false : undefined}
+        contentInsetAdjustmentBehavior={nativeTabs ? 'never' : undefined}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={dynamicScrollContent}
       >
@@ -405,7 +411,7 @@ function MainAppContent({
       </ScrollView>
     );
   }, [dynamicScrollContent, formatAmount, friends, handleSelectFriend, hideHeaderLogo,
-    homeView, isDark, navigateTab, onHeaderLogoLayout, onHeaderLogoNode, openQuickExpense, openExpenseEditor,
+    homeView, isDark, nativeTabs, navigateTab, onHeaderLogoLayout, onHeaderLogoNode, openQuickExpense, openExpenseEditor,
     selectedMemberId, textColor, totalExpenses, totalIncome, totalOwedToYou,
     totalYouOwe, userDisplayName]);
 
@@ -428,6 +434,8 @@ function MainAppContent({
       <ScrollView
         key="expenses-tab-scroll"
         style={styles.scrollView}
+        automaticallyAdjustContentInsets={nativeTabs ? false : undefined}
+        contentInsetAdjustmentBehavior={nativeTabs ? 'never' : undefined}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={dynamicScrollContent}
       >
@@ -466,7 +474,7 @@ function MainAppContent({
             <View style={styles.filterWrap}>
               <View style={styles.filterChipsCol}>
                 <JellyRadio
-                  scrollable
+                  scrollable={!nativeTabs}
                   fadeColor={rootBg}
                   items={['All', 'Expenses', 'Splits', 'Income']}
                   value={expenseFilter}
@@ -483,6 +491,7 @@ function MainAppContent({
               </View>
 
               <AnimatedPressable
+                nativeGlass
                 scaleTo={0.92}
                 onPress={() => setShowCalendarModal(true)}
                 accessibilityLabel="Open calendar date filter"
@@ -531,6 +540,7 @@ function MainAppContent({
               <View style={styles.catActionsRow}>
                 {selectedCategoryFilter !== 'All' && (
                   <AnimatedPressable
+                    nativeGlass
                     scaleTo={0.92}
                     onPress={() => {
                       const match = categories.find(
@@ -548,6 +558,7 @@ function MainAppContent({
                   </AnimatedPressable>
                 )}
                 <AnimatedPressable
+                  nativeGlass
                   scaleTo={0.92}
                   onPress={() => {
                     setCategoryToEdit(null);
@@ -567,6 +578,7 @@ function MainAppContent({
                   Filtered to {formatDisplayDate(selectedExpenseDate, true)} ({filteredTransactions.length})
                 </Text>
                 <AnimatedPressable
+                  nativeGlass
                   scaleTo={0.94}
                   onPress={() => setSelectedExpenseDate(null)}
                   accessibilityLabel="Clear date filter"
@@ -681,7 +693,7 @@ function MainAppContent({
       </ScrollView>
     );
   }, [activeBg, activeText, categories, categoryFilterItems, chipBg, dividerColor,
-    dynamicScrollContent, expenseFilter, formatAmount, isDark, mutedText, openQuickExpense, rootBg,
+    dynamicScrollContent, expenseFilter, formatAmount, isDark, mutedText, nativeTabs, openQuickExpense, rootBg,
     selectedCategoryFilter, selectedExpenseDate, textColor, totalExpenses, transactions, hasMoreTransactions, loadMoreTransactions, transactionActions]);
 
   const renderTripsTab = useCallback(() => {
@@ -691,6 +703,8 @@ function MainAppContent({
         <ScrollView
           key={`trip-detail-scroll-${activeTrip.id}`}
           style={styles.scrollView}
+          automaticallyAdjustContentInsets={nativeTabs ? false : undefined}
+          contentInsetAdjustmentBehavior={nativeTabs ? 'never' : undefined}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={dynamicScrollContent}
         >
@@ -735,6 +749,8 @@ function MainAppContent({
       <ScrollView
         key="trips-hub-scroll"
         style={styles.scrollView}
+        automaticallyAdjustContentInsets={nativeTabs ? false : undefined}
+        contentInsetAdjustmentBehavior={nativeTabs ? 'never' : undefined}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={dynamicScrollContent}
       >
@@ -788,6 +804,7 @@ function MainAppContent({
               </View>
               <View style={styles.tripActions}>
                 {transactionActionStyle === 'buttons' && removableTrips.length > 0 ? <AnimatedPressable
+                  nativeGlass
                   onPress={() => { setRemovingTrips(!removalMode); setTripRemovalError(''); }}
                   accessibilityLabel={removalMode ? 'Finish removing trips' : 'Remove trips'}
                   accessibilityState={{ selected: removalMode }}
@@ -797,6 +814,7 @@ function MainAppContent({
                   {removalMode ? <CheckCircleIcon size={20} color="#10B981" /> : <TrashBinTrashIcon size={20} color="#FFFFFF" />}
                 </AnimatedPressable> : null}
                 <AnimatedPressable
+                  nativeGlass
                   accessibilityLabel="Add a trip or group"
                   contentStyle={[styles.tripRemoveToggle, { backgroundColor: isDark ? '#242428' : '#EFEFF4' }]}
                   hitSlop={COMPACT_BUTTON_HIT_SLOP}
@@ -991,7 +1009,7 @@ function MainAppContent({
       </ScrollView>
     );
   }, [categories, dividerColor, dynamicScrollContent, formatAmount, friends,
-    getSimplifiedDebts, isDark, mutedText, selectedTripId, textColor,
+    getSimplifiedDebts, isDark, mutedText, nativeTabs, selectedTripId, textColor,
     totalOwedToYou, totalYouOwe, transactions, trips, removalMode, removableTrips.length,
     removeTrip, tripRemovalError, user?.uid, transactionActions, transactionActionStyle, openExpenseEditor]);
 
@@ -999,6 +1017,8 @@ function MainAppContent({
     <ScrollView
       key="analytics-tab-scroll"
       style={styles.scrollView}
+      automaticallyAdjustContentInsets={nativeTabs ? false : undefined}
+      contentInsetAdjustmentBehavior={nativeTabs ? 'never' : undefined}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={dynamicScrollContent}
     >
@@ -1014,6 +1034,7 @@ function MainAppContent({
               Expense Breakdown
             </Text>
             <AnimatedPressable
+              nativeGlass
               scaleTo={0.9}
               onPress={() => setShowAnalyticsInfo(true)}
               accessibilityLabel="Analytics instructions"
@@ -1038,7 +1059,7 @@ function MainAppContent({
         </View>
       </View>
     </ScrollView>
-  ), [chipBg, dynamicScrollContent, textColor]);
+  ), [chipBg, dynamicScrollContent, nativeTabs, textColor]);
 
   return (
     <SettingsAvatarTransitionProvider onOpen={() => setShowSettings(true)}>
@@ -1050,8 +1071,10 @@ function MainAppContent({
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <CloudStatus />
 
-      <View collapsable={false} style={[styles.mainViewport, { backgroundColor: rootBg }]}>
-        <View style={[styles.tabPagesContainer, { backgroundColor: rootBg }]}>
+      {/* The page viewport starts below the status bar. Scrolling content cannot
+          cross into the system area or require another blur/material overlay. */}
+      <View collapsable={false} style={[styles.mainViewport, { backgroundColor: rootBg, paddingTop: nativeTabs ? insets.top : 0 }]}>
+        <View style={[styles.tabPagesContainer, { backgroundColor: rootBg }, nativeTabs && { height: undefined }]}>
           <View style={styles.nativeTabsHost}>{routedScreens}</View>
           {showSettings ? (
             <View style={styles.settingsOverlay}><TabScene active duration={340} offsetY={0}><View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>

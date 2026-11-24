@@ -68,6 +68,15 @@ interface AddExpenseModalProps {
   embedded?: boolean;
 }
 
+// The native sheet already supplies the material. Keep its form groups quiet
+// so fields and participant rows do not stack several glass layers together.
+function ExpenseSection({ children, nativeGlass, isDark }: {
+  children: React.ReactNode; nativeGlass: boolean; isDark: boolean;
+}) {
+  if (nativeGlass) return <View style={[styles.sectionCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.03)' }]}>{children}</View>;
+  return <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>{children}</GlassSurface>;
+}
+
 export const AddExpenseModal = memo(function AddExpenseModal({
   visible,
   onClose,
@@ -83,6 +92,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
   const { profile } = useAuth();
   const { currency, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
 
   const [title, setTitle] = useState(transactionToEdit?.title || '');
   const [amountStr, setAmountStr] = useState(transactionToEdit ? String(Math.abs(transactionToEdit.amount)) : '');
@@ -579,7 +589,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
-  const mutedText = isDark ? '#8E8E93' : '#71717A';
+  const mutedText = isDark ? nativeGlass ? '#A1A1AA' : '#8E8E93' : '#71717A';
 
 
   const categoryItems = useMemo(
@@ -857,7 +867,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
           <SheetHandle style={styles.dragHandleWrap} handleStyle={[styles.dragHandle, { backgroundColor: isDark ? '#27272A' : '#D4D4D8' }]} />
 
           <View style={styles.headerRow}>
-            <View>
+            <View style={nativeGlass ? styles.headerText : undefined}>
               <Text style={[styles.title, { color: textColor }]}>{transactionToEdit ? 'Edit transaction' : 'Add & Split Expense'}</Text>
               <Text style={[styles.subtitleText, { color: mutedText }]}>
                 {splitType === 'equal'
@@ -873,9 +883,9 @@ export const AddExpenseModal = memo(function AddExpenseModal({
           </View>
 
           <ScrollEdgeFade style={styles.scrollAreaWrap}>
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={[styles.scrollContent, nativeGlass && { paddingBottom: 32 }]} showsVerticalScrollIndicator={false}>
             {/* Amount, Description & Category */}
-            <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>
+            <ExpenseSection nativeGlass={nativeGlass} isDark={isDark}>
               <GlassPanel style={[styles.amountInputBox, { backgroundColor: inputBg }]}>
                 <Text style={[styles.currencySymbol, { color: textColor }]}>{currSym}</Text>
                 <TextInput
@@ -928,6 +938,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                 <View style={styles.catActionsRow}>
                   {category ? (
                     <AnimatedPressable
+                      nativeGlass
                       scaleTo={0.94}
                       hitSlop={COMPACT_BUTTON_HIT_SLOP}
                       onPress={() => {
@@ -949,6 +960,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                     </AnimatedPressable>
                   ) : null}
                   <AnimatedPressable
+                    nativeGlass
                     scaleTo={0.94}
                     hitSlop={COMPACT_BUTTON_HIT_SLOP}
                     onPress={() => {
@@ -987,15 +999,15 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                 onPress={() => setShowDatePicker(true)}
                 contentStyle={[styles.dateSelectorBtn, { backgroundColor: inputBg }]}
               >
-                <View style={styles.dateLeft}>
+                <View style={[styles.dateLeft, nativeGlass && { flex: 1, minWidth: 0 }]}>
                   <CalendarDateIcon size={16} color={textColor} />
-                  <Text style={[styles.dateValueText, { color: textColor }]}>
+                  <Text style={[styles.dateValueText, { color: textColor }, nativeGlass && { flexShrink: 1 }]}>
                     {selectedDate === getTodayLocalISO()
                       ? `Today • ${formatDisplayDate(selectedDate, true)}`
                       : formatDisplayDate(selectedDate, true)}
                   </Text>
                 </View>
-                <View style={styles.dateRight}>
+                <View style={[styles.dateRight, nativeGlass && { flexShrink: 0, marginLeft: 8 }]}>
                   <Text style={[styles.dateChangeHint, { color: mutedText }]}>Change</Text>
                   <AltArrowRightIcon size={14} color={mutedText} />
                 </View>
@@ -1071,13 +1083,13 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   style={styles.locationChipsScroll}
                 />
               )}
-            </GlassSurface>
+            </ExpenseSection>
 
             {/* Paid By, UPI Profile & Trip Group */}
-            <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>
+            <ExpenseSection nativeGlass={nativeGlass} isDark={isDark}>
               <Text style={[styles.fieldLabel, { color: mutedText }]}>UPI OR CARD PROFILE</Text>
               {accounts.length === 0 ? <Text style={[styles.noPayerText, { color: mutedText, marginBottom: 12 }]}>Add a UPI or card profile in Settings to choose it here.</Text> : null}
-              <JellyRadio
+              {!nativeGlass || accounts.length > 0 ? <JellyRadio
                 scrollable
                 fadeColor={cardBg}
                 items={accounts.map((acc) => ({
@@ -1096,11 +1108,12 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                 size="sm"
                 gap={8}
                 radius={999}
-              />
+              /> : null}
 
               <View style={styles.paidByHeaderRow}>
                 <Text style={[styles.fieldLabel, { color: mutedText, marginBottom: 0 }]}>PAID BY</Text>
                 <AnimatedPressable
+                  nativeGlass
                   scaleTo={0.9}
                   onPress={togglePaidBySearch}
                   hitSlop={COMPACT_BUTTON_HIT_SLOP}
@@ -1198,7 +1211,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                           ]}
                         >
                           <UserAvatar avatarUri={item.avatar} name={item.label} size={32} borderRadius={16} isDark={isDark} />
-                          <View style={styles.payerTextCol}>
+                          <View style={[styles.payerTextCol, nativeGlass && { minWidth: 0 }]}>
                             <Text style={[styles.payerNameText, { color: textColor }]}>{item.label}</Text>
                             <Text style={[styles.payerHandleText, { color: '#10B981' }]}>
                               {item.handle || `@${item.label.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`}
@@ -1256,16 +1269,17 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                 gap={8}
                 radius={999}
               />
-            </GlassSurface>
+            </ExpenseSection>
 
             {/* Split Among Whom using React Bits SpringCheck */}
-            <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>
-              <View style={styles.splitHeaderRow}>
+            <ExpenseSection nativeGlass={nativeGlass} isDark={isDark}>
+              <View style={[styles.splitHeaderRow, nativeGlass && { flexWrap: 'wrap', gap: 8 }]}>
                 <Text style={[styles.fieldLabel, { color: mutedText, marginBottom: 0 }]}>
                   SPLIT AMONG ({splitWithMembers.length})
                 </Text>
                 <View style={styles.splitHeaderActions}>
                   <AnimatedPressable
+                    nativeGlass
                     scaleTo={0.9}
                     onPress={toggleFriendSearch}
                     hitSlop={COMPACT_BUTTON_HIT_SLOP}
@@ -1457,7 +1471,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                   </GlassPanel>
                 )}
               </View>
-            </GlassSurface>
+            </ExpenseSection>
             </ScrollView>
           </ScrollEdgeFade>
 
@@ -1469,7 +1483,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
             variant="accent"
             size="lg"
             onPress={handleSave}
-            style={styles.saveBtn}
+            style={nativeGlass ? { ...styles.saveBtn, marginTop: 0 } : styles.saveBtn}
           />
           </SheetFooter>
         </GlassModalSheet>
@@ -1536,6 +1550,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     paddingHorizontal: 2,
   },
+  headerText: { flex: 1, minWidth: 0, marginRight: 12 },
   title: {
     fontSize: 19,
     fontWeight: '500',

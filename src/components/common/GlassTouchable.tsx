@@ -3,7 +3,8 @@ import { Platform, Pressable, StyleSheet, TouchableOpacity, type PressableProps,
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { AppleGlassPressable } from './AppleGlassPressable';
 
-export function GlassTouchable({ nativeGlass = true, ...props }: TouchableOpacityProps & { nativeGlass?: boolean }) {
+// Data rows retain their layout and events; standalone actions opt into glass.
+export function GlassTouchable({ nativeGlass = false, ...props }: TouchableOpacityProps & { nativeGlass?: boolean }) {
   const { isLiquidGlassEnabled } = useLiquidGlass();
   if (Platform.OS === 'ios' && isLiquidGlassEnabled && nativeGlass && props.onPress) return <AppleGlassPressable
     onPress={() => props.onPress?.({} as never)} onLongPress={props.onLongPress ? () => props.onLongPress?.({} as never) : undefined}
@@ -13,7 +14,7 @@ export function GlassTouchable({ nativeGlass = true, ...props }: TouchableOpacit
   return <TouchableOpacity {...props} />;
 }
 
-export function GlassPressable({ nativeGlass = true, ...props }: PressableProps & { nativeGlass?: boolean }) {
+export function GlassPressable({ nativeGlass = false, ...props }: PressableProps & { nativeGlass?: boolean }) {
   const { isLiquidGlassEnabled } = useLiquidGlass();
   if (Platform.OS === 'ios' && isLiquidGlassEnabled && nativeGlass && props.onPress) return <AppleGlassPressable
     onPress={() => props.onPress?.({} as never)} onLongPress={props.onLongPress ? () => props.onLongPress?.({} as never) : undefined}
@@ -36,5 +37,6 @@ function contentLayout(style: StyleProp<ViewStyle> | undefined): ViewStyle {
   return { flexDirection: flat.flexDirection, alignItems: flat.alignItems, justifyContent: flat.justifyContent,
     padding: flat.padding, paddingVertical: flat.paddingVertical, paddingHorizontal: flat.paddingHorizontal,
     paddingTop: flat.paddingTop, paddingBottom: flat.paddingBottom, paddingLeft: flat.paddingLeft, paddingRight: flat.paddingRight,
-    gap: flat.gap, rowGap: flat.rowGap, columnGap: flat.columnGap, height: flat.height, minHeight: flat.minHeight, borderRadius: flat.borderRadius };
+    gap: flat.gap, rowGap: flat.rowGap, columnGap: flat.columnGap, height: flat.height, minHeight: flat.minHeight,
+    borderRadius: flat.borderRadius, backgroundColor: flat.backgroundColor };
 }
