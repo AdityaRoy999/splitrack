@@ -179,12 +179,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/main/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.5901",
-      "versionDate": "2026-11-24T10:48:39.002Z",
-      "versionDescription": "Problem: liquid glass problem\nAction taken: fixed the UI for the liquid glass",
-      "downloadURL": "https://github.com/AdityaRoy999/splittrack-releases/releases/download/splittrack-ios-59-attempt-1/Splittrack-unsigned.ipa",
-      "size": 28553371,
+      "version": "1.0.6001",
+      "versionDate": "2026-11-24T20:35:52.328Z",
+      "versionDescription": "Problem: ui problem\nAction taken: ui update",
+      "downloadURL": "https://github.com/AdityaRoy999/splittrack-releases/releases/download/splittrack-ios-60-attempt-1/Splittrack-unsigned.ipa",
+      "size": 28554877,
       "versions": [
+        {
+          "version": "1.0.6001",
+          "buildVersion": "6001",
+          "date": "2026-11-24T20:35:52.328Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splittrack-releases/releases/download/splittrack-ios-60-attempt-1/Splittrack-unsigned.ipa",
+          "size": 28554877,
+          "localizedDescription": "Problem: ui problem\nAction taken: ui update"
+        },
         {
           "version": "1.0.5901",
           "buildVersion": "5901",
@@ -336,14 +344,6 @@
           "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-32/Splittrack-unsigned.ipa",
           "size": 27061643,
           "localizedDescription": "fix: preserve Android GL JNI and smooth iOS status blur"
-        },
-        {
-          "version": "1.0.31",
-          "buildVersion": "31",
-          "date": "2026-11-18T20:56:37Z",
-          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-31/Splittrack-unsigned.ipa",
-          "size": 27051096,
-          "localizedDescription": "fix: Android startup crash and progressive edge blur"
         }
       ]
     }
