@@ -1,7 +1,7 @@
 import React, { memo, useLayoutEffect, useMemo } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { SceneActivityContext } from './SceneActivityContext';
+import { SceneActivityContext, SceneVisibilityContext } from './SceneActivityContext';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { useSettingsAvatarTransition } from './SettingsAvatarTransition';
 
@@ -45,9 +45,11 @@ export const TabScene = memo(function TabScene({ active, effectsActive = true, r
         { zIndex: active ? 2 : 1, backgroundColor: palette.background }, motion,
       ]}
     >
-      <SceneActivityContext.Provider value={active && effectsActive}>
-        {content}
-      </SceneActivityContext.Provider>
+      <SceneVisibilityContext.Provider value={active}>
+        <SceneActivityContext.Provider value={active && effectsActive}>
+          {content}
+        </SceneActivityContext.Provider>
+      </SceneVisibilityContext.Provider>
       <Animated.View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { backgroundColor: palette.background }, coverMotion]} />
     </Animated.View>
   );

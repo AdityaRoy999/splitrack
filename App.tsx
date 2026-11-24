@@ -77,6 +77,7 @@ import { OnboardingUsernameScreen } from './src/components/auth/OnboardingUserna
 import { GoogleLinkRecovery } from './src/components/auth/GoogleLinkRecovery';
 import { AnimatedPressable } from './src/components/common/MotionPrimitives';
 import { TabScene } from './src/components/common/TabScene';
+import { ScreenEdgeBlur } from './src/components/common/ScreenEdgeBlur';
 import { JellyRadio } from './src/components/common/JellyRadio';
 import { CloudStatus } from './src/components/common/CloudStatus';
 import { TransactionActionsProvider, useTransactionActions } from './src/components/transactions/TransactionActions';
@@ -239,11 +240,11 @@ function MainAppContent({
     () => [
       styles.scrollContent,
       {
-        paddingTop: nativeTabs ? 10 : insets.top + 10,
+        paddingTop: insets.top + 10,
         paddingBottom: 114,
       },
     ],
-    [insets.top, nativeTabs]
+    [insets.top]
   );
 
   const categoryFilterItems = useMemo(
@@ -1071,10 +1072,9 @@ function MainAppContent({
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <CloudStatus />
 
-      {/* The page viewport starts below the status bar. Scrolling content cannot
-          cross into the system area or require another blur/material overlay. */}
-      <View collapsable={false} style={[styles.mainViewport, { backgroundColor: rootBg, paddingTop: nativeTabs ? insets.top : 0 }]}>
-        <View style={[styles.tabPagesContainer, { backgroundColor: rootBg }, nativeTabs && { height: undefined }]}>
+      {/* Content scrolls beneath the edge blur; padding owns the safe area. */}
+      <View collapsable={false} style={[styles.mainViewport, { backgroundColor: rootBg }]}>
+        <View style={[styles.tabPagesContainer, { backgroundColor: rootBg }]}>
           <View style={styles.nativeTabsHost}>{routedScreens}</View>
           {showSettings ? (
             <View style={styles.settingsOverlay}><TabScene active duration={340} offsetY={0}><View key="settings-page-view" style={[styles.contentConstrainer, { flex: 1, height: '100%' }]}>
@@ -1101,7 +1101,7 @@ function MainAppContent({
                   navigateTab('expenses');
                 }}
               />
-            </View></TabScene></View>
+            </View><ScreenEdgeBlur active={effectsActive} /></TabScene></View>
           ) : null}
 
         </View>

@@ -322,6 +322,9 @@ export const DonutPieChart: React.FC = () => {
     <GlassCard borderRadius={24} style={styles.card}>
       <View style={styles.container}>
       <FormError message={analytics.error} />
+      {analytics.error ? <AnimatedPressable onPress={analytics.retry} accessibilityLabel="Retry expense analytics" contentStyle={{ padding: 12, alignItems: 'center' }}>
+        <Text style={{ color: textColor }}>Retry expenses</Text>
+      </AnimatedPressable> : null}
         {/* Top Summary Bar */}
         <View style={styles.topRow}>
           <Text style={[styles.topLabel, { color: mutedText }]}>

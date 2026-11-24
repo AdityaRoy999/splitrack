@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useVisualActivity } from './useVisualActivity';
-import { useSceneActive } from '../components/common/SceneActivityContext';
+import { useSceneVisible } from '../components/common/SceneActivityContext';
 
 export const isPhotoUri = (uri?: string | null) => Boolean(uri && /^(https?:\/\/|file:\/\/|content:\/\/|blob:|data:image\/)/i.test(uri));
 
@@ -12,7 +12,7 @@ const initial = (uri: PhotoState['uri']): PhotoState => ({ uri, attempt: 0, stat
 // capped backoff while visible, and retry immediately on foreground/scene return.
 export function useAvatarPhoto(uri?: string | null) {
   const { foreground } = useVisualActivity();
-  const sceneActive = useSceneActive();
+  const sceneActive = useSceneVisible();
   const active = foreground && sceneActive;
   const [photo, setPhoto] = useState(() => initial(uri));
   const current = photo.uri === uri ? photo : initial(uri);
@@ -29,6 +29,20 @@ export function useAvatarPhoto(uri?: string | null) {
     }, resumed ? 0 : RETRY_DELAYS[photo.attempt] ?? 60000);
     return () => clearTimeout(timer);
   }, [active, uri, photo]);
+
+  // Native image callbacks may never arrive after a suspended request. Keep a
+  // bounded attempt so the initials cannot mask a photo indefinitely.
+  useEffect(() => {
+    if (!active || !isPhotoUri(uri) || current.status !== 'loading') return;
+    const timer = setTimeout(() => {
+      if (source.current !== uri) return;
+      setPhoto(previous => {
+        const value = previous.uri === uri ? previous : initial(uri);
+        return value.status === 'loading' && value.attempt === current.attempt ? { ...value, status: 'failed' } : previous;
+      });
+    }, 12000);
+    return () => clearTimeout(timer);
+  }, [active, uri, current.status, current.attempt]);
 
   const onError = useCallback(() => {
     if (source.current !== uri) return;

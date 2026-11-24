@@ -14,10 +14,20 @@ export function AppleGlassPressable({ children, onPress, onLongPress, disabled =
   const { themeMode } = useLiquidGlass();
   const layout = StyleSheet.flatten(style) ?? {};
   const originalContent = StyleSheet.flatten(contentStyle) ?? {};
-  const content = { ...originalContent, ...(typeof layout.height === 'number' ? { height: layout.height } : {}) };
+  const { margin, marginHorizontal, marginVertical, marginTop, marginBottom, marginLeft, marginRight, marginStart, marginEnd, ...labelLayout } = originalContent;
+  const margins = { margin, marginHorizontal, marginVertical, marginTop, marginBottom, marginLeft, marginRight, marginStart, marginEnd };
+  const width = layout.width ?? originalContent.width;
+  const height = layout.height ?? originalContent.height;
+  const content = {
+    ...labelLayout,
+    alignItems: labelLayout.alignItems ?? 'center',
+    justifyContent: labelLayout.justifyContent ?? 'center',
+    ...(height !== undefined ? { height } : {}),
+    ...(width !== undefined ? { width: '100%' as const } : {}),
+  };
   const proposedRadius = borderRadius ?? content.borderRadius ?? layout.borderRadius ?? 14;
   const radius = typeof proposedRadius === 'number' ? proposedRadius : 14;
-  const [bounds, setBounds] = useState({ width: typeof layout.width === 'number' ? layout.width : 0, height: typeof layout.height === 'number' ? layout.height : typeof content.height === 'number' ? content.height : 36 });
+  const [bounds, setBounds] = useState({ width: typeof width === 'number' ? width : 0, height: typeof height === 'number' ? height : 36 });
   const neutralStyle = { backgroundColor: 'transparent', borderWidth: 0, shadowOpacity: 0, elevation: 0 };
   const foreground = originalContent.backgroundColor === ACTION_COLORS.danger ? ACTION_COLORS.danger
     : originalContent.backgroundColor === ACTION_COLORS.success ? ACTION_COLORS.success
@@ -38,7 +48,10 @@ export function AppleGlassPressable({ children, onPress, onLongPress, disabled =
     typeof child === 'string' || typeof child === 'number' ? String(child)
       : React.isValidElement<{ children?: React.ReactNode }>(child) ? labelText(child.props.children) : '').filter(Boolean).join(' ');
   const accessibleName = accessibilityLabel ?? labelText(children);
-  return <View style={[style, neutralStyle]}>
+  return <View style={[{ alignItems: 'center', justifyContent: 'center' }, margins, style, { width, height }, neutralStyle]}
+    onLayout={({ nativeEvent: { layout: measured } }) => {
+      if (measured.width > 0 && measured.height > 0) setBounds(previous => Math.abs(previous.width - measured.width) < 0.5 && Math.abs(previous.height - measured.height) < 0.5 ? previous : { width: measured.width, height: measured.height });
+    }}>
     {bounds.width > 0 ? <Host colorScheme={themeMode} ignoreSafeArea="all" alignment="center" style={StyleSheet.absoluteFill}>
       <Button onPress={() => { if (!disabled) onPress(); }} modifiers={[
         buttonStyle('plain'), nativeDisabled(disabled),
@@ -52,9 +65,6 @@ export function AppleGlassPressable({ children, onPress, onLongPress, disabled =
     </Host> : null}
     {selected ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, backgroundColor: themeMode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' }]} /> : null}
     <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
-      style={[content, neutralStyle, { opacity: disabled ? 0.6 : 1, alignSelf: 'stretch' }]}
-      onLayout={({ nativeEvent: { layout: measured } }) => {
-        if (measured.width > 0 && measured.height > 0) setBounds(previous => Math.abs(previous.width - measured.width) < 0.5 && Math.abs(previous.height - measured.height) < 0.5 ? previous : { width: measured.width, height: measured.height });
-      }}>{labelContent}</View>
+      style={[content, neutralStyle, { opacity: disabled ? 0.6 : 1, alignSelf: 'stretch' }]}>{labelContent}</View>
   </View>;
 }

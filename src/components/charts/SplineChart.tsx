@@ -316,6 +316,9 @@ export const SplineChart: React.FC = () => {
     <GlassCard borderRadius={24} intensity={20} style={styles.card}>
       <View>
       <FormError message={analytics.error} />
+      {analytics.error ? <AnimatedPressable onPress={analytics.retry} accessibilityLabel="Retry cash flow analytics" contentStyle={{ padding: 12, alignItems: 'center' }}>
+        <Text style={{ color: textColor }}>Retry cash flow</Text>
+      </AnimatedPressable> : null}
         {/* Header with Stats on left + Calendar Button & Date/Month/Year Selector on right */}
         <View style={[styles.header, nativeGlass && styles.glassHeader]} {...gestureHandlers}>
           <View style={[styles.headerLeft, nativeGlass && styles.glassHeaderStats]}>

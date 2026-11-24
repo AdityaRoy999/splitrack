@@ -1,14 +1,14 @@
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useLayoutEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { isPhotoUri, UserAvatar } from '../common/UserAvatar';
+import { useAvatarPhoto } from '../../hooks/useAvatarPhoto';
 
 // Crossfade decoded photos without a persistent image blur on web or native.
 export function HeaderAvatar({ uri, hidden, dark, name }: { uri: string | null; hidden: boolean; dark: boolean; name: string }) {
   const photo = isPhotoUri(uri);
-  const [readyUri, setReadyUri] = useState<string | null>(null);
-  const [failedUri, setFailedUri] = useState<string | null>(null);
-  const ready = photo && readyUri === uri && failedUri !== uri;
+  const loadedPhoto = useAvatarPhoto(uri);
+  const ready = photo && loadedPhoto.loaded;
   const progress = useSharedValue(hidden ? 0 : 1);
   const photoProgress = useSharedValue(0);
   useLayoutEffect(() => {
@@ -22,8 +22,8 @@ export function HeaderAvatar({ uri, hidden, dark, name }: { uri: string | null; 
   return <View style={styles.slot}>
     <Animated.View style={[StyleSheet.absoluteFill, motion]}>
       <Animated.View style={[StyleSheet.absoluteFill, fallbackMotion]}><UserAvatar avatarUri={photo ? null : uri} name={name} size={42} borderRadius={14} isDark={dark} /></Animated.View>
-      {photo && failedUri !== uri ? <Animated.Image source={{ uri: uri! }} resizeMode="cover"
-        onLoadEnd={() => setReadyUri(uri)} onError={() => setFailedUri(uri)}
+      {loadedPhoto.shouldLoad ? <Animated.Image key={`${uri}:${loadedPhoto.attempt}`} source={{ uri: uri!, cache: loadedPhoto.attempt > 0 ? 'reload' : 'default' }} resizeMode="cover"
+        onLoad={loadedPhoto.onLoad} onError={loadedPhoto.onError}
         style={[StyleSheet.absoluteFill, photoMotion]} /> : null}
     </Animated.View>
   </View>;

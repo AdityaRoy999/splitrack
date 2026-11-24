@@ -331,7 +331,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: nativeGlass ? Math.max(10, 16 - insets.top) : Math.max(16, insets.top + 10),
+            paddingTop: Math.max(16, insets.top + 10),
             paddingBottom: Math.max(128, insets.bottom + 88),
           },
         ]}

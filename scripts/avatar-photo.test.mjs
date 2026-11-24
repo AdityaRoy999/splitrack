@@ -45,7 +45,7 @@ function harness(uri = 'https://photos.example.invalid/friend.jpg') {
     require(name) {
       if (name === 'react') return hooks;
       if (name === './useVisualActivity') return { useVisualActivity: () => activity };
-      if (name.endsWith('/SceneActivityContext')) return { useSceneActive: () => activity.sceneActive };
+      if (name.endsWith('/SceneActivityContext')) return { useSceneVisible: () => activity.sceneActive };
       throw new Error(`Unexpected dependency: ${name}`);
     },
     setTimeout(callback, delay) { const id = ++timerId; timers.set(id, { callback, at: now + delay }); return id; },
@@ -144,5 +144,19 @@ test('cartoon/canonical references never request photos and unmount clears retri
   h.photo.onError(); h.flush();
   assert.equal(h.timerCount, 1);
   h.unmount();
+  assert.equal(h.timerCount, 0);
+});
+
+test('a stalled native download retries and a late callback from its abandoned attempt is ignored', () => {
+  const h = harness(), first = h.photo;
+  h.advance(12000);
+  assert.equal(h.photo.shouldLoad, false);
+  h.advance(1000);
+  assert.equal(h.photo.attempt, 1);
+  assert.equal(h.photo.shouldLoad, true);
+  first.onLoad(); h.flush();
+  assert.equal(h.photo.loaded, false);
+  h.photo.onLoad(); h.flush();
+  assert.equal(h.photo.loaded, true);
   assert.equal(h.timerCount, 0);
 });

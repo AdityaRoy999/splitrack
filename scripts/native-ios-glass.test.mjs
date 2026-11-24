@@ -178,8 +178,67 @@ test('native glass actions use fixed layout and noninteractive untinted material
   button.props.onPress(); assert.equal(pressed, 1);
   all(Native({ ...props, disabled: true }), node => node.type === 'Button')[0].props.onPress();
   assert.equal(pressed, 1, 'disabled native action cannot submit');
-  const disabledLabel = all(Native({ ...props, disabled: true }), node => node.props.onLayout)[0];
+  const disabledLabel = all(Native({ ...props, disabled: true }), node => node.props.accessibilityElementsHidden && all(node, child => child.type === 'Text').length)[0];
   assert.equal(nativeViews.StyleSheet.flatten(disabledLabel.props.style).opacity, 0.6, 'one readable disabled treatment');
+  const icon = Native({ ...props, style: undefined, contentStyle: { width: 36, height: 36, marginLeft: 6, alignItems: 'center', justifyContent: 'center' }, children: React.createElement('OriginalIcon') });
+  const outer = nativeViews.StyleSheet.flatten(icon.props.style);
+  assert.equal(outer.width, 36); assert.equal(outer.height, 36); assert.equal(outer.marginLeft, 6);
+  const labelBox = all(icon, node => node.props.accessibilityElementsHidden && all(node, child => child.type === 'OriginalIcon').length)[0];
+  const inner = nativeViews.StyleSheet.flatten(labelBox.props.style);
+  assert.equal(inner.width, '100%'); assert.equal(inner.height, 36);
+  assert.equal(inner.marginLeft, undefined, 'outer spacing cannot shift the icon inside its material');
+  assert.equal(inner.alignItems, 'center'); assert.equal(inner.justifyContent, 'center');
+  const orb = Native({ ...props, style: { width: 64, height: 64 }, contentStyle: { height: 36, alignItems: undefined, justifyContent: undefined }, children: React.createElement('OriginalPlusIcon') });
+  const orbLabel = all(orb, node => node.props.accessibilityElementsHidden && all(node, child => child.type === 'OriginalPlusIcon').length)[0];
+  const orbContent = nativeViews.StyleSheet.flatten(orbLabel.props.style);
+  assert.equal(orbContent.height, 64, 'the plus label fills the 64pt orb instead of keeping the default 36pt button height');
+  assert.equal(orbContent.width, '100%');
+  assert.equal(orbContent.alignItems, 'center'); assert.equal(orbContent.justifyContent, 'center');
+});
+
+test('iOS Glass restores both screen-edge blurs with safe-area coverage and no tint', async () => {
+  const mode = { isLiquidGlassEnabled: true };
+  const platform = { OS: 'ios' };
+  const EdgeBlur = await component('src/components/common/ScreenEdgeBlur.tsx', {
+    'react-native': { ...nativeViews, Platform: platform },
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 59, bottom: 34 }) },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => mode },
+    '../effects/GradualBlur': { GradualBlur: 'GradualBlur' },
+  }, 'ScreenEdgeBlur');
+  const edges = all(EdgeBlur({}), node => node.type === 'GradualBlur');
+  assert.equal(edges.length, 2);
+  assert.equal(edges[0].props.position, 'top'); assert.equal(edges[0].props.height, 71);
+  assert.equal(edges[1].props.position, 'bottom'); assert.equal(edges[1].props.height, 66);
+  assert.ok(edges.every(edge => edge.props.tint === 'transparent' && edge.props.active));
+  assert.ok(all(EdgeBlur({ active: false }), node => node.type === 'GradualBlur').every(edge => !edge.props.active));
+  mode.isLiquidGlassEnabled = false;
+  assert.equal(EdgeBlur({}), null, 'the shared Matte blur stays unchanged');
+  mode.isLiquidGlassEnabled = true; platform.OS = 'android';
+  assert.equal(EdgeBlur({}), null, 'Android retains its existing edge treatment');
+});
+
+test('tab content keeps fetching while effects pause, and edge blur stays inside the scene below the dock', async () => {
+  const visibility = React.createContext(true), activity = React.createContext(true);
+  let focused = true;
+  const tabs = { effectsActive: true, settingsVisible: false, render: { analytics: () => React.createElement('Charts') } };
+  const Screen = await component('src/navigation/MainTabScreen.tsx', {
+    react: { ...React, useState: () => [focused, () => {}], useCallback: callback => callback },
+    'expo-router': { useFocusEffect() {} },
+    '../components/common/SceneActivityContext': { SceneVisibilityContext: visibility, SceneActivityContext: activity },
+    '../components/common/ScreenEdgeBlur': { ScreenEdgeBlur: 'ScreenEdgeBlur' },
+    './MainTabsContext': { useMainTabs: () => tabs },
+  }, 'MainTabScreen');
+  const tree = Screen({ tab: 'analytics' });
+  const scene = all(tree, node => node.type === 'View')[0];
+  assert.deepEqual(React.Children.toArray(scene.props.children).map(child => child.type), ['Charts', 'ScreenEdgeBlur']);
+  tabs.effectsActive = false;
+  const paused = Screen({ tab: 'analytics' });
+  assert.equal(all(paused, node => node.type === visibility)[0].props.value, true, 'a sheet cannot disable analytics or photo loading');
+  assert.equal(all(paused, node => node.type === activity)[0].props.value, false);
+  tabs.settingsVisible = true;
+  assert.equal(all(Screen({ tab: 'analytics' }), node => node.type === visibility)[0].props.value, false);
+  tabs.settingsVisible = false; focused = false;
+  assert.equal(all(Screen({ tab: 'analytics' }), node => node.type === visibility)[0].props.value, false);
 });
 
 test('Glass adapters preserve Matte styles, event and press feedback unchanged', async () => {
