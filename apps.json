@@ -179,12 +179,20 @@
       "localizedDescription": "Split expenses, track shared balances, and manage group spending with Splittrack.",
       "iconURL": "https://raw.githubusercontent.com/AdityaRoy999/splitrack/ios/assets/icon-light.png",
       "tintColor": "#6366F1",
-      "version": "1.0.6101",
-      "versionDate": "2026-11-25T10:04:39.048Z",
-      "versionDescription": "Problem: ui update\nAction taken: ui update fix",
-      "downloadURL": "https://github.com/AdityaRoy999/splittrack-releases/releases/download/splittrack-ios-61-attempt-1/Splittrack-unsigned.ipa",
-      "size": 28555443,
+      "version": "1.0.6301",
+      "versionDate": "2026-11-25T18:54:43.273Z",
+      "versionDescription": "Problem: fix\nAction taken: ios fix",
+      "downloadURL": "https://github.com/AdityaRoy999/splittrack-releases/releases/download/splittrack-ios-63-attempt-1/Splittrack-unsigned.ipa",
+      "size": 28555291,
       "versions": [
+        {
+          "version": "1.0.6301",
+          "buildVersion": "6301",
+          "date": "2026-11-25T18:54:43.273Z",
+          "downloadURL": "https://github.com/AdityaRoy999/splittrack-releases/releases/download/splittrack-ios-63-attempt-1/Splittrack-unsigned.ipa",
+          "size": 28555291,
+          "localizedDescription": "Problem: fix\nAction taken: ios fix"
+        },
         {
           "version": "1.0.6101",
           "buildVersion": "6101",
@@ -336,14 +344,6 @@
           "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-37/Splittrack-unsigned.ipa",
           "size": 27145480,
           "localizedDescription": "Add transaction editing and bin, owned settlements and solid modal surfaces"
-        },
-        {
-          "version": "1.0.36",
-          "buildVersion": "36",
-          "date": "2026-11-19T09:10:45Z",
-          "downloadURL": "https://github.com/AdityaRoy999/splitrack/releases/download/splittrack-ios-36/Splittrack-unsigned.ipa",
-          "size": 27138485,
-          "localizedDescription": "fix: smooth modal blur and add global dropdown selection"
         }
       ]
     }
