@@ -61,6 +61,7 @@ jobs:
           node scripts/prepare-release-ref.mjs
           SPLITTRACK_BUILD_SCRIPT
         env:
+          RELEASE_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
           BUILD_LOG_STEP: Resolve binary release commit
           BUILD_LOG_INDEX: "4"
       - name: Setup Node.js

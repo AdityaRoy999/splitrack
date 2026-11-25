@@ -36,6 +36,9 @@ test('configuration fails early and release uploads precede pending registration
     const approval = steps.findIndex(s => s.name === 'Authorize build request');
     assert.ok(approval >= 0 && approval < setup && approval < install);
     assert.equal(steps[approval].env.CONTROL_BUILD_REQUEST, '${{ inputs.control_request }}');
+    const resolveRef = steps.find(s => s.name === 'Resolve binary release commit');
+    assert.equal(resolveRef.env.RELEASE_TOKEN, '${{ secrets.PUBLIC_RELEASE_TOKEN }}');
+    assert.equal(doc.env.RELEASE_TOKEN, undefined, 'release credentials stay scoped to the step that needs them');
     const release = steps.findIndex(s => s.uses?.startsWith('softprops/action-gh-release'));
     const register = steps.findIndex(s => s.name === 'Register build for release approval');
     assert.ok(release >= 0 && register > release);
