@@ -161,7 +161,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const rootBg = isDark ? '#09090B' : '#F4F4F6';
   const cardBg = isDark ? '#111114' : '#FFFFFF';
-  const chipBg = isDark ? '#1C1C22' : '#F4F4F6';
+  const chipBg = nativeGlass ? 'transparent' : isDark ? '#1C1C22' : '#F4F4F6';
   const textColor = isDark ? '#FFFFFF' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
@@ -798,7 +798,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <View style={{ flex: 1 }}>
                     <View style={styles.sourceTagRow}>
                       <GlassPanel style={[styles.sourceBadge, { backgroundColor: activeBg }]}>
-                        <Text style={[styles.sourceBadgeText, { color: activeText }]}>
+                        <Text style={[styles.sourceBadgeText, { color: nativeGlass ? textColor : activeText }]}>
                           {importResult.sourceApp}
                         </Text>
                       </GlassPanel>
@@ -970,13 +970,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           <GlassModalSheet>
             <SheetHeader title="Sync with Google" subtitle="Connect Google to your existing account" onClose={closeGoogleLink} disabled={googlePending} />
             <ScrollEdgeFade><ScrollView contentContainerStyle={{ gap: 14, paddingBottom: 4 }}>
-              <View style={{ padding: 18, borderRadius: 22, gap: 12, backgroundColor: isDark ? '#111114' : '#EDEDF1' }}>
+              <GlassPanel style={{ padding: 18, borderRadius: 22, gap: 12, backgroundColor: isDark ? '#111114' : '#EDEDF1' }}>
                 <Text style={{ color: textColor, fontSize: 15, fontWeight: '600' }}>{user?.email || profile?.email || 'Your account'}</Text>
                 <Text style={{ color: mutedText, fontSize: 13, lineHeight: 20 }}>Your transactions, groups and password sign-in stay with this account.</Text>
                 {googleNeedsPassword ? <TextInput accessibilityLabel="Current account password" value={googlePassword} onChangeText={setGooglePassword}
                   placeholder="Current password" placeholderTextColor={mutedText} secureTextEntry autoCapitalize="none" autoCorrect={false}
                   editable={!googlePending} style={{ backgroundColor: chipBg, color: textColor, fontSize: 14, borderRadius: 14, paddingHorizontal: 14, height: 48 }} /> : null}
-              </View>
+              </GlassPanel>
             </ScrollView></ScrollEdgeFade>
             <SheetFooter>
               <FormError message={googleError} />

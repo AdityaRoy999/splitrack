@@ -1,6 +1,6 @@
 import { TransactionSwipeRow } from '../transactions/TransactionSwipeRow';
 import React, { useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { BillListIcon } from '@solar-icons/react-native/bold/bill-list';
@@ -48,6 +48,7 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
   const { formatAmount, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const actions = useTransactionActions();
   const isDark = themeMode === 'dark';
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
 
   const [txFilter, setTxFilter] = useState<MemberTxFilter>('All');
   const [copiedUpi, setCopiedUpi] = useState(false);
@@ -55,8 +56,8 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
 
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
-  const pillSurface = isDark ? '#18181D' : '#EFEFF4';
-  const chipBg = isDark ? '#18181D' : '#FFFFFF';
+  const pillSurface = nativeGlass ? 'transparent' : isDark ? '#18181D' : '#EFEFF4';
+  const chipBg = nativeGlass ? 'transparent' : isDark ? '#18181D' : '#FFFFFF';
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
@@ -229,7 +230,7 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
                   contentStyle={[
                     styles.contactChip,
                     {
-                      backgroundColor: isDark
+                      backgroundColor: nativeGlass ? 'transparent' : isDark
                         ? 'rgba(255,255,255,0.12)'
                         : 'rgba(15,23,42,0.08)',
                     },
@@ -247,7 +248,7 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
                   style={[
                     styles.contactChip,
                     {
-                      backgroundColor: isDark
+                      backgroundColor: nativeGlass ? 'transparent' : isDark
                         ? 'rgba(255,255,255,0.12)'
                         : 'rgba(15,23,42,0.08)',
                     },
@@ -274,7 +275,7 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
           contentStyle={[
             styles.heroEditBtn,
             {
-              backgroundColor: isDark
+              backgroundColor: nativeGlass ? 'transparent' : isDark
                 ? 'rgba(255, 255, 255, 0.14)'
                 : 'rgba(15, 23, 42, 0.08)',
             },
@@ -445,9 +446,9 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
                     <AnimatedPressable
                       scaleTo={0.93}
                       onPress={() => onSettleFriend(friend)}
-                      contentStyle={[styles.miniSettleBtn, { backgroundColor: activeBg }]}
+                      contentStyle={[styles.miniSettleBtn, { backgroundColor: nativeGlass ? 'transparent' : activeBg }]}
                     >
-                      <Text style={[styles.miniSettleText, { color: activeText }]}>
+                      <Text style={[styles.miniSettleText, { color: nativeGlass ? textColor : activeText }]}>
                         Settle
                       </Text>
                     </AnimatedPressable>

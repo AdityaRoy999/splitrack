@@ -409,8 +409,9 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
 export const UpiProfilesSection: React.FC = () => {
   const { accounts, selectedAccountId, setSelectedAccountId, transactions, deleteUpiAccount } = useSplitTrack();
   const { run, pending, error } = useAsyncAction();
-  const { formatAmount, themeMode } = useLiquidGlass();
+  const { formatAmount, themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [showAddProfile, setShowAddProfile] = useState(false);
@@ -457,10 +458,10 @@ export const UpiProfilesSection: React.FC = () => {
 
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? 'rgba(255, 255, 255, 0.72)' : '#52525B';
-  const pillSurface = isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(15, 23, 42, 0.08)';
-  const actionGlassBg = isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(255, 255, 255, 0.78)';
-  const primaryPillBg = isDark ? '#F4F4F5' : '#18181B';
-  const primaryPillText = isDark ? '#18181B' : '#FFFFFF';
+  const pillSurface = nativeGlass ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(15, 23, 42, 0.08)';
+  const actionGlassBg = nativeGlass ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(255, 255, 255, 0.78)';
+  const primaryPillBg = nativeGlass ? 'transparent' : isDark ? '#F4F4F5' : '#18181B';
+  const primaryPillText = nativeGlass ? textColor : isDark ? '#18181B' : '#FFFFFF';
 
   const handleCopy = (acc: UpiAccount) => {
     triggerNotification(NotificationType.Success);
@@ -579,10 +580,10 @@ export const UpiProfilesSection: React.FC = () => {
           <GlassModalSheet>
             <SheetHeader title="Delete payment profile?" subtitle="Your previous transactions remain in the ledger" onClose={() => !pending && setAccountToDelete(null)} disabled={pending} />
             <ScrollEdgeFade><ScrollView contentContainerStyle={{ gap: 14, paddingBottom: 4 }}>
-              <View style={{ padding: 18, borderRadius: 22, gap: 10, backgroundColor: isDark ? '#111114' : '#EDEDF1' }}>
+              <GlassPanel style={{ padding: 18, borderRadius: 22, gap: 10, backgroundColor: isDark ? '#111114' : '#EDEDF1' }}>
                 <Text style={{ color: textColor, fontSize: 17, fontWeight: '600' }}>{accountToDelete?.title}</Text>
                 <Text style={{ color: mutedText, fontSize: 13, lineHeight: 20 }}>Delete this payment profile? Past recorded transactions will remain available.</Text>
-              </View>
+              </GlassPanel>
               <FormError message={error} />
               <GlassPill label={pending ? 'Deleting…' : 'Delete profile'} size="lg" variant="danger" disabled={pending} onPress={() => {
                 if (!accountToDelete) return;

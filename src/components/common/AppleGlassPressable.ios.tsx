@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button, HStack, Host } from '@expo/ui/swift-ui';
-import { accessibilityLabel as nativeLabel, buttonStyle, contentShape, disabled as nativeDisabled, frame, glassEffect, onLongPressGesture, shapes } from '@expo/ui/swift-ui/modifiers';
+import { accessibilityAddTraits, accessibilityLabel as nativeLabel, buttonStyle, contentShape, disabled as nativeDisabled, frame, glassEffect, onLongPressGesture, shapes } from '@expo/ui/swift-ui/modifiers';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
 import { GlassSurface } from '../glass/GlassSurface';
 import type { AppleGlassPressableProps } from './AppleGlassPressable';
@@ -37,7 +37,7 @@ export function AppleGlassPressable({ children, onPress, onLongPress, disabled =
     if (child.type === GlassSurface || child.type === GlassPanel) return <View style={[child.props.style, neutralStyle]}>{adaptLabel(child.props.children)}</View>;
     if (child.type === Text) {
       const color = StyleSheet.flatten(child.props.style)?.color;
-      return React.cloneElement(child, { style: [child.props.style, !color || ['#FFFFFF', '#ffffff', '#000000', '#F4F4F5', '#18181B', '#fff', '#FFF', '#09090B', '#111114'].includes(String(color)) ? { color: foreground } : undefined] });
+      return React.cloneElement(child, { style: [child.props.style, !color || ['#FFFFFF', '#ffffff', '#000000', '#F4F4F5', '#18181B', '#fff', '#FFF', '#09090B', '#111114'].includes(String(color)) ? { color: foreground } : undefined, selected && { fontWeight: '600' }] });
     }
     if (child.props.color && ['#FFFFFF', '#ffffff', '#000000', '#F4F4F5', '#18181B', '#fff', '#09090B'].includes(child.props.color)) return React.cloneElement(child, { color: foreground });
     return child.props.children ? React.cloneElement(child, {}, adaptLabel(child.props.children)) : child;
@@ -56,6 +56,7 @@ export function AppleGlassPressable({ children, onPress, onLongPress, disabled =
       <Button onPress={() => { if (!disabled) onPress(); }} modifiers={[
         buttonStyle('plain'), nativeDisabled(disabled),
         ...(accessibleName ? [nativeLabel(accessibleName)] : []),
+        ...(selected ? [accessibilityAddTraits(['isSelected'])] : []),
         ...(onLongPress ? [onLongPressGesture(() => { if (!disabled) onLongPress(); }, 0.35)] : []),
       ]}>
         <HStack modifiers={[frame({ width: bounds.width, height: bounds.height }),
@@ -63,7 +64,6 @@ export function AppleGlassPressable({ children, onPress, onLongPress, disabled =
           contentShape(shapes.roundedRectangle({ cornerRadius: radius }))]}>{null}</HStack>
       </Button>
     </Host> : null}
-    {selected ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, backgroundColor: themeMode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' }]} /> : null}
     <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
       style={[content, neutralStyle, { opacity: disabled ? 0.6 : 1, alignSelf: 'stretch' }]}>{labelContent}</View>
   </View>;

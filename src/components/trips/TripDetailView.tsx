@@ -1,7 +1,7 @@
 import { ACTION_COLORS } from '../../theme/actionColors';
 import { TransactionSwipeRow } from '../transactions/TransactionSwipeRow';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { AltArrowLeftIcon } from '@solar-icons/react-native/bold/alt-arrow-left';
 import { AddCircleIcon } from '@solar-icons/react-native/bold/add-circle';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
@@ -56,14 +56,14 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({
     void getTripTransactions(trip.id).then(page => { if (active) { setHistory(page.items); setHistoryCursor(page.cursor); setHistoryProfiles(page.profiles); } }).catch(failure => { if (active) setMemberError(errorMessage(failure)); }).finally(() => { if (active) setLoadedHistoryKey(historyKey); });
     return () => { active = false; };
   }, [trip.id, revision, getTripTransactions, historyKey]);
-  const { formatAmount, themeMode, transactionActionStyle } = useLiquidGlass();
+  const { formatAmount, themeMode, transactionActionStyle, isLiquidGlassEnabled } = useLiquidGlass();
   const [showAddMember, setShowAddMember] = useState(false);
   const [removingMembers, setRemovingMembers] = useState(false);
   const isDark = themeMode === 'dark';
 
   const textColor = isDark ? '#FFFFFF' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
-  const pillSurface = isDark ? '#18181D' : '#EFEFF4';
+  const pillSurface = Platform.OS === 'ios' && isLiquidGlassEnabled ? 'transparent' : isDark ? '#18181D' : '#EFEFF4';
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
 
   const tripFriends = friends.filter((f) => trip.members.includes(f.id));

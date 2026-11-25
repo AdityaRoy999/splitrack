@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const React = require('react');
 const ts = require('typescript');
 const nativeViews = Object.fromEntries(['View', 'Text', 'ScrollView', 'Pressable'].map(name => [name, name]));
-nativeViews.StyleSheet = { create: styles => styles, absoluteFill: {}, flatten: styles => Object.assign({}, ...[].concat(styles)) };
+nativeViews.StyleSheet = { create: styles => styles, absoluteFill: {}, flatten: styles => Object.assign({}, ...[styles].flat(Infinity).filter(Boolean)) };
 
 async function component(path, modules, exportName, extraSource = '') {
   const source = await readFile(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -30,9 +30,10 @@ function all(node, predicate) {
 
 test('native material ignores custom tints and painted backing in cards and sheets', async () => {
   const mode = { isLiquidGlassEnabled: true, themeMode: 'dark' };
+  let available = true;
   const Surface = await component('src/components/glass/GlassSurface.ios.tsx', {
     'expo-blur': { BlurView: 'BlurView' },
-    'expo-glass-effect': { GlassView: 'GlassView', isGlassEffectAPIAvailable: () => true, isLiquidGlassAvailable: () => true },
+    'expo-glass-effect': { GlassView: 'GlassView', isGlassEffectAPIAvailable: () => available, isLiquidGlassAvailable: () => available },
     '../../theme/LiquidGlassContext': { useLiquidGlass: () => mode },
     '../common/BackdropSurfaceContext': { BackdropSurfaceContext: React.createContext(null) },
   }, 'GlassSurface');
@@ -48,6 +49,15 @@ test('native material ignores custom tints and painted backing in cards and shee
   assert.deepEqual(React.Children.toArray(card.props.children).slice(0, 2).map(child => child.type), ['CardGradient', 'GlassView'], 'the restored gradient sits behind clear native glass');
   assert.equal(glass.props.isInteractive, false, 'surface buttons do not stretch or merge on press');
   assert.equal(all(card, node => node.props.value === 'transparent').length, 1, 'rows inherit transparent backing');
+  available = false;
+  for (const theme of ['dark', 'light']) {
+    mode.themeMode = theme;
+    const fallback = Surface(props);
+    assert.equal(all(fallback, node => node.type === 'GlassView').length, 0);
+    const blur = all(fallback, node => node.type === 'BlurView')[0];
+    assert.equal(blur.props.tint, theme === 'dark' ? 'systemUltraThinMaterialDark' : 'systemUltraThinMaterialLight');
+    assert.equal(blur.props.intensity, 30, 'unsupported devices retain a visible lightweight material');
+  }
   mode.isLiquidGlassEnabled = false;
   const matte = Surface(props);
   assert.equal(all(matte, node => node.type === 'GlassView').length, 0);
@@ -81,22 +91,72 @@ test('settled iOS Quick Send photos render outside SVG ForeignObject and still o
   assert.equal(selected, friend);
 });
 
-test('native sheets preserve the system background and use the saved appearance', async () => {
+test('native sheets use clear material when available and retain the system fallback', async () => {
   const calls = [];
+  const mode = { themeMode: 'dark', isLiquidGlassEnabled: true };
+  let available = true;
   const Sheet = await component('src/components/common/AppleSheet.ios.tsx', {
     'react-native': { ...nativeViews, useWindowDimensions: () => ({ width: 390 }) },
-    '@expo/ui/swift-ui': { BottomSheet: 'BottomSheet', Group: 'Group', Host: 'Host', RNHostView: 'RNHostView' },
-    '@expo/ui/swift-ui/modifiers': Object.fromEntries(['preferredColorScheme', 'presentationDetents', 'presentationDragIndicator', 'ignoreSafeArea'].map(name => [name, value => { calls.push([name, value]); return { name, value }; }])),
-    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark' }) },
+    '@expo/ui/swift-ui': { BottomSheet: 'BottomSheet', Group: 'Group', Host: 'Host', RNHostView: 'RNHostView', Rectangle: 'Rectangle' },
+    '@expo/ui/swift-ui/modifiers': Object.fromEntries(['preferredColorScheme', 'presentationDetents', 'presentationDragIndicator', 'ignoreSafeArea', 'foregroundStyle', 'glassEffect'].map(name => [name, value => { calls.push([name, value]); return { name, value }; }])),
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => mode },
+    '../glass/GlassSurface': { useNativeGlassAvailable: () => available },
   }, 'AppleSheet');
   let closed = 0, dismissed = 0;
-  const tree = Sheet({ visible: true, children: 'draft', onRequestClose: () => closed++, onDismiss: () => dismissed++ });
+  const props = { visible: true, children: 'draft', onRequestClose: () => closed++, onDismiss: () => dismissed++ };
+  const tree = Sheet(props);
   const sheet = all(tree, node => node.type === 'BottomSheet')[0];
-  assert.equal(sheet.props.presentationBackground, undefined, 'system owns the sheet material');
+  const background = sheet.props.presentationBackground;
+  assert.equal(background.type, 'Rectangle');
+  assert.equal(background.props.modifiers.find(item => item.name === 'foregroundStyle').value, 'transparent');
+  const glass = background.props.modifiers.find(item => item.name === 'glassEffect').value;
+  assert.equal(glass.glass.variant, 'clear');
+  assert.equal(glass.glass.interactive, false);
+  assert.equal(glass.glass.tint, undefined);
+  assert.equal(glass.shape, 'rectangle');
   assert.ok(calls.some(([name, value]) => name === 'preferredColorScheme' && value === 'dark'));
   sheet.props.onIsPresentedChange(false);
   sheet.props.onDismiss();
   assert.equal(closed, 1); assert.equal(dismissed, 1);
+  available = false;
+  assert.equal(all(Sheet(props), node => node.type === 'BottomSheet')[0].props.presentationBackground, undefined, 'older iOS keeps a visible system sheet instead of a transparent rectangle');
+  available = true; mode.isLiquidGlassEnabled = false;
+  assert.equal(all(Sheet(props), node => node.type === 'BottomSheet')[0].props.presentationBackground, undefined, 'Matte does not receive a custom glass sheet');
+});
+
+test('glass panels share one material with descendants while preserving Matte props', async () => {
+  const mode = { isLiquidGlassEnabled: true };
+  let parentSurface = null;
+  const context = React.createContext(null);
+  const Panel = await component('src/components/glass/GlassPanel.ios.tsx', {
+    react: { ...React, useContext: () => parentSurface },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => mode },
+    '../common/BackdropSurfaceContext': { BackdropSurfaceContext: context },
+    './GlassSurface': { GlassSurface: 'GlassSurface' },
+  }, 'GlassPanel');
+  const onLayout = () => {};
+  const style = [{ backgroundColor: '#1C1C22', borderWidth: 1, shadowOpacity: 0.4, elevation: 4 }, { borderRadius: 18, padding: 12 }];
+  const children = React.createElement('NestedPanel');
+  const props = { style, children, onLayout, accessibilityLabel: 'Details' };
+  const standalone = Panel(props);
+  const layout = nativeViews.StyleSheet.flatten(standalone.props.style);
+  assert.equal(layout.backgroundColor, 'transparent');
+  assert.equal(layout.borderWidth, 0); assert.equal(layout.shadowOpacity, 0); assert.equal(layout.elevation, 0);
+  assert.equal(layout.opacity, undefined, 'material transparency is native, not ancestor opacity');
+  assert.equal(layout.padding, 12); assert.equal(standalone.props.onLayout, onLayout);
+  const surfaces = all(standalone, node => node.type === 'GlassSurface');
+  assert.equal(surfaces.length, 1); assert.equal(surfaces[0].props.borderRadius, 18);
+  const provider = all(standalone, node => node.type === context && node.props.value === 'transparent')[0];
+  assert.equal(provider.props.children, children, 'children inherit the existing clear surface');
+  parentSurface = provider.props.value;
+  const nested = Panel(props);
+  assert.equal(all(nested, node => node.type === 'GlassSurface').length, 0, 'nested cards do not stack material');
+  assert.equal(nativeViews.StyleSheet.flatten(nested.props.style).backgroundColor, 'transparent');
+  mode.isLiquidGlassEnabled = false;
+  const matte = Panel(props);
+  assert.equal(matte.props.style, style); assert.equal(matte.props.onLayout, onLayout);
+  assert.equal(matte.props.accessibilityLabel, 'Details'); assert.equal(matte.props.children, children);
+  assert.equal(all(matte, node => node.type === 'GlassSurface').length, 0);
 });
 
 test('surface changes keep the same navigator and dock action handlers', async () => {
@@ -158,7 +218,7 @@ test('native glass actions use fixed layout and noninteractive untinted material
     '../glass/GlassPanel': { GlassPanel: 'GlassPanel' },
     react: { ...React, useState: () => [bounds, update => { bounds = update(bounds); }] },
     '@expo/ui/swift-ui': Object.fromEntries(['Button', 'HStack', 'Host', 'RNHostView'].map(name => [name, name])),
-    '@expo/ui/swift-ui/modifiers': { ...Object.fromEntries(['accessibilityLabel', 'buttonStyle', 'contentShape', 'disabled', 'frame', 'glassEffect', 'onLongPressGesture'].map(name => [name, modifier(name)])), shapes: { roundedRectangle: value => ({ type: 'roundedRectangle', ...value }) } },
+    '@expo/ui/swift-ui/modifiers': { ...Object.fromEntries(['accessibilityAddTraits', 'accessibilityLabel', 'buttonStyle', 'contentShape', 'disabled', 'frame', 'glassEffect', 'onLongPressGesture'].map(name => [name, modifier(name)])), shapes: { roundedRectangle: value => ({ type: 'roundedRectangle', ...value }) } },
     '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ themeMode: 'dark' }) },
     '../glass/GlassSurface': { GlassSurface: 'GlassSurface' },
     '../../theme/actionColors': { ACTION_COLORS: { danger: '#A92F3A', success: '#16734B' } },
@@ -200,6 +260,64 @@ test('native glass actions use fixed layout and noninteractive untinted material
   assert.equal(orbContent.height, 64, 'the plus label fills the 64pt orb instead of keeping the default 36pt button height');
   assert.equal(orbContent.width, '100%');
   assert.equal(orbContent.alignItems, 'center'); assert.equal(orbContent.justifyContent, 'center');
+  const chosen = Native({ ...props, selected: true, children: [React.createElement('OriginalSolarIcon', { key: 'icon', color: '#FFFFFF' }), React.createElement('Text', { key: 'label', style: { color: '#FFFFFF' } }, 'Selected')] });
+  const chosenButton = all(chosen, node => node.type === 'Button')[0];
+  assert.deepEqual(Array.from(chosenButton.props.modifiers.find(item => item.name === 'accessibilityAddTraits').value), ['isSelected']);
+  assert.equal(nativeViews.StyleSheet.flatten(all(chosen, node => node.type === 'Text')[0].props.style).fontWeight, '600');
+  assert.equal(all(chosen, node => node.type === 'OriginalSolarIcon').length, 1);
+  assert.ok(all(chosen, () => true).every(node => {
+    const color = nativeViews.StyleSheet.flatten(node.props.style).backgroundColor;
+    return color === undefined || color === 'transparent';
+  }), 'selection has no painted wash over the clear material');
+});
+
+test('native calendar, menus and chips use untinted clear glass and retain selection actions', async () => {
+  let available = true;
+  const modules = {
+    '@expo/ui/swift-ui': Object.fromEntries(['Button', 'DatePicker', 'GlassEffectContainer', 'HStack', 'Host', 'Picker', 'RNHostView', 'ScrollView', 'Spacer', 'Text', 'Toggle', 'VStack'].map(name => [name, name])),
+    '@expo/ui/swift-ui/modifiers': Object.fromEntries(['accessibilityAddTraits', 'buttonBorderShape', 'buttonStyle', 'controlSize', 'datePickerStyle', 'disabled', 'labelsHidden', 'pickerStyle', 'scrollIndicators', 'tag', 'toggleStyle', 'glassEffect', 'lineLimit', 'padding', 'font'].map(name => [name, value => ({ name, value })])),
+    'expo-glass-effect': { GlassContainer: 'GlassContainer', isLiquidGlassAvailable: () => available },
+  };
+  const Radio = await component('src/components/common/AppleNativeControls.ios.tsx', modules, 'AppleRadioControl');
+  const Calendar = await component('src/components/common/AppleNativeControls.ios.tsx', modules, 'AppleGraphicalCalendar');
+  const assertClear = node => {
+    const effect = node.props.modifiers.find(item => item.name === 'glassEffect')?.value;
+    assert.equal(effect?.glass.variant, 'clear');
+    assert.equal(effect.glass.interactive, false); assert.equal(effect.glass.tint, undefined);
+  };
+  let today = 0, cleared = 0;
+  const calendar = Calendar({ selectedDate: '2026-11-25', onSelectDate() {}, onToday: () => today++, onClear: () => cleared++, isDark: true });
+  const calendarActions = all(calendar, node => node.type === 'Button');
+  assert.equal(calendarActions.length, 2);
+  for (const action of calendarActions) { assertClear(action); action.props.onPress(); }
+  assert.equal(today, 1); assert.equal(cleared, 1);
+
+  const selections = [];
+  const items = [{ value: 'a', label: 'Alpha', icon: React.createElement('OriginalSolarIcon') }, { value: 'b', label: 'Beta' }, { value: 'c', label: 'Gamma', disabled: true }];
+  const props = { items, value: 'a', onChange: (value, index) => selections.push([value, index]), isDark: true };
+  const menu = all(Radio({ ...props, menu: true }), node => node.type === 'Picker')[0];
+  assertClear(menu);
+  assert.equal(all(menu.props.label, node => node.type === 'OriginalSolarIcon').length, 1);
+  menu.props.onSelectionChange('b'); menu.props.onSelectionChange('c'); menu.props.onSelectionChange('missing');
+  assert.deepEqual(selections, [['b', 1]]);
+  const chips = all(Radio({ ...props, scrollable: true }), node => node.type === 'Button');
+  assert.equal(chips.length, 3);
+  for (const chip of chips) {
+    assertClear(chip);
+    assert.equal(chip.props.modifiers.find(item => item.name === 'buttonStyle').value, 'plain');
+  }
+  assert.equal(chips[0].props.modifiers.find(item => item.name === 'font').value.weight, 'semibold');
+  assert.deepEqual(Array.from(chips[0].props.modifiers.find(item => item.name === 'accessibilityAddTraits').value), ['isSelected']);
+  chips[1].props.onPress(); chips[2].props.onPress();
+  assert.deepEqual(selections, [['b', 1], ['b', 1]], 'disabled options cannot commit');
+  const segmented = all(Radio(props), node => node.type === 'Picker')[0];
+  assert.equal(segmented.props.modifiers.find(item => item.name === 'pickerStyle').value, 'segmented');
+  assert.equal(segmented.props.modifiers.some(item => item.name === 'glassEffect'), false, 'the system owns the sliding segmented material');
+  available = false;
+  const fallback = all(Radio({ ...props, scrollable: true }), node => node.type === 'Button');
+  assert.equal(fallback[0].props.modifiers.find(item => item.name === 'buttonStyle').value, 'borderedProminent');
+  assert.equal(fallback[1].props.modifiers.find(item => item.name === 'buttonStyle').value, 'bordered');
+  assert.ok(fallback.every(chip => chip.props.modifiers.every(item => item.name !== 'glassEffect')));
 });
 
 test('iOS Glass restores both screen-edge blurs with safe-area coverage and no tint', async () => {
@@ -427,7 +545,7 @@ test('expense form keeps its three cards, payment profiles and pinned save actio
   assert.equal(groups.length, 3, 'all form groups remain present');
   for (const group of groups) {
     const surface = group.type(group.props);
-    assert.equal(surface.type, 'View', 'native sheet groups do not add another glass layer');
+    assert.equal(surface.type, 'GlassPanel', 'native sheet groups share one clear panel with their fields');
     assert.equal(group.type({ ...group.props, nativeGlass: false }).type, 'GlassSurface', 'Matte retains its card structure');
   }
   const profiles = all(tree, node => node.type === 'JellyRadio' && node.props.items?.some(item => item.value === 'bank'))[0];
@@ -531,6 +649,7 @@ test('long dynamic Glass selections keep full labels while short fixed groups sl
     './ScrollEdgeFade': { HorizontalEdgeFade: 'EdgeFade', useHorizontalScrollEdges: () => ({}) },
     './DropdownSelect': { DropdownSelect: 'Dropdown' },
     './AppleSlidingSelector': { AppleSlidingSelector: 'SlidingSelector' },
+    '../glass/GlassSurface': { GlassSurface: 'GlassSurface' },
     '../../constants/buttonSizes': { COMPACT_BUTTON_HEIGHT: 36, COMPACT_BUTTON_HIT_SLOP: {} },
   };
   const Radio = await component('src/components/common/JellyRadio.tsx', modules, 'JellyRadio');
@@ -542,6 +661,10 @@ test('long dynamic Glass selections keep full labels while short fixed groups sl
   const chip = chips[1].type(chips[1].props);
   assert.equal(all(chip, node => node.type === 'Text')[0].props.children, name);
   assert.equal(nativeViews.StyleSheet.flatten(chip.props.style).width, undefined, 'chip width follows its label');
+  assert.equal(nativeViews.StyleSheet.flatten(chip.props.style).backgroundColor, 'transparent');
+  assert.equal(nativeViews.StyleSheet.flatten(chip.props.style).opacity, undefined, 'glass stays at full opacity');
+  assert.equal(all(chip, node => node.type === 'GlassSurface').length, 1);
+  assert.equal(chip.props.accessibilityRole, 'radio');
   chip.props.onPress(); assert.equal(selected, name);
   const periods = Radio({ items: ['All', 'Date', 'Month', 'Year'], value: 'All' });
   assert.equal(periods.type, 'SlidingSelector');

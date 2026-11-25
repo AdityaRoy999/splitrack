@@ -16,7 +16,7 @@ interface TripMemberPillProps {
 }
 
 export function TripMemberPill({ member, removalMode, canRemove, onRemove }: TripMemberPillProps) {
-  const { themeMode } = useLiquidGlass();
+  const { themeMode, isLiquidGlassEnabled } = useLiquidGlass();
   const isDark = themeMode === 'dark';
   const textColor = isDark ? '#FFFFFF' : '#09090B';
   const [progress] = useState(() => new Animated.Value(1));
@@ -53,7 +53,7 @@ export function TripMemberPill({ member, removalMode, canRemove, onRemove }: Tri
     <ItemActionReveal name={`${member.name} from trip`} onDelete={canRemove ? () => { void remove(); } : undefined} disabled={pending} buttons={false} compact borderRadius={999}>
     <Animated.View style={[
       styles.pill,
-      { backgroundColor: isDark ? '#18181D' : '#EFEFF4', opacity: progress,
+      { backgroundColor: Platform.OS === 'ios' && isLiquidGlassEnabled ? 'transparent' : isDark ? '#18181D' : '#EFEFF4', opacity: progress,
         transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] },
     ]}>
       <UserAvatar avatarUri={member.avatar} name={member.name} size={20} borderRadius={10} isDark={isDark} />

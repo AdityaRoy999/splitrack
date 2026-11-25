@@ -118,10 +118,10 @@ const ProfileFormContent: React.FC<FormContentProps> = ({ editingAccount, onClos
     ? (Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
     : (isDark ? '#121216' : '#FFFFFF');
   const inputBg = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
+    ? (Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
     : (isDark ? '#1B1B20' : '#F2F3F7');
   const chipBg = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.04)')
+    ? (Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.04)')
     : (isDark ? '#1C1C22' : '#EFEFF4');
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';

@@ -45,6 +45,7 @@ async function harness(glass, width = 375, os = 'ios') {
     ...base, '../../utils/haptics': { triggerSelection() {} },
     './ScrollEdgeFade': { HorizontalEdgeFade: 'EdgeFade', useHorizontalScrollEdges: () => ({}) },
     './DropdownSelect': { DropdownSelect: 'DropdownSelect' }, './AppleSlidingSelector': { AppleSlidingSelector: 'AppleSlidingSelector' },
+    '../glass/GlassSurface': { GlassSurface: 'GlassSurface' },
     '../../constants/buttonSizes': { COMPACT_BUTTON_HEIGHT: 36, COMPACT_BUTTON_HIT_SLOP: {} },
   }, 'JellyRadio');
   const shared = value => ({ get: () => value, set() {} });

@@ -28,6 +28,8 @@ import {
   glassEffect,
   lineLimit,
   padding,
+  font,
+  accessibilityAddTraits,
 } from '@expo/ui/swift-ui/modifiers';
 import { GlassContainer, isLiquidGlassAvailable } from 'expo-glass-effect';
 
@@ -112,14 +114,14 @@ export const AppleGraphicalCalendar: React.FC<AppleGraphicalCalendarProps> = ({
       <Button
         label="Today"
         onPress={onToday}
-        modifiers={[buttonStyle('plain'), padding({ horizontal: 16, vertical: 10 }), glassEffect({ glass: { variant: 'regular', interactive: false }, shape: 'capsule' })]}
+        modifiers={[buttonStyle('plain'), padding({ horizontal: 16, vertical: 10 }), glassEffect({ glass: { variant: 'clear', interactive: false }, shape: 'capsule' })]}
       />
       <Spacer />
       {allowClear && onClear ? (
         <Button
           label="All Dates"
           onPress={onClear}
-          modifiers={[buttonStyle('plain'), padding({ horizontal: 16, vertical: 10 }), glassEffect({ glass: { variant: 'regular', interactive: false }, shape: 'capsule' })]}
+          modifiers={[buttonStyle('plain'), padding({ horizontal: 16, vertical: 10 }), glassEffect({ glass: { variant: 'clear', interactive: false }, shape: 'capsule' })]}
         />
       ) : null}
     </HStack>
@@ -172,7 +174,7 @@ export const AppleRadioControl: React.FC<AppleRadioControlProps> = ({
       const index = items.findIndex(item => item.value === String(selected));
       if (!disabled && index >= 0 && !items[index].disabled) onChange(items[index].value, index);
     }} modifiers={[pickerStyle('menu'), buttonStyle('plain'), padding({ horizontal: 12, vertical: 8 }),
-      glassEffect({ glass: { variant: 'regular', interactive: false }, shape: 'capsule' }),
+      glassEffect({ glass: { variant: 'clear', interactive: false }, shape: 'capsule' }),
       ...(disabled ? [disabledModifier(true)] : [])]}>
       {items.map(item => <HStack key={item.value} modifiers={[tag(item.value), ...(item.disabled ? [disabledModifier(true)] : [])]}>{optionLabel(item)}</HStack>)}
     </Picker>
@@ -225,9 +227,7 @@ export const AppleRadioControl: React.FC<AppleRadioControlProps> = ({
   const renderChipButton = (item: AppleRadioOption, idx: number) => {
     const isSelected = item.value === value;
     const isDisabled = disabled || Boolean(item.disabled);
-    const btnStyle = isSelected
-      ? buttonStyle(hasGlass ? 'glassProminent' : 'borderedProminent')
-      : buttonStyle(hasGlass ? 'glass' : 'bordered');
+    const btnStyle = buttonStyle(hasGlass ? 'plain' : isSelected ? 'borderedProminent' : 'bordered');
 
     return (
       <Button
@@ -240,6 +240,9 @@ export const AppleRadioControl: React.FC<AppleRadioControlProps> = ({
           btnStyle,
           buttonBorderShape('capsule'),
           controlSize(ctrlSize),
+          ...(hasGlass ? [padding({ horizontal: 12, vertical: 8 }), glassEffect({ glass: { variant: 'clear', interactive: false }, shape: 'capsule' })] : []),
+          font({ weight: isSelected ? 'semibold' : 'regular' }),
+          ...(isSelected ? [accessibilityAddTraits(['isSelected'])] : []),
           ...(isDisabled ? [disabledModifier(true)] : []),
         ]}
       />

@@ -92,7 +92,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
     ? (Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
     : (isDark ? '#141418' : '#FFFFFF');
   const inputBg = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
+    ? (Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
     : (isDark ? '#1D1D22' : '#EFEFF4');
   const textColor = isDark ? '#FFFFFF' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';

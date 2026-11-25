@@ -95,7 +95,7 @@ export const SettleModal: React.FC<SettleModalProps> = ({
   const cardSurface = nativeGlass ? 'transparent' : isDark ? '#111114' : '#EDEDF1';
   const textColor = isDark ? '#F4F4F5' : '#09090B';
   const mutedText = isDark ? '#8E8E93' : '#71717A';
-  const pillSurface = isDark ? '#1C1C22' : '#E5E5EA';
+  const pillSurface = nativeGlass ? 'transparent' : isDark ? '#1C1C22' : '#E5E5EA';
   const dividerColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.07)';
 
   const renderDebtGroup = (

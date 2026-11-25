@@ -68,12 +68,11 @@ interface AddExpenseModalProps {
   embedded?: boolean;
 }
 
-// The native sheet already supplies the material. Keep its form groups quiet
-// so fields and participant rows do not stack several glass layers together.
+// Form groups share a single clear surface with their fields and rows.
 function ExpenseSection({ children, nativeGlass, isDark }: {
   children: React.ReactNode; nativeGlass: boolean; isDark: boolean;
 }) {
-  if (nativeGlass) return <View style={[styles.sectionCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.03)' }]}>{children}</View>;
+  if (nativeGlass) return <GlassPanel style={styles.sectionCard}>{children}</GlassPanel>;
   return <GlassSurface borderRadius={22} matteColor={isDark ? '#121216' : '#FFFFFF'} style={styles.sectionCard}>{children}</GlassSurface>;
 }
 
@@ -581,10 +580,10 @@ export const AddExpenseModal = memo(function AddExpenseModal({
     ? (Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)')
     : (isDark ? '#121216' : '#FFFFFF');
   const inputBg = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
+    ? (Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)')
     : (isDark ? '#1B1B20' : '#F2F3F7');
   const chipBg = isLiquidGlassEnabled
-    ? (isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.04)')
+    ? (Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.04)')
     : (isDark ? '#1C1C22' : '#EFEFF4');
   const activeBg = isDark ? '#F4F4F5' : '#18181B';
   const activeText = isDark ? '#18181B' : '#FFFFFF';
@@ -1205,7 +1204,7 @@ export const AddExpenseModal = memo(function AddExpenseModal({
                           style={[
                             styles.payerSearchItem,
                             {
-                              backgroundColor: isSelected ? (isDark ? '#272732' : '#E4E4EC') : 'transparent',
+                              backgroundColor: isSelected && !nativeGlass ? (isDark ? '#272732' : '#E4E4EC') : 'transparent',
                               borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
                             },
                           ]}

@@ -38,7 +38,7 @@ export function GlassSurface({ children, backdrop, style, borderRadius = 24,
     {isLiquidGlassEnabled ? available
       ? <GlassView pointerEvents="none" glassEffectStyle="clear" isInteractive={false}
           colorScheme={themeMode} style={[StyleSheet.absoluteFill, corners]} />
-      : <BlurView pointerEvents="none" tint="systemMaterial" intensity={60} style={[StyleSheet.absoluteFill, corners]} />
+      : <BlurView pointerEvents="none" tint={themeMode === 'dark' ? 'systemUltraThinMaterialDark' : 'systemUltraThinMaterialLight'} intensity={30} style={[StyleSheet.absoluteFill, corners]} />
       : null}
     <BackdropSurfaceContext.Provider value={isLiquidGlassEnabled ? 'transparent' : matte}>{children}</BackdropSurfaceContext.Provider>
   </View>;

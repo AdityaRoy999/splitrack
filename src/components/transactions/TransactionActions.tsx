@@ -47,8 +47,10 @@ export function TransactionActionsProvider({ children }: { children: React.React
   const [editRequested, setEditRequested] = useState(false);
   const [editDate, setEditDate] = useState('');
   const dark = themeMode === 'dark';
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
   const color = dark ? '#F4F4F5' : '#18181B';
-  const surface = dark ? '#111114' : '#EDEDF1';
+  const surface = nativeGlass ? 'transparent' : dark ? '#111114' : '#EDEDF1';
+  const inputSurface = nativeGlass ? 'transparent' : dark ? '#1C1C22' : '#DADAE0';
   const owner = useCallback((tx: Transaction) => !tx.id.startsWith('offline-') && (tx.type === 'expense' ? tx.paidBy === 'user' : tx.creatorId === user?.uid), [user?.uid]);
   const current = detail && (detail.id.startsWith('offline-')
     ? transactions.find(tx => tx.id === detail.id) || transactions.find(tx => (tx as Transaction & { clientRequestId?: string }).clientRequestId === detail.id.slice('offline-'.length))
@@ -139,7 +141,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
         <ScrollEdgeFade>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {current ? <GlassPanel style={[styles.summaryCard, { backgroundColor: surface }]}>
-              <View style={styles.summaryHeading}><View style={[styles.summaryIcon, { backgroundColor: dark ? '#1C1C22' : '#DADAE0' }]}>
+              <View style={styles.summaryHeading}><View style={[styles.summaryIcon, { backgroundColor: inputSurface }]}>
                 {confirmDelete ? <TrashBinTrashIcon size={20} color="#E5484D" /> : <BillListIcon size={20} color={color} />}
               </View><View style={{ flex: 1 }}><Text numberOfLines={2} style={[styles.recordTitle, { color }]}>{current.title}</Text><Text style={[styles.caption, { color: dark ? '#8E8E93' : '#71717A' }]}>{current.date} · {current.type === 'settlement' ? 'Payment' : current.category}</Text></View></View>
               <Text style={[styles.summaryAmount, { color }]}>{formatAmount(Math.abs(current.amount))}</Text>
@@ -156,7 +158,7 @@ export function TransactionActionsProvider({ children }: { children: React.React
                   {vector.balances.map((balance, index) => <Text key={index} style={[styles.body, { color }]}>{balance.creditorId === 'user' ? 'Owes you' : balance.debtorId === 'user' ? 'You owe' : 'Outstanding'} {formatAmount(balance.amount)}</Text>)}
                   {current.paidBy === 'user' && vector.balances.some(balance => balance.creditorId === 'user') ? <>
                     <Text style={[styles.sectionLabel, { color: dark ? '#8E8E93' : '#71717A' }]}>AMOUNT RECEIVED</Text>
-                    <TextInput accessibilityLabel="Amount received" keyboardType="decimal-pad" value={amounts[vector.memberId] ?? String(vector.remainingAmount)} onChangeText={value => setAmounts(old => ({ ...old, [vector.memberId]: value }))} style={[styles.input, { color, backgroundColor: dark ? '#1C1C22' : '#DADAE0' }]} />
+                    <TextInput accessibilityLabel="Amount received" keyboardType="decimal-pad" value={amounts[vector.memberId] ?? String(vector.remainingAmount)} onChangeText={value => setAmounts(old => ({ ...old, [vector.memberId]: value }))} style={[styles.input, { color, backgroundColor: inputSurface }]} />
                     <GlassPill label="Mark member settled" size="lg" variant="dark" disabled={pending} onPress={() => {
                       const amount = Number(amounts[vector.memberId] ?? vector.remainingAmount);
                       void runWithIntent({ id: current.id, memberId: vector.memberId, amount }, async (draft, intent) => {
@@ -170,11 +172,11 @@ export function TransactionActionsProvider({ children }: { children: React.React
               {owner(current) ? <>
                 {current.type !== 'expense' && editRequested ? <GlassPanel style={[styles.sectionCard, { backgroundColor: surface }]}>
                   <Text style={[styles.sectionLabel, { color: dark ? '#8E8E93' : '#71717A' }]}>DESCRIPTION</Text>
-                  <TextInput accessibilityLabel="Transaction title" value={editTitle} onChangeText={setEditTitle} style={[styles.input, { color, backgroundColor: dark ? '#1C1C22' : '#DADAE0' }]} />
+                  <TextInput accessibilityLabel="Transaction title" value={editTitle} onChangeText={setEditTitle} style={[styles.input, { color, backgroundColor: inputSurface }]} />
                   <Text style={[styles.sectionLabel, { color: dark ? '#8E8E93' : '#71717A' }]}>AMOUNT</Text>
-                  <TextInput accessibilityLabel="Transaction amount" keyboardType="decimal-pad" value={editAmount} onChangeText={setEditAmount} style={[styles.input, { color, backgroundColor: dark ? '#1C1C22' : '#DADAE0' }]} />
+                  <TextInput accessibilityLabel="Transaction amount" keyboardType="decimal-pad" value={editAmount} onChangeText={setEditAmount} style={[styles.input, { color, backgroundColor: inputSurface }]} />
                   <Text style={[styles.sectionLabel, { color: dark ? '#8E8E93' : '#71717A' }]}>DATE</Text>
-                  <TextInput accessibilityLabel="Transaction date YYYY-MM-DD" value={editDate} onChangeText={setEditDate} style={[styles.input, { color, backgroundColor: dark ? '#1C1C22' : '#DADAE0' }]} />
+                  <TextInput accessibilityLabel="Transaction date YYYY-MM-DD" value={editDate} onChangeText={setEditDate} style={[styles.input, { color, backgroundColor: inputSurface }]} />
                   <GlassPill label={pending ? 'Saving…' : 'Save changes'} size="lg" variant="dark" disabled={pending} onPress={() => {
                     void runWithIntent({ id: current.id, title: editTitle.trim(), amount: Number(editAmount), date: editDate }, async (draft, intent) => {
                       if (!draft.title || !Number.isFinite(draft.amount) || draft.amount <= 0) throw new Error('Enter a description and positive amount.');

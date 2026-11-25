@@ -133,7 +133,7 @@ export const HeroBalanceCard: React.FC<HeroBalanceCardProps> = ({
                 styles.currencyPill,
                 {
                   backgroundColor: isLiquidGlassEnabled
-                    ? isDark
+                    ? Platform.OS === 'ios' ? 'transparent' : isDark
                       ? 'rgba(255, 255, 255, 0.16)'
                       : 'rgba(255, 255, 255, 0.56)'
                     : isDark
