@@ -1,6 +1,6 @@
 import { GlassPressable as Pressable } from '../common/GlassTouchable';
 import { ACTION_COLORS } from '../../theme/actionColors';
-import React, { useCallback, useContext, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Animated, { Extrapolation, interpolate, interpolateColor, ReduceMotion, useAnimatedReaction, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
@@ -8,7 +8,6 @@ import { Pen2Icon } from '@solar-icons/react-native/bold/pen-2';
 import { TrashBinTrashIcon } from '@solar-icons/react-native/bold/trash-bin-trash';
 import type { Transaction } from '../../types';
 import { useLiquidGlass } from '../../theme/LiquidGlassContext';
-import { BackdropSurfaceContext } from '../common/BackdropSurfaceContext';
 import { COMPACT_BUTTON_HEIGHT, COMPACT_BUTTON_HIT_SLOP } from '../../constants/buttonSizes';
 import { useTransactionActions } from './TransactionActions';
 
@@ -50,20 +49,23 @@ function SwipeActions({ progress, translation, rowProgress, side, dark, transact
 }
 
 // The installed gesture library animates and tracks the row on the UI thread.
-export function TransactionSwipeRow({ transaction, children }: { transaction: Transaction; children: React.ReactNode }) {
+export function TransactionSwipeRow({ transaction, children, borderRadius = 16 }: { transaction: Transaction; children: React.ReactNode; borderRadius?: number }) {
   const actions = useTransactionActions();
   const { themeMode, transactionActionStyle, isLiquidGlassEnabled } = useLiquidGlass();
-  const surface = useContext(BackdropSurfaceContext);
   const swipeable = useRef<SwipeableMethods>(null);
   const pendingAction = useRef<(() => void) | null>(null);
   const rowProgress = useSharedValue(0);
   const dark = themeMode === 'dark';
-  const baseSurface = Platform.OS === 'ios' && isLiquidGlassEnabled ? 'transparent' : surface ?? (dark ? '#17171C' : '#FFFFFF');
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassEnabled;
+  const revealedSurface = dark ? '#29292E' : '#E5E5EA';
   const cardMotion = useAnimatedStyle(() => {
     const reveal = interpolate(Math.abs(rowProgress.get()), [0, 0.35], [0, 1], Extrapolation.CLAMP);
     // Padding changes re-layout every text and icon on Android during a drag.
-    // Keep the row geometry fixed; its translation, corner and color reveal stay.
-    return { borderRadius: 16 * reveal, backgroundColor: interpolateColor(reveal, [0, 1], [baseSurface, dark ? '#29292E' : '#E5E5EA']) };
+    // The hit area never paints over a glass card or clips its rounded corners.
+    return {
+      borderRadius,
+      backgroundColor: nativeGlass || reveal === 0 ? 'transparent' : interpolateColor(reveal, [0, 1], ['transparent', revealedSurface]),
+    };
   });
   // Add breathing room at the revealed end without re-laying out text during
   // the gesture. Normal list alignment returns when the row closes.
@@ -119,13 +121,13 @@ export function TransactionSwipeRow({ transaction, children }: { transaction: Tr
     renderLeftActions={renderLeftActions} renderRightActions={renderRightActions}
     onSwipeableOpenStartDrag={closeOtherRow} onSwipeableWillOpen={closeOtherRow}
     onSwipeableClose={finishClose}
-    containerStyle={styles.row}>
+    containerStyle={[styles.row, { borderRadius }]}>
     <Animated.View style={[styles.card, cardMotion]}><Animated.View style={contentMotion}>{children}</Animated.View></Animated.View>
   </ReanimatedSwipeable>;
 }
 
 const styles = StyleSheet.create({
-  row: { borderWidth: 0 },
+  row: { borderWidth: 0, backgroundColor: 'transparent' },
   card: { overflow: 'hidden', borderWidth: 0 },
   actionViewport: { width: ACTION_WIDTH, justifyContent: 'center' },
   actions: { width: ACTION_WIDTH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 4 },

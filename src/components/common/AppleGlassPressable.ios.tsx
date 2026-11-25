@@ -59,7 +59,7 @@ export function AppleGlassPressable({ children, onPress, onLongPress, disabled =
         ...(onLongPress ? [onLongPressGesture(() => { if (!disabled) onLongPress(); }, 0.35)] : []),
       ]}>
         <HStack modifiers={[frame({ width: bounds.width, height: bounds.height }),
-          glassEffect({ glass: { variant: 'regular', interactive: false }, shape: radius >= 100 ? 'capsule' : 'roundedRectangle', cornerRadius: radius }),
+          glassEffect({ glass: { variant: 'clear', interactive: false }, shape: radius >= 100 ? 'capsule' : 'roundedRectangle', cornerRadius: radius }),
           contentShape(shapes.roundedRectangle({ cornerRadius: radius }))]}>{null}</HStack>
       </Button>
     </Host> : null}

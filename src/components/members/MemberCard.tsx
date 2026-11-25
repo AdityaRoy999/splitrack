@@ -60,7 +60,7 @@ export const MemberCard: React.FC<MemberCardProps> = ({
   );
 
   return (
-    <ItemActionReveal name={friend.name} onEdit={onEdit} buttons={false} style={styles.cardWrap}>
+    <ItemActionReveal name={friend.name} onEdit={onEdit} buttons={false} borderRadius={24} style={styles.cardWrap}>
       <SpotlightCard
         onPress={onPress}
         coverImageUri={isPhotoUri(friend.avatar) ? friend.avatar : undefined}

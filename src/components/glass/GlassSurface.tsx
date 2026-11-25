@@ -34,6 +34,7 @@ interface GlassSurfaceProps {
   matteColor?: string;
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
+  backdrop?: React.ReactNode;
 }
 
 /**
@@ -57,6 +58,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
   matteColor,
   style,
   children,
+  backdrop,
 }) => {
   const { isLiquidGlassEnabled, themeMode } = useLiquidGlass();
   const modal = useModalVisual();
@@ -82,6 +84,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
           style,
         ]}
       >
+        {backdrop}
         <BackdropSurfaceContext.Provider value={resolvedMatte}>{children}</BackdropSurfaceContext.Provider>
       </View>
     );
@@ -162,6 +165,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
         style={[StyleSheet.absoluteFill, cornerRadii]}
       />
 
+      {backdrop}
       <BackdropSurfaceContext.Provider value={resolvedMatte}>{children}</BackdropSurfaceContext.Provider>
     </View>
   );

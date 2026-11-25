@@ -36,18 +36,23 @@ test('native material ignores custom tints and painted backing in cards and shee
     '../../theme/LiquidGlassContext': { useLiquidGlass: () => mode },
     '../common/BackdropSurfaceContext': { BackdropSurfaceContext: React.createContext(null) },
   }, 'GlassSurface');
-  const props = { interactive: true, tintColor: 'rgba(18,18,24,0.88)', style: { backgroundColor: '#17171C' }, matteColor: '#111114', children: 'rows' };
+  const props = { interactive: true, tintColor: 'rgba(18,18,24,0.88)', style: { backgroundColor: '#17171C', borderRadius: 22, borderTopLeftRadius: 10 }, matteColor: '#111114', children: 'rows', backdrop: React.createElement('CardGradient') };
   const card = Surface(props);
   assert.equal(nativeViews.StyleSheet.flatten(card.props.style).backgroundColor, 'transparent');
   const glass = all(card, node => node.type === 'GlassView')[0];
   assert.equal(glass.props.tintColor, undefined);
-  assert.equal(glass.props.glassEffectStyle, 'regular');
+  assert.equal(glass.props.glassEffectStyle, 'clear');
+  assert.equal(nativeViews.StyleSheet.flatten(glass.props.style).borderRadius, 22, 'native glass follows the visible card corners');
+  assert.equal(nativeViews.StyleSheet.flatten(glass.props.style).borderTopLeftRadius, 10);
+  assert.equal(nativeViews.StyleSheet.flatten(card.props.style).borderRadius, 22);
+  assert.deepEqual(React.Children.toArray(card.props.children).slice(0, 2).map(child => child.type), ['CardGradient', 'GlassView'], 'the restored gradient sits behind clear native glass');
   assert.equal(glass.props.isInteractive, false, 'surface buttons do not stretch or merge on press');
   assert.equal(all(card, node => node.props.value === 'transparent').length, 1, 'rows inherit transparent backing');
   mode.isLiquidGlassEnabled = false;
   const matte = Surface(props);
   assert.equal(all(matte, node => node.type === 'GlassView').length, 0);
   assert.equal(nativeViews.StyleSheet.flatten(matte.props.style).backgroundColor, '#111114');
+  assert.equal(all(matte, node => node.type === 'CardGradient').length, 1);
 });
 
 test('settled iOS Quick Send photos render outside SVG ForeignObject and still open the friend', async () => {
@@ -169,6 +174,7 @@ test('native glass actions use fixed layout and noninteractive untinted material
   const frame = all(tree, node => node.type === 'HStack')[0].props.modifiers;
   assert.equal(frame[0].value.width, 358); assert.equal(frame[0].value.height, 48);
   assert.equal(frame[1].value.glass.interactive, false);
+  assert.equal(frame[1].value.glass.variant, 'clear');
   assert.equal(frame[1].value.glass.tint, undefined);
   assert.equal(frame[2].name, 'contentShape', 'the full material area receives presses');
   assert.equal(all(tree, node => node.type === 'Text').length, 1, 'the label mounts exactly once');
@@ -301,6 +307,79 @@ test('Glass swipe Edit runs immediately even when the swipe close callback does 
   tree.props.renderLeftActions(shared(), shared()).props.requestAction('edit');
   assert.equal(closeCount, 1); assert.equal(editCount, 1);
   tree.props.onSwipeableClose(); assert.equal(editCount, 1, 'late close must not open a second editor');
+});
+
+test('transaction hit areas stay transparent and retain card corners when closed or swiped', async () => {
+  const mode = { isLiquidGlassEnabled: true, themeMode: 'dark', transactionActionStyle: 'swipe' };
+  const platform = { OS: 'ios' };
+  let drag = 0;
+  const Row = await component('src/components/transactions/TransactionSwipeRow.tsx', {
+    react: { ...React, useRef: initial => ({ current: initial }), useCallback: callback => callback, useEffect() {} },
+    'react-native': { ...nativeViews, Platform: platform },
+    '../common/GlassTouchable': { GlassPressable: 'GlassPressable' },
+    '../../theme/actionColors': { ACTION_COLORS: { danger: '#A92F3A' } },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => mode },
+    '../../constants/buttonSizes': { COMPACT_BUTTON_HEIGHT: 36, COMPACT_BUTTON_HIT_SLOP: {} },
+    './TransactionActions': { useTransactionActions: () => ({ canManage: () => true }) },
+    'react-native-gesture-handler/ReanimatedSwipeable': { default: 'Swipeable' },
+    'react-native-reanimated': { default: { View: 'AnimatedView' }, ReduceMotion: {}, Extrapolation: { CLAMP: 'clamp' },
+      useSharedValue: () => ({ get: () => drag, set() {} }), useAnimatedStyle: callback => callback(),
+      interpolate: value => Math.max(0, Math.min(1, value / 0.35)), interpolateColor: (_value, _range, colors) => colors[1] },
+    '@solar-icons/react-native/bold/pen-2': { Pen2Icon: 'Pen2Icon' },
+    '@solar-icons/react-native/bold/trash-bin-trash': { TrashBinTrashIcon: 'TrashBinTrashIcon' },
+  }, 'TransactionSwipeRow');
+  for (const os of ['ios', 'android']) for (const glass of [true, false]) for (const dark of [true, false]) for (const translation of [0, 0.001, 1, -1]) {
+    platform.OS = os; mode.isLiquidGlassEnabled = glass; mode.themeMode = dark ? 'dark' : 'light'; drag = translation;
+    const tree = Row({ transaction: { id: 'test', title: 'Test' }, borderRadius: 22, children: React.createElement('RoundedCard') });
+    const container = nativeViews.StyleSheet.flatten(tree.props.containerStyle);
+    const hitArea = nativeViews.StyleSheet.flatten(tree.props.children.props.style);
+    assert.equal(container.backgroundColor, 'transparent');
+    assert.equal(container.borderRadius, 22); assert.equal(hitArea.borderRadius, 22);
+    assert.equal(hitArea.overflow, 'hidden');
+    if (!translation || os === 'ios' && glass) assert.equal(hitArea.backgroundColor, 'transparent', 'closed rows and every Glass swipe must not paint a rectangle behind the card');
+    else assert.equal(hitArea.backgroundColor, dark ? '#29292E' : '#E5E5EA', 'revealed Matte actions keep their existing color');
+  }
+});
+
+test('balance and payment cards keep their Aurora backdrop in Liquid Glass mode', async () => {
+  class Value { interpolate() { return 0; } }
+  const hooks = { ...React, useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}], useEffect() {} };
+  const shared = {
+    react: { ...hooks, useMemo: callback => callback() },
+    'react-native': { ...nativeViews, Platform: { OS: 'ios' }, Animated: { Value, View: 'AnimatedView' }, TouchableOpacity: 'TouchableOpacity' },
+    '../../theme/LiquidGlassContext': { useLiquidGlass: () => ({ isLiquidGlassEnabled: true, themeMode: 'dark', currency: 'INR', formatAmount: String }) },
+    '../../store/SplitTrackStore': { useSplitTrack: () => ({ accounts: [{ id: 'bank', balance: 12 }], selectedAccountId: 'bank', totalBalance: 12, monthlyExpenses: 2, netFriendBalance: 0 }) },
+    '../../utils/haptics': { ImpactStyle: {}, NotificationType: {}, triggerImpact() {}, triggerNotification() {} },
+    '../../hooks/useAsyncAction': { useAsyncAction: () => ({}), FormError: 'FormError' },
+    '../effects/Aurora': { Aurora: 'Aurora' }, '../glass/GlassSurface': { GlassSurface: 'GlassSurface' },
+    '../glass/GlassPanel': { GlassPanel: 'GlassPanel' }, '../glass/GlassPill': { GlassPill: 'GlassPill' },
+    '../common/MotionPrimitives': { AnimatedPressable: 'AnimatedPressable' },
+    '../common/GlassTouchable': { GlassPressable: 'Pressable' },
+    '../common/ItemActionReveal': { ItemActionReveal: 'ItemActionReveal' },
+    '../common/BrandEmblemIcon': { BrandEmblemIcon: 'BrandEmblemIcon' },
+    '../../theme/colors': { currencies: { INR: { symbol: '₹' } } },
+    '../../theme/actionColors': { ACTION_COLORS: {} },
+    '../../constants/buttonSizes': {}, './AddUpiProfileModal': {}, './UpiQrModal': {},
+    '../common/SheetModal': {}, '../common/GlassModalSheet': {}, '../common/ModalBackdrop': {},
+    '../common/SheetHeader': {}, '../common/ScrollEdgeFade': {}, '../../../assets/card-chip.png': 'CardChipImage',
+  };
+  for (const name of ['eye', 'eye-closed', 'add-circle', 'check-circle', 'users-group-rounded', 'copy', 'qr-code', 'pen-2', 'trash-bin-trash', 'alt-arrow-down', 'alt-arrow-up', 'card', 'wallet']) {
+    shared[`@solar-icons/react-native/bold/${name}`] = new Proxy({}, { get: () => 'OriginalIcon' });
+  }
+  for (const [path, exported] of [['src/components/home/HeroBalanceCard.tsx', 'HeroBalanceCard'], ['src/components/cards/StackedCardDeck.tsx', 'StackedCardDeck']]) {
+    const Card = await component(path, shared, exported);
+    const surface = all(Card({}), node => node.type === 'GlassSurface')[0];
+    assert.equal(surface.props.backdrop.type, 'Aurora');
+    assert.equal(surface.props.backdrop.props.style.borderRadius, 24);
+    assert.ok(surface.props.backdrop.props.opacity > 0);
+  }
+  const ProfileCard = await component('src/components/upi/UpiProfilesSection.tsx', shared, 'ProfileDeckCard', '\nmodule.exports.ProfileDeckCard = ProfileDeckCard;');
+  const profile = ProfileCard({ acc: { id: 'bank', kind: 'debit', provider: 'bank', title: 'Bank' }, mapIndex: 0, rank: 0, totalCount: 1,
+    isDefault: true, isExpanded: false, isDark: true, formatAmount: String });
+  const profileSurface = all(profile, node => node.type === 'GlassSurface')[0];
+  assert.equal(profileSurface.props.backdrop.type, 'Aurora');
+  assert.equal(profileSurface.props.backdrop.props.paused, false);
+  assert.ok(profileSurface.props.backdrop.props.opacity > 0);
 });
 
 test('sheet viewport uses native keyboard progress and a single avoidance owner', async () => {

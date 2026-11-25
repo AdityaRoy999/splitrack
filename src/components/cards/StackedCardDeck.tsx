@@ -134,7 +134,7 @@ export const StackedCardDeck: React.FC<{
               ]}
             >
               <TouchableOpacity
-                activeOpacity={0.9}
+                activeOpacity={Platform.OS === 'ios' && isLiquidGlassEnabled ? 1 : 0.9}
                 onPress={() => {
                   if (!isExpanded) {
                     toggleExpand();
@@ -149,8 +149,7 @@ export const StackedCardDeck: React.FC<{
                   glassStyle="regular"
                   matteColor="#111114"
                   style={styles.cardGradient}
-                >
-                  {Platform.OS === 'ios' && isLiquidGlassEnabled ? null : <Aurora
+                  backdrop={<Aurora
                     colorStops={auroraStops}
                     amplitude={1.05}
                     blend={0.55}
@@ -164,6 +163,7 @@ export const StackedCardDeck: React.FC<{
                     lightMode={false}
                     style={{ borderRadius: 24 }}
                   />}
+                >
                   <View style={styles.cardInner}>
                   {/* Top Row: Cardholder & VISA */}
                   <View style={styles.cardTopRow}>

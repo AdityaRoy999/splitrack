@@ -583,7 +583,7 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({
                 .join(' • ');
 
               return (
-                <TransactionSwipeRow key={tx.id} transaction={tx}><AnimatedPressable
+                <TransactionSwipeRow key={tx.id} transaction={tx} borderRadius={22}><AnimatedPressable
                   key={tx.id}
                   scaleTo={0.98}
                   onPress={() => actions.open(tx)}

@@ -79,7 +79,7 @@ export function ItemActionReveal({ children, name, onEdit, onDelete, disabled = 
     dragOffsetFromLeft={10} dragOffsetFromRight={-10} animationOptions={SPRING}
     renderLeftActions={(progress, translation) => renderActions(progress, translation, 'left')}
     renderRightActions={(progress, translation) => renderActions(progress, translation, 'right')}
-    onSwipeableOpenStartDrag={open} onSwipeableWillOpen={open} onSwipeableClose={finishClose} containerStyle={{ borderRadius, borderWidth: 0 }}>
+    onSwipeableOpenStartDrag={open} onSwipeableWillOpen={open} onSwipeableClose={finishClose} containerStyle={{ borderRadius, borderWidth: 0, backgroundColor: 'transparent' }}>
     {children}
   </ReanimatedSwipeable></View>;
 }

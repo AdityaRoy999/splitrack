@@ -19,6 +19,7 @@ interface GlassSurfaceProps {
   matteColor?: string;
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
+  backdrop?: React.ReactNode;
 }
 
 // Keep Android's existing tint, corner geometry, and sheen without loading
@@ -35,6 +36,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
   matteColor,
   style,
   children,
+  backdrop,
 }) => {
   const { isLiquidGlassEnabled, themeMode } = useLiquidGlass();
   const modal = useModalVisual();
@@ -51,6 +53,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
 
   if (!isLiquidGlassEnabled || modal) {
     return <View style={[styles.surfaceContainer, cornerRadii, { backgroundColor: resolvedMatte }, style]}>
+      {backdrop}
       <BackdropSurfaceContext.Provider value={resolvedMatte}>{children}</BackdropSurfaceContext.Provider>
     </View>;
   }
@@ -73,6 +76,7 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
       start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }}
       style={[StyleSheet.absoluteFill, cornerRadii]}
     />
+    {backdrop}
     <BackdropSurfaceContext.Provider value={resolvedMatte}>{children}</BackdropSurfaceContext.Provider>
   </View>;
 };

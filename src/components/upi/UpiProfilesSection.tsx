@@ -135,7 +135,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const { transactionActionStyle, isLiquidGlassEnabled } = useLiquidGlass();
+  const { transactionActionStyle } = useLiquidGlass();
   const targetTop = isExpanded ? rank * (CARD_HEIGHT + EXPAND_GAP) : rank * STACK_PEEK;
   const targetScale = isExpanded ? 1 : Math.max(0.82, 1 - rank * 0.035);
   const targetFooterOpacity = isExpanded || rank === 0 ? 1 : 0;
@@ -188,8 +188,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
         intensity={isDark ? 82 : 92}
         matteColor={cardBaseBg}
         style={styles.upiCardGradient}
-      >
-        {Platform.OS === 'ios' && isLiquidGlassEnabled ? null : <Aurora
+        backdrop={<Aurora
           colorStops={auroraStops}
           amplitude={0.88}
           blend={0.5}
@@ -203,6 +202,7 @@ const ProfileDeckCard: React.FC<ProfileDeckCardProps> = ({
           lightMode={!isDark}
           style={{ borderRadius: 24 }}
         />}
+      >
 
         {/* Full-card tap layer (expands stack or collapses default card) */}
         <Pressable
